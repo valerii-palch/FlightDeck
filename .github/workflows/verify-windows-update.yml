@@ -29,14 +29,15 @@ jobs:
           $updateSource = Get-Content updates.cjs -Raw
           ($env:FD_PATCH + "`n" + $updateSource.Replace("send('failed'));", "{ logUpdate(error); send('failed'); });").Replace("on('error', () =>", "on('error', error =>").Replace("} catch { send('failed'); }", "} catch (error) { logUpdate(error); send('failed'); }")) | Set-Content updates.cjs
           npm run prepare:web
-          npx electron-builder --win --x64 --dir --publish never
+          npx electron-builder --win nsis --x64 --arm64 --publish never
       - name: Install, trigger the in-app update and verify the installed version
         working-directory: FlightDeck-Windows
         run: |
           Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
           $appDir = Join-Path $env:LOCALAPPDATA 'Programs\FlightDeck'
-          New-Item -ItemType Directory -Force (Split-Path $appDir) | Out-Null
-          Copy-Item -Recurse dist/win-unpacked $appDir
+          $setup = Resolve-Path dist/FlightDeck-0.21.0-Windows-Setup.exe
+          $fixtureInstall = Start-Process $setup -ArgumentList '/S' -PassThru -Wait
+          if ($fixtureInstall.ExitCode -ne 0) { throw "Fixture installer exit code: $($fixtureInstall.ExitCode)" }
           $exe = Join-Path $appDir FlightDeck.exe
           if ((Get-Item $exe).VersionInfo.ProductVersion -notmatch '^0\.21\.0') { throw 'Expected installed version 0.21.0' }
           $env:FD_UPDATER_LOG = Join-Path $env:RUNNER_TEMP 'updater.log'
