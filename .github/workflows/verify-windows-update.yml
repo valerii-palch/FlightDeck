@@ -130,3 +130,38 @@ jobs:
           } while ((Get-Date) -lt $deadline)
           Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; StartTime = (Get-Date).AddMinutes(-5) } -ErrorAction SilentlyContinue | Select-Object -First 4 -ExpandProperty Message
           throw "Expected FlightDeck 0.22.0 running after update, installed version: $installed"
+
+  published-install:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-2022, windows-2025]
+    timeout-minutes: 8
+    steps:
+      - name: Install and launch the published package
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP FlightDeckSetup.exe
+          Invoke-WebRequest 'https://github.com/valerii-palch/FlightDeck/releases/download/v0.22.0/FlightDeck-0.22.0-Windows-Setup.exe' -OutFile $setup
+          if ((Get-FileHash $setup).Hash.ToLowerInvariant() -ne 'a7ed59c38c2105318c2df1fe05d0ae3f9bc4f3ed2e6bbb20d2976d0eef6ed9d2') { throw 'Published installer SHA-256 changed' }
+          $install = Start-Process $setup -ArgumentList '/S' -PassThru -Wait
+          Write-Output "Installer exit code: $($install.ExitCode)"
+          if ($install.ExitCode -ne 0) {
+            Start-Sleep -Seconds 3
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; StartTime = (Get-Date).AddMinutes(-4) } -ErrorAction SilentlyContinue | Select-Object -First 4 -ExpandProperty Message
+            throw 'Published installer failed'
+          }
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\FlightDeck\FlightDeck.exe'
+          if ((Get-Item $exe).VersionInfo.ProductVersion -notmatch '^0\.22\.0') { throw 'Expected installed version 0.22.0' }
+          $null = Start-Process $exe -ArgumentList '--remote-debugging-port=49482'
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $pages = Invoke-RestMethod 'http://127.0.0.1:49482/json/list'
+              if ($pages | Where-Object { $_.url -eq 'flightdeck://app/index.html' }) {
+                Write-Output 'Published installer and FlightDeck renderer verified'
+                exit 0
+              }
+            } catch {}
+            Start-Sleep -Seconds 1
+          }
+          throw 'Installed FlightDeck renderer did not load'
