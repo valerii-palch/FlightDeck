@@ -137,7 +137,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-2022, windows-2025]
+        runner: [windows-2022, windows-2025, windows-11-arm]
     timeout-minutes: 8
     steps:
       - name: Install and launch the published package
@@ -154,6 +154,14 @@ jobs:
           }
           $exe = Join-Path $env:LOCALAPPDATA 'Programs\FlightDeck\FlightDeck.exe'
           if ((Get-Item $exe).VersionInfo.ProductVersion -notmatch '^0\.22\.0') { throw 'Expected installed version 0.22.0' }
+          $pe = [IO.BinaryReader]::new([IO.File]::OpenRead($exe))
+          try {
+            $pe.BaseStream.Position = 0x3c
+            $pe.BaseStream.Position = $pe.ReadInt32() + 4
+            $machine = $pe.ReadUInt16()
+          } finally { $pe.Dispose() }
+          $expectedMachine = if ($env:RUNNER_ARCH -eq 'ARM64') { 0xAA64 } else { 0x8664 }
+          if ($machine -ne $expectedMachine) { throw ('Expected native executable architecture, got 0x{0:x4}' -f $machine) }
           $null = Start-Process $exe -ArgumentList '--remote-debugging-port=49482'
           for ($i = 0; $i -lt 30; $i++) {
             try {
