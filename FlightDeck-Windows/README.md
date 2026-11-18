@@ -11,7 +11,7 @@ npm install
 npm run build
 ```
 
-В `dist` появится `FlightDeck-0.22.0-Windows-Setup.exe`. Распакованное приложение с `FlightDeck.exe` и сопутствующими файлами находится в каталогах `win-unpacked` и `win-arm64-unpacked`. Для разработки можно запустить `npm start`.
+В `dist` появится `FlightDeck-0.22.1-Windows-Setup.exe`. Распакованное приложение с `FlightDeck.exe` и сопутствующими файлами находится в каталогах `win-unpacked` и `win-arm64-unpacked`. Для разработки можно запустить `npm start`.
 
 ## Установка и данные
 

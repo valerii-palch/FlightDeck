@@ -1,7 +1,7 @@
 {
   "name": "flightdeck",
   "productName": "FlightDeck",
-  "version": "0.22.0",
+  "version": "0.22.1",
   "description": "FlightDeck flight planner and journal for Windows",
   "private": true,
   "main": "main.cjs",
@@ -12,7 +12,7 @@
   },
   "devDependencies": {
     "electron": "45.3.1",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.18.1"
   },
   "build": {
     "appId": "app.flightdeck.windows",
