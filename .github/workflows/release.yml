@@ -1,0 +1,86 @@
+name: Release FlightDeck
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag matching the app version, for example v0.22.0'
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: flightdeck-release
+  cancel-in-progress: false
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os, plistlib, json
+          with open('FlightDesk/Info.plist','rb') as f: version=plistlib.load(f)['CFBundleShortVersionString']
+          assert os.environ['RELEASE_TAG'] == 'v'+version, 'Tag must match Info.plist'
+          assert json.load(open('FlightDeck-Windows/package.json'))['version'] == version
+          PY
+      - name: Build universal macOS app and installer
+        env:
+          UNIVERSAL_BUILD: '1'
+        run: |
+          python3 FlightDesk/build-web.py
+          bash FlightDesk/build-mac.sh
+          bash FlightDesk/build-installer.sh
+      - name: Sign update manifest
+        env:
+          FLIGHTDECK_UPDATE_PRIVATE_KEY: ${{ secrets.FLIGHTDECK_UPDATE_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' FlightDesk/Info.plist)
+          swift tools/sign-update.swift sign "releases/FlightDeck-macOS-$version.pkg" "$RELEASE_TAG" releases/macos-update.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-release
+          path: |
+            releases/*.pkg
+            releases/macos-update.json
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build Windows installers and update metadata
+        working-directory: FlightDeck-Windows
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npm install --no-audit --no-fund
+          npm run build -- --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            FlightDeck-Windows/dist/*.exe
+            FlightDeck-Windows/dist/*.blockmap
+            FlightDeck-Windows/dist/latest*.yml
+  publish:
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" release-assets/* --target "$GITHUB_SHA" --title "FlightDeck $RELEASE_TAG" --generate-notes --latest

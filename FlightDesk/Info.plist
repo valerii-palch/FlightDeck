@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>FlightDeck</string>
+	<key>CFBundleExecutable</key>
+	<string>FlightDesk</string>
+	<key>CFBundleIconFile</key>
+	<string>FlightDeck.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>local.flightdesk.app</string>
+	<key>CFBundleName</key>
+	<string>FlightDeck</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.22.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>FlightDeck sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>flightdeck-auth</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>26</string>
+	<key>FlightDeckUpdatePublicKey</key>
+	<string>IEaCRt5LJLirCLQ9BKiWOBkQCQtl6mCM56AV/Ke74F8=</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>

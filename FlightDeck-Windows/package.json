@@ -1,0 +1,52 @@
+{
+  "name": "flightdeck",
+  "productName": "FlightDeck",
+  "version": "0.22.0",
+  "description": "FlightDeck flight planner and journal for Windows",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "prepare:web": "python ../FlightDesk/build-web.py --output FlightDesk.html",
+    "start": "npm run prepare:web && electron .",
+    "build": "npm run prepare:web && electron-builder --win nsis --x64 --arm64"
+  },
+  "devDependencies": {
+    "electron": "45.3.1",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "app.flightdeck.windows",
+    "files": [
+      "main.cjs",
+      "FlightDesk.html",
+      "icon.png",
+      "preload.cjs",
+      "google-auth.cjs",
+      "updates.cjs"
+    ],
+    "win": {
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "artifactName": "FlightDeck-${version}-Windows-Setup.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "valerii-palch",
+        "repo": "FlightDeck",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  }
+}

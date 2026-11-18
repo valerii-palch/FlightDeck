@@ -1,0 +1,834 @@
+{
+ "UEEE": {
+  "cityRu": "Якутск",
+  "nameRu": "Международный аэропорт Якутск имени П. А. Ойунского",
+  "cityEn": "Yakutsk",
+  "nameEn": "Yakutsk International Airport",
+  "lat": 62.0933,
+  "lon": 129.771
+ },
+ "UDYZ": {
+  "cityRu": "Ереван",
+  "nameRu": "Международный аэропорт Звартноц",
+  "cityEn": "Yerevan",
+  "nameEn": "Zvartnots International Airport",
+  "lat": 40.1473,
+  "lon": 44.3959
+ },
+ "UHBB": {
+  "cityRu": "Благовещенск",
+  "nameRu": "Международный аэропорт Благовещенск (Игнатьево)",
+  "cityEn": "Blagoveshchensk",
+  "nameEn": "Blagoveshchensk Ignatyevo International Airport",
+  "lat": 50.4254,
+  "lon": 127.412
+ },
+ "UBBB": {
+  "cityRu": "Баку",
+  "nameRu": "Международный аэропорт Гейдар Алиев",
+  "cityEn": "Baku",
+  "nameEn": "Heydar Aliyev International Airport",
+  "lat": 40.4675,
+  "lon": 50.0467
+ },
+ "UHHH": {
+  "cityRu": "Хабаровск",
+  "nameRu": "Международный аэропорт Хабаровск (Новый) имени Г. И. Невельского",
+  "cityEn": "Khabarovsk",
+  "nameEn": "Khabarovsk Novy International Airport",
+  "lat": 48.528,
+  "lon": 135.188
+ },
+ "UMMS": {
+  "cityRu": "Минск",
+  "nameRu": "Национальный аэропорт Минск",
+  "cityEn": "Minsk",
+  "nameEn": "Minsk National Airport",
+  "lat": 53.8825,
+  "lon": 28.0307
+ },
+ "UHMA": {
+  "cityRu": "Анадырь",
+  "nameRu": "Международный аэропорт Анадырь (Угольный)",
+  "cityEn": "Anadyr",
+  "nameEn": "Ugolny Airport",
+  "lat": 64.7349,
+  "lon": 177.741
+ },
+ "ZBAD": {
+  "cityRu": "Пекин",
+  "nameRu": "Международный аэропорт Пекин Дасин",
+  "cityEn": "Beijing",
+  "nameEn": "Beijing Daxing International Airport",
+  "lat": 39.50995,
+  "lon": 116.41092
+ },
+ "UHMM": {
+  "cityRu": "Магадан",
+  "nameRu": "Международный аэропорт Магадан (Сокол) имени В. С. Высоцкого",
+  "cityEn": "Magadan",
+  "nameEn": "Magadan Sokol International Airport",
+  "lat": 59.911,
+  "lon": 150.72
+ },
+ "ZGGG": {
+  "cityRu": "Гуанчжоу",
+  "nameRu": "Международный аэропорт Гуанчжоу Байюнь",
+  "cityEn": "Guangzhou",
+  "nameEn": "Guangzhou Baiyun International Airport",
+  "lat": 23.3924,
+  "lon": 113.299
+ },
+ "UHPP": {
+  "cityRu": "Петропавловск-Камчатский",
+  "nameRu": "Международный аэропорт Петропавловск-Камчатский (Елизово) имени Витуса Беринга",
+  "cityEn": "Petropavlovsk-Kamchatsky",
+  "nameEn": "Petropavlovsk-Kamchatsky Yelizovo International Airport",
+  "lat": 53.1679,
+  "lon": 158.45399
+ },
+ "ZJSY": {
+  "cityRu": "Санья",
+  "nameRu": "Международный аэропорт Санья Феникс",
+  "cityEn": "Sanya",
+  "nameEn": "Sanya Phoenix International Airport",
+  "lat": 18.3029,
+  "lon": 109.412
+ },
+ "UHSS": {
+  "cityRu": "Южно-Сахалинск",
+  "nameRu": "Международный аэропорт Южно-Сахалинск (Хомутово) имени А. П. Чехова",
+  "cityEn": "Yuzhno-Sakhalinsk",
+  "nameEn": "Yuzhno-Sakhalinsk International Airport",
+  "lat": 46.8887,
+  "lon": 142.718
+ },
+ "ZSPD": {
+  "cityRu": "Шанхай",
+  "nameRu": "Международный аэропорт Шанхай Пудун",
+  "cityEn": "Shanghai",
+  "nameEn": "Shanghai Pudong International Airport",
+  "lat": 31.1434,
+  "lon": 121.805
+ },
+ "UHWW": {
+  "cityRu": "Владивосток",
+  "nameRu": "Международный аэропорт Владивосток (Кневичи) имени В. К. Арсеньева",
+  "cityEn": "Vladivostok",
+  "nameEn": "Vladivostok International Airport",
+  "lat": 43.399,
+  "lon": 132.14799
+ },
+ "MUVR": {
+  "cityRu": "Варадеро",
+  "nameRu": "Международный аэропорт имени Хуана Гуальберто Гомеса",
+  "cityEn": "Varadero",
+  "nameEn": "Juan Gualberto Gómez International Airport",
+  "lat": 23.0344,
+  "lon": -81.4353
+ },
+ "UIAA": {
+  "cityRu": "Чита",
+  "nameRu": "Международный аэропорт Чита (Кадала)",
+  "cityEn": "Chita",
+  "nameEn": "Chita Kadala International Airport",
+  "lat": 52.0263,
+  "lon": 113.306
+ },
+ "MUHA": {
+  "cityRu": "Гавана",
+  "nameRu": "Международный аэропорт имени Хосе Марти",
+  "cityEn": "Havana",
+  "nameEn": "José Martí International Airport",
+  "lat": 22.9892,
+  "lon": -82.4091
+ },
+ "UIII": {
+  "cityRu": "Иркутск",
+  "nameRu": "Международный аэропорт Иркутск",
+  "cityEn": "Irkutsk",
+  "nameEn": "Irkutsk International Airport",
+  "lat": 52.268,
+  "lon": 104.389
+ },
+ "HECA": {
+  "cityRu": "Каир",
+  "nameRu": "Международный аэропорт Каира",
+  "cityEn": "Cairo",
+  "nameEn": "Cairo International Airport",
+  "lat": 30.1219,
+  "lon": 31.4056
+ },
+ "UIUU": {
+  "cityRu": "Улан-Удэ",
+  "nameRu": "Международный аэропорт Байкал (Улан-Удэ, Мухино)",
+  "cityEn": "Ulan-Ude",
+  "nameEn": "Baikal International Airport",
+  "lat": 51.8078,
+  "lon": 107.438
+ },
+ "HEGN": {
+  "cityRu": "Хургада",
+  "nameRu": "Международный аэропорт Хургады",
+  "cityEn": "Hurghada",
+  "nameEn": "Hurghada International Airport",
+  "lat": 27.1783,
+  "lon": 33.7994
+ },
+ "ULAA": {
+  "cityRu": "Архангельск",
+  "nameRu": "Международный аэропорт Архангельск (Талаги) имени Ф. А. Абрамова",
+  "cityEn": "Arkhangelsk",
+  "nameEn": "Arkhangelsk Talagi International Airport",
+  "lat": 64.6003,
+  "lon": 40.7167
+ },
+ "HESH": {
+  "cityRu": "Шарм-эш-Шейх",
+  "nameRu": "Международный аэропорт Шарм-эш-Шейха",
+  "cityEn": "Sharm El Sheikh",
+  "nameEn": "Sharm El Sheikh International Airport",
+  "lat": 27.9773,
+  "lon": 34.395
+ },
+ "ULLI": {
+  "cityRu": "Санкт-Петербург",
+  "nameRu": "Аэропорт Пулково",
+  "cityEn": "Saint Petersburg",
+  "nameEn": "Pulkovo Airport",
+  "lat": 59.8003,
+  "lon": 30.2625
+ },
+ "VHHH": {
+  "cityRu": "Гонконг",
+  "nameRu": "Международный аэропорт Гонконга",
+  "cityEn": "Hong Kong",
+  "nameEn": "Hong Kong International Airport",
+  "lat": 22.3089,
+  "lon": 113.915
+ },
+ "ULMK": {
+  "cityRu": "Апатиты",
+  "nameRu": "Аэропорт Хибины (Апатиты)",
+  "cityEn": "Apatity",
+  "nameEn": "Khibiny Airport",
+  "lat": 67.4633,
+  "lon": 33.5883
+ },
+ "VIDP": {
+  "cityRu": "Дели",
+  "nameRu": "Международный аэропорт имени Индиры Ганди",
+  "cityEn": "Delhi",
+  "nameEn": "Indira Gandhi International Airport",
+  "lat": 28.5665,
+  "lon": 77.1031
+ },
+ "ULMM": {
+  "cityRu": "Мурманск",
+  "nameRu": "Международный аэропорт Мурманск имени Николая II",
+  "cityEn": "Murmansk",
+  "nameEn": "Murmansk Airport",
+  "lat": 68.7817,
+  "lon": 32.7508
+ },
+ "VOGA": {
+  "cityRu": "Гоа (Мопа)",
+  "nameRu": "Международный аэропорт Манохар",
+  "cityEn": "Goa (Mopa)",
+  "nameEn": "Manohar International Airport",
+  "lat": 15.7425,
+  "lon": 73.86694
+ },
+ "UMKK": {
+  "cityRu": "Калининград",
+  "nameRu": "Международный аэропорт Калининград (Храброво) имени императрицы Елизаветы Петровны",
+  "cityEn": "Kaliningrad",
+  "nameEn": "Khrabrovo International Airport",
+  "lat": 54.89,
+  "lon": 20.5926
+ },
+ "WADD": {
+  "cityRu": "Денпасар",
+  "nameRu": "Международный аэропорт Нгурах-Рай",
+  "cityEn": "Denpasar",
+  "nameEn": "I Gusti Ngurah Rai International Airport",
+  "lat": -8.74817,
+  "lon": 115.167
+ },
+ "UNAA": {
+  "cityRu": "Абакан",
+  "nameRu": "Международный аэропорт Абакан",
+  "cityEn": "Abakan",
+  "nameEn": "Abakan International Airport",
+  "lat": 53.74,
+  "lon": 91.385
+ },
+ "UATE": {
+  "cityRu": "Актау",
+  "nameRu": "Международный аэропорт Актау",
+  "cityEn": "Aktau",
+  "nameEn": "Aktau International Airport",
+  "lat": 43.8601,
+  "lon": 51.092
+ },
+ "UNBB": {
+  "cityRu": "Барнаул",
+  "nameRu": "Международный аэропорт Барнаул имени Г. С. Титова",
+  "cityEn": "Barnaul",
+  "nameEn": "Barnaul Gherman Titov International Airport",
+  "lat": 53.3638,
+  "lon": 83.5385
+ },
+ "UAAA": {
+  "cityRu": "Алматы",
+  "nameRu": "Международный аэропорт Алматы",
+  "cityEn": "Almaty",
+  "nameEn": "Almaty International Airport",
+  "lat": 43.3521,
+  "lon": 77.0405
+ },
+ "UNBG": {
+  "cityRu": "Горно-Алтайск",
+  "nameRu": "Аэропорт Горно-Алтайск",
+  "cityEn": "Gorno-Altaysk",
+  "nameEn": "Gorno-Altaysk Airport",
+  "lat": 51.9667,
+  "lon": 85.8333
+ },
+ "UACC": {
+  "cityRu": "Астана",
+  "nameRu": "Международный аэропорт Нурсултан Назарбаев",
+  "cityEn": "Astana",
+  "nameEn": "Nursultan Nazarbayev International Airport",
+  "lat": 51.0222,
+  "lon": 71.4669
+ },
+ "UNEE": {
+  "cityRu": "Кемерово",
+  "nameRu": "Международный аэропорт Кемерово имени А. А. Леонова",
+  "cityEn": "Kemerovo",
+  "nameEn": "Kemerovo Alexei Leonov International Airport",
+  "lat": 55.2701,
+  "lon": 86.1072
+ },
+ "UCFM": {
+  "cityRu": "Бишкек",
+  "nameRu": "Международный аэропорт Манас",
+  "cityEn": "Bishkek",
+  "nameEn": "Manas International Airport",
+  "lat": 43.0613,
+  "lon": 74.4776
+ },
+ "UNKL": {
+  "cityRu": "Красноярск",
+  "nameRu": "Международный аэропорт Красноярск имени Д. А. Хворостовского (Емельяново)",
+  "cityEn": "Krasnoyarsk",
+  "nameEn": "Krasnoyarsk International Airport",
+  "lat": 56.1729,
+  "lon": 92.4933
+ },
+ "VRMM": {
+  "cityRu": "Мале",
+  "nameRu": "Международный аэропорт Велана",
+  "cityEn": "Malé",
+  "nameEn": "Velana International Airport",
+  "lat": 4.19183,
+  "lon": 73.5291
+ },
+ "UNNT": {
+  "cityRu": "Новосибирск",
+  "nameRu": "Международный аэропорт Новосибирск (Толмачёво) имени А. И. Покрышкина",
+  "cityEn": "Novosibirsk",
+  "nameEn": "Novosibirsk Tolmachevo International Airport",
+  "lat": 55.0126,
+  "lon": 82.6507
+ },
+ "FSIA": {
+  "cityRu": "Виктория",
+  "nameRu": "Международный аэропорт Сейшельских островов",
+  "cityEn": "Victoria",
+  "nameEn": "Seychelles International Airport",
+  "lat": -4.67434,
+  "lon": 55.5218
+ },
+ "UNOO": {
+  "cityRu": "Омск",
+  "nameRu": "Аэропорт Омск (Центральный) имени Д. М. Карбышева",
+  "cityEn": "Omsk",
+  "nameEn": "Omsk Tsentralny Airport",
+  "lat": 54.967,
+  "lon": 73.3105
+ },
+ "VCBI": {
+  "cityRu": "Коломбо",
+  "nameRu": "Международный аэропорт Бандаранаике",
+  "cityEn": "Colombo",
+  "nameEn": "Bandaranaike International Airport",
+  "lat": 7.18076,
+  "lon": 79.8841
+ },
+ "UNTT": {
+  "cityRu": "Томск",
+  "nameRu": "Международный аэропорт Томск (Богашёво) имени Н. И. Камова",
+  "cityEn": "Tomsk",
+  "nameEn": "Tomsk Bogashevo International Airport",
+  "lat": 56.3803,
+  "lon": 85.2083
+ },
+ "VTBS": {
+  "cityRu": "Бангкок",
+  "nameRu": "Международный аэропорт Суварнабхуми",
+  "cityEn": "Bangkok",
+  "nameEn": "Suvarnabhumi Airport",
+  "lat": 13.6811,
+  "lon": 100.747
+ },
+ "UNWW": {
+  "cityRu": "Новокузнецк",
+  "nameRu": "Международный аэропорт Новокузнецк (Спиченково) имени Б. В. Волынова",
+  "cityEn": "Novokuznetsk",
+  "nameEn": "Novokuznetsk Spichenkovo International Airport",
+  "lat": 53.8114,
+  "lon": 86.8772
+ },
+ "VTSP": {
+  "cityRu": "Пхукет",
+  "nameRu": "Международный аэропорт Пхукета",
+  "cityEn": "Phuket",
+  "nameEn": "Phuket International Airport",
+  "lat": 8.1132,
+  "lon": 98.3169
+ },
+ "URKA": {
+  "cityRu": "Анапа",
+  "nameRu": "Международный аэропорт Анапа (Витязево) имени В. К. Коккинаки",
+  "cityEn": "Anapa",
+  "nameEn": "Anapa Vityazevo International Airport",
+  "lat": 45.0021,
+  "lon": 37.3473
+ },
+ "VTBU": {
+  "cityRu": "Паттайя / Районг",
+  "nameRu": "Международный аэропорт У-Тапао Районг–Паттайя",
+  "cityEn": "Pattaya / Rayong",
+  "nameEn": "U-Tapao Rayong–Pattaya International Airport",
+  "lat": 12.6799,
+  "lon": 101.005
+ },
+ "URKG": {
+  "cityRu": "Геленджик",
+  "nameRu": "Аэропорт Геленджик",
+  "cityEn": "Gelendzhik",
+  "nameEn": "Gelendzhik Airport",
+  "lat": 44.58209,
+  "lon": 38.01248
+ },
+ "LTAC": {
+  "cityRu": "Анкара",
+  "nameRu": "Международный аэропорт Анкара Эсенбога",
+  "cityEn": "Ankara",
+  "nameEn": "Ankara Esenboğa Airport",
+  "lat": 40.1281,
+  "lon": 32.9951
+ },
+ "URKK": {
+  "cityRu": "Краснодар",
+  "nameRu": "Международный аэропорт Краснодар (Пашковский) имени Екатерины II",
+  "cityEn": "Krasnodar",
+  "nameEn": "Krasnodar Pashkovsky International Airport",
+  "lat": 45.0347,
+  "lon": 39.1705
+ },
+ "LTAI": {
+  "cityRu": "Анталья",
+  "nameRu": "Международный аэропорт Антальи",
+  "cityEn": "Antalya",
+  "nameEn": "Antalya International Airport",
+  "lat": 36.8987,
+  "lon": 30.8005
+ },
+ "URMG": {
+  "cityRu": "Грозный",
+  "nameRu": "Международный аэропорт Грозный (Северный) имени А. А. Кадырова",
+  "cityEn": "Grozny",
+  "nameEn": "Akhmat Kadyrov Grozny International Airport",
+  "lat": 43.3883,
+  "lon": 45.6986
+ },
+ "LTBS": {
+  "cityRu": "Даламан",
+  "nameRu": "Международный аэропорт Даламан",
+  "cityEn": "Dalaman",
+  "nameEn": "Dalaman International Airport",
+  "lat": 36.7131,
+  "lon": 28.7925
+ },
+ "URML": {
+  "cityRu": "Махачкала",
+  "nameRu": "Международный аэропорт Махачкала (Уйташ) имени Амет-Хана Султана",
+  "cityEn": "Makhachkala",
+  "nameEn": "Makhachkala Uytash International Airport",
+  "lat": 42.8168,
+  "lon": 47.6523
+ },
+ "LTFM": {
+  "cityRu": "Стамбул",
+  "nameRu": "Аэропорт Стамбул",
+  "cityEn": "Istanbul",
+  "nameEn": "Istanbul Airport",
+  "lat": 41.27528,
+  "lon": 28.75194
+ },
+ "URMM": {
+  "cityRu": "Минеральные Воды",
+  "nameRu": "Международный аэропорт Минеральные Воды имени М. Ю. Лермонтова",
+  "cityEn": "Mineralnye Vody",
+  "nameEn": "Mineralnyye Vody Airport",
+  "lat": 44.2251,
+  "lon": 43.0819
+ },
+ "LTDB": {
+  "cityRu": "Мерсин / Адана",
+  "nameRu": "Международный аэропорт Чукурова",
+  "cityEn": "Mersin / Adana",
+  "nameEn": "Çukurova International Airport",
+  "lat": 36.89148,
+  "lon": 35.07124
+ },
+ "URMT": {
+  "cityRu": "Ставрополь",
+  "nameRu": "Международный аэропорт Ставрополь (Шпаковское) имени А. В. Суворова",
+  "cityEn": "Stavropol",
+  "nameEn": "Stavropol Shpakovskoye Airport",
+  "lat": 45.1092,
+  "lon": 42.1128
+ },
+ "OMAA": {
+  "cityRu": "Абу-Даби",
+  "nameRu": "Международный аэропорт Заид",
+  "cityEn": "Abu Dhabi",
+  "nameEn": "Zayed International Airport",
+  "lat": 24.433,
+  "lon": 54.6511
+ },
+ "URSS": {
+  "cityRu": "Сочи",
+  "nameRu": "Международный аэропорт Сочи имени В. И. Севастьянова",
+  "cityEn": "Sochi",
+  "nameEn": "Sochi International Airport",
+  "lat": 43.4499,
+  "lon": 39.9566
+ },
+ "OMDB": {
+  "cityRu": "Дубай",
+  "nameRu": "Международный аэропорт Дубая",
+  "cityEn": "Dubai",
+  "nameEn": "Dubai International Airport",
+  "lat": 25.2528,
+  "lon": 55.3644
+ },
+ "URWA": {
+  "cityRu": "Астрахань",
+  "nameRu": "Международный аэропорт Астрахань (Нариманово) имени Б. М. Кустодиева",
+  "cityEn": "Astrakhan",
+  "nameEn": "Astrakhan Narimanovo International Airport",
+  "lat": 46.2833,
+  "lon": 48.0063
+ },
+ "OMDW": {
+  "cityRu": "Дубай",
+  "nameRu": "Международный аэропорт Аль-Мактум",
+  "cityEn": "Dubai",
+  "nameEn": "Al Maktoum International Airport",
+  "lat": 24.89636,
+  "lon": 55.16139
+ },
+ "URWI": {
+  "cityRu": "Элиста",
+  "nameRu": "Международный аэропорт Элиста",
+  "cityEn": "Elista",
+  "nameEn": "Elista Airport",
+  "lat": 46.3739,
+  "lon": 44.3309
+ },
+ "UZSB": {
+  "cityRu": "Бухара",
+  "nameRu": "Международный аэропорт Бухара",
+  "cityEn": "Bukhara",
+  "nameEn": "Bukhara International Airport",
+  "lat": 39.77532,
+  "lon": 64.48228
+ },
+ "URWW": {
+  "cityRu": "Волгоград",
+  "nameRu": "Международный аэропорт Волгоград (Гумрак)",
+  "cityEn": "Volgograd",
+  "nameEn": "Volgograd International Airport",
+  "lat": 48.7825,
+  "lon": 44.3455
+ },
+ "UZSS": {
+  "cityRu": "Самарканд",
+  "nameRu": "Международный аэропорт Самарканд",
+  "cityEn": "Samarkand",
+  "nameEn": "Samarkand International Airport",
+  "lat": 39.70184,
+  "lon": 66.98147
+ },
+ "USCC": {
+  "cityRu": "Челябинск",
+  "nameRu": "Международный аэропорт Челябинск (Баландино) имени И. В. Курчатова",
+  "cityEn": "Chelyabinsk",
+  "nameEn": "Chelyabinsk Balandino International Airport",
+  "lat": 55.3058,
+  "lon": 61.5033
+ },
+ "UZTT": {
+  "cityRu": "Ташкент",
+  "nameRu": "Международный аэропорт Ташкент имени Ислама Каримова",
+  "cityEn": "Tashkent",
+  "nameEn": "Tashkent Islam Karimov International Airport",
+  "lat": 41.2579,
+  "lon": 69.2812
+ },
+ "USCM": {
+  "cityRu": "Магнитогорск",
+  "nameRu": "Международный аэропорт Магнитогорск",
+  "cityEn": "Magnitogorsk",
+  "nameEn": "Magnitogorsk International Airport",
+  "lat": 53.3931,
+  "lon": 58.7557
+ },
+ "UZNU": {
+  "cityRu": "Ургенч",
+  "nameRu": "Международный аэропорт Ургенч",
+  "cityEn": "Urgench",
+  "nameEn": "Urgench International Airport",
+  "lat": 41.5843,
+  "lon": 60.6417
+ },
+ "USHH": {
+  "cityRu": "Ханты-Мансийск",
+  "nameRu": "Международный аэропорт Ханты-Мансийск",
+  "cityEn": "Khanty-Mansiysk",
+  "nameEn": "Khanty Mansiysk Airport",
+  "lat": 61.0285,
+  "lon": 69.0861
+ },
+ "VVTS": {
+  "cityRu": "Хошимин",
+  "nameRu": "Международный аэропорт Таншоннят",
+  "cityEn": "Ho Chi Minh City",
+  "nameEn": "Tan Son Nhat International Airport",
+  "lat": 10.8188,
+  "lon": 106.652
+ },
+ "USII": {
+  "cityRu": "Ижевск",
+  "nameRu": "Аэропорт Ижевск",
+  "cityEn": "Izhevsk",
+  "nameEn": "Izhevsk Airport",
+  "lat": 56.8281,
+  "lon": 53.4575
+ },
+ "VVCR": {
+  "cityRu": "Нячанг",
+  "nameRu": "Международный аэропорт Камрань",
+  "cityEn": "Nha Trang",
+  "nameEn": "Cam Ranh International Airport",
+  "lat": 11.9982,
+  "lon": 109.219
+ },
+ "USKK": {
+  "cityRu": "Киров",
+  "nameRu": "Аэропорт Победилово (Киров)",
+  "cityEn": "Kirov",
+  "nameEn": "Pobedilovo Airport",
+  "lat": 58.5033,
+  "lon": 49.3483
+ },
+ "USMU": {
+  "cityRu": "Новый Уренгой",
+  "nameRu": "Аэропорт Новый Уренгой",
+  "cityEn": "Novy Urengoy",
+  "nameEn": "Novy Urengoy Airport",
+  "lat": 66.0694,
+  "lon": 76.5203
+ },
+ "USNN": {
+  "cityRu": "Нижневартовск",
+  "nameRu": "Международный аэропорт Нижневартовск",
+  "cityEn": "Nizhnevartovsk",
+  "nameEn": "Nizhnevartovsk Airport",
+  "lat": 60.9493,
+  "lon": 76.4836
+ },
+ "USPP": {
+  "cityRu": "Пермь",
+  "nameRu": "Международный аэропорт Пермь (Большое Савино)",
+  "cityEn": "Perm",
+  "nameEn": "Perm Bolshoye Savino International Airport",
+  "lat": 57.9145,
+  "lon": 56.0212
+ },
+ "USRR": {
+  "cityRu": "Сургут",
+  "nameRu": "Международный аэропорт Сургут имени Ф. К. Салманова",
+  "cityEn": "Surgut",
+  "nameEn": "Surgut International Airport",
+  "lat": 61.3437,
+  "lon": 73.4018
+ },
+ "USSS": {
+  "cityRu": "Екатеринбург",
+  "nameRu": "Международный аэропорт Екатеринбург (Кольцово) имени А. Н. Демидова",
+  "cityEn": "Yekaterinburg",
+  "nameEn": "Koltsovo International Airport",
+  "lat": 56.7431,
+  "lon": 60.8027
+ },
+ "USTR": {
+  "cityRu": "Тюмень",
+  "nameRu": "Международный аэропорт Тюмень (Рощино) имени Д. И. Менделеева",
+  "cityEn": "Tyumen",
+  "nameEn": "Tyumen Roshchino International Airport",
+  "lat": 57.1896,
+  "lon": 65.3243
+ },
+ "UUBC": {
+  "cityRu": "Калуга",
+  "nameRu": "Международный аэропорт Калуга (Грабцево) имени К. Э. Циолковского",
+  "cityEn": "Kaluga",
+  "nameEn": "Kaluga Grabtsevo International Airport",
+  "lat": 54.55,
+  "lon": 36.36667
+ },
+ "UUDD": {
+  "cityRu": "Москва",
+  "nameRu": "Московский аэропорт Домодедово имени М. В. Ломоносова",
+  "cityEn": "Moscow",
+  "nameEn": "Domodedovo International Airport",
+  "lat": 55.4088,
+  "lon": 37.9063
+ },
+ "UUEE": {
+  "cityRu": "Москва",
+  "nameRu": "Международный аэропорт Шереметьево имени А. С. Пушкина",
+  "cityEn": "Moscow",
+  "nameEn": "Sheremetyevo International Airport",
+  "lat": 55.9726,
+  "lon": 37.4146
+ },
+ "UUWW": {
+  "cityRu": "Москва",
+  "nameRu": "Международный аэропорт Внуково имени А. Н. Туполева",
+  "cityEn": "Moscow",
+  "nameEn": "Vnukovo International Airport",
+  "lat": 55.5915,
+  "lon": 37.2615
+ },
+ "UUYY": {
+  "cityRu": "Сыктывкар",
+  "nameRu": "Международный аэропорт Сыктывкар",
+  "cityEn": "Syktyvkar",
+  "nameEn": "Syktyvkar Airport",
+  "lat": 61.647,
+  "lon": 50.8451
+ },
+ "UWGG": {
+  "cityRu": "Нижний Новгород",
+  "nameRu": "Международный аэропорт Нижний Новгород (Стригино) имени В. П. Чкалова",
+  "cityEn": "Nizhny Novgorod",
+  "nameEn": "Nizhny Novgorod Strigino International Airport",
+  "lat": 56.2301,
+  "lon": 43.784
+ },
+ "UWKD": {
+  "cityRu": "Казань",
+  "nameRu": "Международный аэропорт Казань имени Габдуллы Тукая",
+  "cityEn": "Kazan",
+  "nameEn": "Kazan International Airport",
+  "lat": 55.6062,
+  "lon": 49.2787
+ },
+ "UWKE": {
+  "cityRu": "Набережные Челны / Нижнекамск",
+  "nameRu": "Международный аэропорт Бегишево имени Н. В. Лемаева",
+  "cityEn": "Naberezhnye Chelny / Nizhnekamsk",
+  "nameEn": "Begishevo International Airport",
+  "lat": 55.5647,
+  "lon": 52.0925
+ },
+ "UWKS": {
+  "cityRu": "Чебоксары",
+  "nameRu": "Международный аэропорт Чебоксары имени А. Г. Николаева",
+  "cityEn": "Cheboksary",
+  "nameEn": "Cheboksary Airport",
+  "lat": 56.0903,
+  "lon": 47.3473
+ },
+ "UWLL": {
+  "cityRu": "Ульяновск",
+  "nameRu": "Международный аэропорт Ульяновск (Баратаевка) имени Н. М. Карамзина",
+  "cityEn": "Ulyanovsk",
+  "nameEn": "Ulyanovsk Baratayevka Airport",
+  "lat": 54.2683,
+  "lon": 48.2267
+ },
+ "UWOO": {
+  "cityRu": "Оренбург",
+  "nameRu": "Международный аэропорт Оренбург (Центральный) имени Ю. А. Гагарина",
+  "cityEn": "Orenburg",
+  "nameEn": "Orenburg Tsentralny International Airport",
+  "lat": 51.7958,
+  "lon": 55.4567
+ },
+ "UWOR": {
+  "cityRu": "Орск",
+  "nameRu": "Международный аэропорт Орск",
+  "cityEn": "Orsk",
+  "nameEn": "Orsk Airport",
+  "lat": 51.0725,
+  "lon": 58.5956
+ },
+ "UWPP": {
+  "cityRu": "Пенза",
+  "nameRu": "Аэропорт Пенза имени В. Г. Белинского",
+  "cityEn": "Penza",
+  "nameEn": "Penza Airport",
+  "lat": 53.1106,
+  "lon": 45.0211
+ },
+ "UWPS": {
+  "cityRu": "Саранск",
+  "nameRu": "Международный аэропорт Саранск",
+  "cityEn": "Saransk",
+  "nameEn": "Saransk International Airport",
+  "lat": 54.12513,
+  "lon": 45.21226
+ },
+ "UWSG": {
+  "cityRu": "Саратов",
+  "nameRu": "Международный аэропорт Гагарин",
+  "cityEn": "Saratov",
+  "nameEn": "Gagarin International Airport",
+  "lat": 51.7128,
+  "lon": 46.171
+ },
+ "UWUU": {
+  "cityRu": "Уфа",
+  "nameRu": "Международный аэропорт Уфа имени Мустая Карима",
+  "cityEn": "Ufa",
+  "nameEn": "Ufa International Airport",
+  "lat": 54.5575,
+  "lon": 55.8744
+ },
+ "UWWW": {
+  "cityRu": "Самара",
+  "nameRu": "Международный аэропорт Самара (Курумоч) имени С. П. Королёва",
+  "cityEn": "Samara",
+  "nameEn": "Kurumoch International Airport",
+  "lat": 53.5049,
+  "lon": 50.1643
+ }
+}

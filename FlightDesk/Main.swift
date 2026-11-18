@@ -1,0 +1,305 @@
+import AppKit
+import WebKit
+import UniformTypeIdentifiers
+
+final class WindowDragHandle: NSView {
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { window?.zoom(nil) }
+        else { window?.performDrag(with: event) }
+    }
+}
+
+final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+    private var window: NSWindow!
+    private var webView: WKWebView!
+    private var googleOAuth: GoogleOAuth?
+    private let appUpdater = AppUpdater()
+    private let testing = CommandLine.arguments.contains("--self-test")
+    private var stateURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FlightDesk/state.json")
+    }
+
+    private func configureApplicationMenu() {
+        let preference = UserDefaults.standard.string(forKey: "flightdeck.language") ?? "system"
+        let systemLanguage = Locale.preferredLanguages.compactMap {
+            Locale(identifier: $0).language.languageCode?.identifier
+        }.first { $0 == "ru" || $0 == "en" } ?? "en"
+        let language = ["ru", "en"].contains(preference) ? preference : systemLanguage
+        let menu = NSMenu()
+        let applicationItem = NSMenuItem()
+        let applicationMenu = NSMenu(title: "FlightDeck")
+        let quit = NSMenuItem(title: language == "ru" ? "Завершить FlightDeck" : "Quit FlightDeck",
+                              action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.keyEquivalentModifierMask = [.command]
+        quit.target = NSApp
+        applicationMenu.addItem(quit)
+        applicationItem.submenu = applicationMenu
+        menu.addItem(applicationItem)
+        NSApp.mainMenu = menu
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        configureApplicationMenu()
+        let configuration = WKWebViewConfiguration()
+        if testing { configuration.websiteDataStore = .nonPersistent() }
+        let controller = configuration.userContentController
+        controller.add(self, name: "exportBackup")
+        controller.add(self, name: "googleSignIn")
+        controller.add(self, name: "completeOnboarding")
+        if !testing { controller.add(self, name: "updateApplication") }
+        let completed = testing || UserDefaults.standard.bool(forKey: "flightdeck.onboarding.v1")
+        controller.addUserScript(WKUserScript(source: "window.flightDeckTourCompleted = \(completed);",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let languages = Locale.preferredLanguages
+        let language = testing ? "ru" : (UserDefaults.standard.string(forKey: "flightdeck.language") ?? "system")
+        if let encoded = try? JSONEncoder().encode(["languages": languages, "preference": [language]]),
+           let json = String(data: encoded, encoding: .utf8) {
+            controller.addUserScript(WKUserScript(source: """
+                { const settings = \(json);
+                  window.flightDeckSystemLanguages = settings.languages;
+                  window.flightDeckLanguage = settings.preference[0]; }
+                """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        if !testing { controller.add(self, name: "saveLanguage") }
+        controller.add(self, name: "closeWindow")
+        controller.add(self, name: "toggleFullscreen")
+        if !testing {
+            controller.add(self, name: "saveMapsKey")
+            if let key = UserDefaults.standard.string(forKey: "yandexMapsJavaScriptKey"),
+               let encoded = try? JSONEncoder().encode(key),
+               let json = String(data: encoded, encoding: .utf8) {
+                controller.addUserScript(WKUserScript(source: "window.flightDeckMapsKey = " + json,
+                    injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            }
+        }
+        if !testing {
+            controller.add(self, name: "saveState")
+            if let raw = try? Data(contentsOf: stateURL),
+               let json = try? JSONSerialization.jsonObject(with: raw),
+               let clean = try? JSONSerialization.data(withJSONObject: json),
+               let text = String(data: clean, encoding: .utf8) {
+                controller.addUserScript(WKUserScript(source: "window.flightDeskState = " + text,
+                    injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            }
+        }
+        webView = WKWebView(frame: .zero, configuration: configuration)
+        appUpdater.status = { [weak self] state in
+            guard let data = try? JSONEncoder().encode(state), let json = String(data: data, encoding: .utf8) else { return }
+            self?.webView.evaluateJavaScript("window.flightDeckUpdateStatus?.(\(json))")
+        }
+        webView.navigationDelegate = self
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 810),
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                          backing: .buffered, defer: false)
+        window.title = "FlightDeck"
+        window.contentMinSize = NSSize(width: 1340, height: 700)
+        window.collectionBehavior.insert(.fullScreenPrimary)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            window.standardWindowButton(kind)?.isHidden = true
+        }
+        window.contentView = webView
+        let dragHandle = WindowDragHandle(frame: .zero)
+        dragHandle.translatesAutoresizingMaskIntoConstraints = false
+        webView.addSubview(dragHandle)
+        NSLayoutConstraint.activate([
+            dragHandle.leadingAnchor.constraint(equalTo: webView.leadingAnchor, constant: 106),
+            dragHandle.trailingAnchor.constraint(equalTo: webView.trailingAnchor, constant: -220),
+            dragHandle.topAnchor.constraint(equalTo: webView.topAnchor),
+            dragHandle.heightAnchor.constraint(equalToConstant: 50)
+        ])
+        window.center()
+        if !testing {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        guard let html = Bundle.main.url(forResource: "FlightDesk", withExtension: "html") else { exit(1) }
+        webView.loadFileURL(html, allowingReadAccessTo: html.deletingLastPathComponent())
+        if testing { DispatchQueue.main.asyncAfter(deadline: .now() + 20) { exit(2) } }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame, let text = message.body as? String else { return }
+        if message.name == "updateApplication" { appUpdater.start(); return }
+        if message.name == "closeWindow" { window.close(); return }
+        if message.name == "toggleFullscreen" { window.toggleFullScreen(nil); return }
+        if message.name == "googleSignIn" {
+            if googleOAuth != nil { return }
+            let auth = GoogleOAuth(anchor: { self.window })
+            googleOAuth = auth
+            Task { @MainActor in
+                var result: [String: String]
+                do {
+                    let response = try await auth.authorize()
+                    result = ["code": response.code, "verifier": response.verifier]
+                } catch { result = ["error": "oauth_failed"] }
+                googleOAuth = nil
+                if let data = try? JSONEncoder().encode(result), let json = String(data: data, encoding: .utf8) {
+                    _ = try? await webView.evaluateJavaScript("window.flightDeckGoogleResult?.(\(json))")
+                }
+            }
+            return
+        }
+        if message.name == "completeOnboarding" {
+            UserDefaults.standard.set(true, forKey: "flightdeck.onboarding.v1")
+            return
+        }
+        if message.name == "saveLanguage" {
+            if ["system", "ru", "en"].contains(text) {
+                UserDefaults.standard.set(text, forKey: "flightdeck.language")
+                configureApplicationMenu()
+            }
+            return
+        }
+        if message.name == "saveMapsKey" {
+            UserDefaults.standard.set(text, forKey: "yandexMapsJavaScriptKey")
+            return
+        }
+        if message.name == "saveState" {
+            do {
+                try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(text.utf8).write(to: stateURL, options: .atomic)
+            } catch {
+                webView.evaluateJavaScript("notice(tr('Не удалось записать данные на диск. Сохрани резервную копию.'))")
+            }
+        } else if message.name == "exportBackup" {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = "flightdesk-backup.json"
+            panel.allowedContentTypes = [.json]
+            panel.beginSheetModal(for: window) { result in
+                guard result == .OK, let url = panel.url else { return }
+                do { try Data(text.utf8).write(to: url, options: .atomic) }
+                catch {
+                    self.webView.evaluateJavaScript("notice(tr('Не удалось сохранить резервную копию.'))")
+                }
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if action.navigationType == .linkActivated, action.sourceFrame.isMainFrame,
+           let url = action.request.url,
+           (url.scheme == "mailto" && url.path.lowercased() == "valvah2000@gmail.com" ||
+            url.scheme == "https" && url.host == "mail.google.com") {
+            if !NSWorkspace.shared.open(url) {
+                webView.evaluateJavaScript("notice(tr('Открой ссылку Gmail в форме обратной связи.'))")
+            }
+            decisionHandler(.cancel)
+            return
+        }
+        if action.navigationType == .linkActivated, action.sourceFrame.isMainFrame,
+           let url = action.request.url, url.scheme == "https",
+           (url.host == "yandex.ru" && url.path.hasPrefix("/maps") ||
+            url.host == "commons.wikimedia.org" && url.path.hasPrefix("/wiki/File:") ||
+            url.host == "nbc.aero" && url.path.hasPrefix("/media/gallery/")) {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard testing else { return }
+        webView.evaluateJavaScript("""
+        (() => {
+          const check = (condition, name) => { if (!condition) throw Error(name); };
+          check(data.airports.length === 104 && data.flights.length === 56, 'seed');
+          check(document.querySelector('h1').textContent === 'Главная', 'initial view');
+          check(capacity(fleet[2]) === 402 && fleet[2].stands === fleet[1].stands, '777');
+          check(stands('UUEE').some(s => s.includes('118')), 'standing range');
+          const sample = {...flight(), date:'2026-02-07', std:'09:10', status:'Идет посадка',
+            stages:{board:'2026-02-07T08:47:00Z'}};
+          check(forecast(sample).includes('09:17 UTC · +7 мин'), 'delay prediction');
+          check(validBackup(data), 'backup format');
+          check(summaryFlights().length===48 && flightStats(summaryFlights()).minutes===9007, 'A321 PDF total');
+          check(data.flights.filter(f=>f.demo).length===8, 'demo flights');
+          const diverted = data.flights.find(f=>f.number==='SU 1485');
+          check(continuationLeg(diverted)?.number==='SU 1485' && arrivalDelay(diverted)===195, 'linked diversion');
+          document.querySelector('[data-page=journal]').click();
+          check(document.querySelector('.flight-board') && document.querySelector('#typeFilter'), 'flight board');
+          check(data.airports.every(a=>/^[A-Z]{3}$/.test(a.iata)), 'IATA catalog');
+          check(arrivalDelay({date:'2026-02-07',std:'23:50',sta:'03:45',atd:'00:01',ata:'04:01'})===16,'late overnight arrival');
+          check(arrivalDelay({date:'2026-02-07',std:'23:50',sta:'03:45',atd:'23:53',ata:'03:40'})===-5,'early overnight arrival');
+          check(stands('ZJSY').includes('Любая стоянка'), 'unrestricted stands');
+          document.querySelector('[data-page=fleet]').click();
+          check(document.querySelectorAll('.aircraft-art').length===1,'fleet artwork');
+          document.querySelector('[data-slide-focus=next]').click();
+          check(document.querySelector('.fleet-slide h2').textContent.includes('A350'),'carousel next');
+          document.querySelector('[data-aircraft="RA-73155"]').click();
+          check(document.querySelector('h1').textContent==='RA-73155','aircraft detail');
+          document.querySelector('[data-page=pilot]').click();
+          check(document.querySelector('main').textContent.includes('Валерий Вахрушев'),'pilot logbook');
+          document.querySelector('[data-page=journal]').click();
+          check(document.querySelectorAll('.arrival-late').length>0,'journal late styling');
+          document.querySelector('[data-page=airports]').click();
+          check(document.querySelectorAll('[data-airport]').length === 9 && filteredAirports().every(isDomestic), 'airport UI');
+          check(data.airports.every(a=>airportPhotos[a.icao]?.url), 'airport photo catalog');
+          const country = document.querySelector('#airportCountry');
+          country.value = 'TR';
+          country.dispatchEvent(new Event('change', {bubbles:true}));
+          check(filteredAirports().length > 0 && filteredAirports().every(a=>airportCountry(a)==='TR'), 'country filter');
+          check(document.querySelector('.airport-photo img') !== null, 'airport photo markup');
+          document.querySelector('[data-tail="RA-73132"]').click();
+          document.querySelector('[data-action=new]').click();
+          const form = document.querySelector('#editForm');
+          form.elements.arr.value = 'URSS';
+          form.elements.std.value = '23:50';
+          form.elements.sta.value = '03:45';
+          form.elements.pax.value = '386';
+          form.requestSubmit();
+          check(flight()?.tail === 'RA-73132' && flight().pax === 386, 'add 777 flight');
+          check(document.querySelector('main').textContent.includes('03:45 +1 UTC'), 'midnight rollover');
+          const parking = document.querySelector('[data-stand=depStand]');
+          check(parking.options.length > 1, '777 parking');
+          parking.selectedIndex = 1;
+          parking.dispatchEvent(new Event('change', {bubbles:true}));
+          check(flight().depStand === parking.value, 'stand selection');
+          const snapshot = JSON.stringify(cloudSnapshot());
+          const chooseLanguage = value => {
+            document.querySelector('[data-action=settings]').click();
+            const settings = document.querySelector('#settingsForm');
+            settings.elements.language.value = value;
+            settings.requestSubmit();
+          };
+          chooseLanguage('en');
+          check(document.documentElement.lang === 'en' && document.querySelector('h1').textContent === 'Flight center', 'English flight center');
+          check(document.querySelector('#status option').textContent === 'Scheduled' &&
+                document.querySelector('#status option').value === 'Запланирован', 'English label, canonical value');
+          document.querySelector('[data-page=journal]').click();
+          check(document.querySelector('h1').textContent === 'Logbook' && document.querySelector('.flight-board').textContent.includes('Completed'), 'English logbook');
+          document.querySelector('[data-page=airports]').click();
+          check(document.querySelector('h1').textContent === 'Airports' && countryName('RU') === 'Russia', 'English airports');
+          window.flightDeckSystemLanguages = ['fr-FR', 'ru-RU'];
+          chooseLanguage('system');
+          check(document.documentElement.lang === 'ru' && document.querySelector('h1').textContent === 'Аэропорты', 'system language');
+          window.flightDeckSystemLanguages = ['fr-FR'];
+          chooseLanguage('system');
+          check(document.documentElement.lang === 'en', 'fallback language');
+          chooseLanguage('ru');
+          check(JSON.stringify(cloudSnapshot()) === snapshot, 'language leaves journal intact');
+          return 'PASS: flight editing, journal, airports and language selection';
+        })()
+        """) { result, error in
+            if let error { fputs("\(error)\n", stderr); exit(1) }
+            print(result ?? "No test result")
+            exit(result == nil ? 1 : 0)
+        }
+    }
+}
+
+@main
+struct FlightDeckMain {
+    @MainActor static func main() {
+        let app = NSApplication.shared
+        let delegate = FlightDesk()
+        app.delegate = delegate
+        app.setActivationPolicy(CommandLine.arguments.contains("--self-test") ? .accessory : .regular)
+        app.run()
+    }
+}

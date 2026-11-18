@@ -1,0 +1,9 @@
+.release-secrets/
+**/.module-cache/
+**/node_modules/
+**/*.app/
+**/xcuserdata/
+releases/
+.DS_Store
+FlightDesk/FlightDesk.html
+FlightDeck-Windows/FlightDesk.html
