@@ -25,6 +25,9 @@ jobs:
           python -c 'import plistlib; from pathlib import Path; p=Path("../FlightDesk/Info.plist"); d=plistlib.loads(p.read_bytes()); d["CFBundleShortVersionString"]="0.21.0"; p.write_bytes(plistlib.dumps(d))'
           npm pkg set version=0.21.0
           npm install --no-audit --no-fund
+          $env:FD_PATCH = "const fs = require('node:fs'); const logUpdate = e => fs.appendFileSync(process.env.FD_UPDATER_LOG, (e?.stack || String(e)) + '\n');"
+          $updateSource = Get-Content updates.cjs -Raw
+          ($env:FD_PATCH + "`n" + $updateSource.Replace("send('failed'));", "{ logUpdate(error); send('failed'); });").Replace("on('error', () =>", "on('error', error =>").Replace("} catch { send('failed'); }", "} catch (error) { logUpdate(error); send('failed'); }")) | Set-Content updates.cjs
           npm run prepare:web
           npx electron-builder --win --x64 --dir --publish never
       - name: Install, trigger the in-app update and verify the installed version
@@ -36,6 +39,18 @@ jobs:
           Copy-Item -Recurse dist/win-unpacked $appDir
           $exe = Join-Path $appDir FlightDeck.exe
           if ((Get-Item $exe).VersionInfo.ProductVersion -notmatch '^0\.21\.0') { throw 'Expected installed version 0.21.0' }
+          $env:FD_UPDATER_LOG = Join-Path $env:RUNNER_TEMP 'updater.log'
+          $feed = Join-Path $appDir 'resources\app-update.yml'
+          if (-not (Test-Path $feed)) {
+            @'
+            provider: github
+            owner: valerii-palch
+            repo: FlightDeck
+            releaseType: release
+            updaterCacheDirName: flightdeck-updater
+            '@ | Set-Content -Encoding utf8 $feed
+          }
+          Get-Content $feed
           Get-Process FlightDeck -ErrorAction SilentlyContinue | Stop-Process
           Start-Process $exe -ArgumentList '--remote-debugging-port=49482'
           @'
@@ -106,7 +121,9 @@ jobs:
           ws.close();
           '@ | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP trigger-update.mjs)
           node (Join-Path $env:RUNNER_TEMP trigger-update.mjs)
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testStatus = $LASTEXITCODE
+          if (Test-Path $env:FD_UPDATER_LOG) { Get-Content $env:FD_UPDATER_LOG }
+          if ($testStatus -ne 0) { exit $testStatus }
           $deadline = (Get-Date).AddMinutes(3)
           do {
             Start-Sleep -Seconds 2
