@@ -62,6 +62,17 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build -- --publish never
+      - name: Verify the Windows installer
+        working-directory: FlightDeck-Windows
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $setup = Resolve-Path "dist/FlightDeck-$version-Windows-Setup.exe"
+          $install = Start-Process $setup -ArgumentList '/S' -PassThru -Wait
+          if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\FlightDeck\FlightDeck.exe'
+          $installed = (Get-Item $exe).VersionInfo
+          $installedVersion = "$($installed.ProductMajorPart).$($installed.ProductMinorPart).$($installed.ProductBuildPart)"
+          if ($installedVersion -ne $version) { throw "Expected FlightDeck $version, found $installedVersion" }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release
