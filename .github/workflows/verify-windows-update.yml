@@ -1,0 +1,121 @@
+name: Verify Windows update 0.22.0
+on:
+  push:
+    branches: [verify/windows-update-022]
+permissions:
+  contents: read
+jobs:
+  update:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build a 0.21.0 fixture with the existing updater
+        working-directory: FlightDeck-Windows
+        run: |
+          python -c 'import plistlib; from pathlib import Path; p=Path("../FlightDesk/Info.plist"); d=plistlib.loads(p.read_bytes()); d["CFBundleShortVersionString"]="0.21.0"; p.write_bytes(plistlib.dumps(d))'
+          npm pkg set version=0.21.0
+          npm install --no-audit --no-fund
+          npm run prepare:web
+          npx electron-builder --win nsis --x64 --publish never
+      - name: Install, trigger the in-app update and verify the installed version
+        working-directory: FlightDeck-Windows
+        run: |
+          Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue
+          $setup = Resolve-Path dist/FlightDeck-0.21.0-Windows-Setup.exe
+          $appDir = Join-Path $env:RUNNER_TEMP FlightDeckUpdateFixture
+          $result = Start-Process $setup -ArgumentList "/S", "/D=$appDir" -PassThru -Wait
+          if ($result.ExitCode -ne 0) { throw "Initial installer exit code: $($result.ExitCode)" }
+          $exe = Join-Path $appDir FlightDeck.exe
+          if ((Get-Item $exe).VersionInfo.ProductVersion -notmatch '^0\.21\.0') { throw 'Expected installed version 0.21.0' }
+          Get-Process FlightDeck -ErrorAction SilentlyContinue | Stop-Process
+          Start-Process $exe -ArgumentList '--remote-debugging-port=49482'
+          @'
+          import assert from 'node:assert/strict';
+          import { setTimeout as delay } from 'node:timers/promises';
+          let page;
+          for (let i = 0; i < 60 && !page; i++) {
+            try {
+              const pages = await (await fetch('http://127.0.0.1:49482/json/list')).json();
+              page = pages.find(target => target.url === 'flightdeck://app/index.html');
+            } catch {}
+            if (!page) await delay(500);
+          }
+          assert(page, 'Could not attach to FlightDeck');
+          const ws = new WebSocket(page.webSocketDebuggerUrl);
+          await new Promise((resolve, reject) => {
+            ws.addEventListener('open', resolve, {once:true});
+            ws.addEventListener('error', reject, {once:true});
+          });
+          let nextId = 0;
+          function evaluate(expression) {
+            const id = ++nextId;
+            return new Promise((resolve, reject) => {
+              const timer = setTimeout(() => {
+                ws.removeEventListener('message', receive);
+                reject(Error('Renderer disconnected or stopped responding'));
+              }, 4000);
+              function receive(event) {
+                const response = JSON.parse(event.data);
+                if (response.id !== id) return;
+                clearTimeout(timer);
+                ws.removeEventListener('message', receive);
+                if (response.error || response.result.exceptionDetails) reject(Error(JSON.stringify(response)));
+                else resolve(response.result.result.value);
+              }
+              ws.addEventListener('message', receive);
+              ws.send(JSON.stringify({id, method:'Runtime.evaluate', params:{expression, returnByValue:true}}));
+            });
+          }
+          let clicked = false;
+          for (let i = 0; i < 60 && !clicked; i++) {
+            clicked = await evaluate(`(() => {
+              const skip = document.querySelector('[data-tour=skip]');
+              if (skip) skip.click();
+              const settings = document.querySelector('[data-action=settings]');
+              if (!settings) return false;
+              settings.click();
+              const update = document.querySelector('[data-action=update]');
+              if (!update) return false;
+              update.click();
+              return true;
+            })()`);
+            if (!clicked) await delay(500);
+          }
+          assert(clicked, 'Could not click the update button');
+          console.log('Clicked Settings → Update application');
+          let previous;
+          for (let i = 0; i < 120; i++) {
+            let status;
+            try { status = await evaluate('updateState'); }
+            catch { break; }
+            if (status !== previous) console.log('Update status:', status);
+            assert(!['failed', 'current', 'development'].includes(status), 'A newer release should install: ' + status);
+            previous = status;
+            if (status === 'installing') break;
+            await delay(1000);
+          }
+          ws.close();
+          '@ | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP trigger-update.mjs)
+          node (Join-Path $env:RUNNER_TEMP trigger-update.mjs)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $deadline = (Get-Date).AddMinutes(3)
+          do {
+            Start-Sleep -Seconds 2
+            $installed = (Get-Item $exe -ErrorAction SilentlyContinue).VersionInfo.ProductVersion
+            $running = Get-Process FlightDeck -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
+            if ($installed -match '^0\.22\.0' -and $running) {
+              Write-Output "Verified in-app upgrade and restart: $installed"
+              exit 0
+            }
+          } while ((Get-Date) -lt $deadline)
+          throw "Expected FlightDeck 0.22.0 running after update, installed version: $installed"
