@@ -42,13 +42,7 @@ jobs:
           $env:FD_UPDATER_LOG = Join-Path $env:RUNNER_TEMP 'updater.log'
           $feed = Join-Path $appDir 'resources\app-update.yml'
           if (-not (Test-Path $feed)) {
-            @'
-            provider: github
-            owner: valerii-palch
-            repo: FlightDeck
-            releaseType: release
-            updaterCacheDirName: flightdeck-updater
-            '@ | Set-Content -Encoding utf8 $feed
+            @('provider: github', 'owner: valerii-palch', 'repo: FlightDeck', 'releaseType: release', 'updaterCacheDirName: flightdeck-updater') | Set-Content -Encoding utf8 $feed
           }
           Get-Content $feed
           Get-Process FlightDeck -ErrorAction SilentlyContinue | Stop-Process
