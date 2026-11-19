@@ -13,9 +13,7 @@ const countryName=code=>displayCountries[appLanguage()].of(code);
 const knownCountries={ARMENIA:'AM',AZERBAIJAN:'AZ',BELARUS:'BY',CHINA:'CN',CUBA:'CU',EGIPT:'EG','HONG KONG':'HK',INDIA:'IN',INDONESIA:'ID',KAZAKHSTAN:'KZ',KYRGYZSTAN:'KG',MALDIVES:'MV',SEYCHELLES:'SC','SRI-LANKA':'LK',THAILAND:'TH',TURKEY:'TR',UAE:'AE',UZBEKISTAN:'UZ',VIETNAM:'VN','РОССИЯ':'RU',RUSSIA:'RU'};
 const airportCountry=a=>a?.countryCode||knownCountries[a?.country?.trim().toUpperCase()];
 const preferences=()=>{
- const settings={profileName:'Валерий Вахрушев',startPage:'home',density:'normal',theme:'system',mapProvider:'yandex',includeDemo:false,...data.preferences};
- if(settings.mapProvider==='google') settings.mapProvider='yandex';
- return settings;
+ return {profileName:'',startPage:'home',density:'normal',theme:'system',includeDemo:false,...data.preferences};
 };
 const summaryFlights=()=>preferences().includeDemo?data.flights:data.flights.filter(f=>!f.demo);
 const themes=[['light','Светлая'],['dark','Темная'],['system','Системная']];
@@ -30,15 +28,18 @@ function refreshMapTheme(){
  mapCleanup=mountYandexMap();
 }
 systemLight?.addEventListener('change',()=>{if(preferences().theme==='system') refreshMapTheme();});
-let mapsKey='';
-try {mapsKey=localStorage.getItem('flightdeck.yandexMapsKey')||'';} catch {}
-if(typeof window.flightDeckMapsKey==='string') mapsKey=window.flightDeckMapsKey;
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
+const mapsKey=(()=>{
+ let legacyKey;
+ try {legacyKey=localStorage.getItem('flightdeck.yandexMapsKey');} catch {}
+ const bundledKey=JSON.parse(byId('map-config').textContent).yandexKey;
+ return [bundledKey,window.flightDeckMapsKey,legacyKey].find(key=>typeof key==='string'&&mapKeyPattern.test(key));
+})();
 
 function editSettings() {
  const p=preferences();
  const preview=variant=>'<span class="theme-mini theme-mini-'+variant+'" aria-hidden="true"><i></i><i></i><i></i></span>';
- openDialog(`<header class="settings-header"><div><h2>${tr("Настройки")}</h2><p class="muted">${tr("Оформление, карта и данные FlightDeck")}</p></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
+ openDialog(`<header class="settings-header"><div><h2>${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
  '<form id="settingsForm" class="settings-layout">'+
  `<fieldset class="settings-section theme-settings"><legend>${tr("Оформление")}</legend><div class="theme-options">`+themes.map(([key,label])=>
  '<label class="theme-option"><input type="radio" name="theme" value="'+key+'" '+(p.theme===key?'checked':'')+'><span class="theme-card"><span class="theme-preview">'+
@@ -46,14 +47,10 @@ function editSettings() {
  '<fieldset class="settings-section"><legend>'+tr('Язык')+'</legend><select aria-label="'+tr('Язык')+'" name="language">'+
  languageOptions.map(([key,label])=>option(key,tr(label),languagePreference)).join('')+'</select></fieldset>'+
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
- `<label>${tr("Имя в профиле")}<input name="profileName" required maxlength="80" value="`+esc(p.profileName)+'"></label>'+
+ `<label>${tr("Имя в профиле")}<input name="profileName" autocomplete="nickname" maxlength="80" value="`+esc(p.profileName)+'"></label>'+
  `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
  '<label>'+tr('Плотность журнала')+'<select name="density">'+option('normal',tr("Обычная"),p.density)+option('compact',tr("Компактная"),p.density)+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
- `<fieldset class="settings-section"><legend>${tr("Карта")}</legend><div class="settings-fields">`+
- `<label>${tr("Источник")}<select name="mapProvider">`+option('offline',tr("Встроенная"),p.mapProvider)+option('yandex',tr("Яндекс Карты"),p.mapProvider)+'</select></label>'+
- `<label>${tr("Ключ JavaScript API Яндекс Карт")}<input name="mapsKey" type="password" autocomplete="off" value="`+esc(mapsKey)+'"></label></div>'+
- `<p class="muted">${tr("Без ключа или интернета используется встроенная карта. Ключ хранится отдельно от резервной копии.")}</p></fieldset>`+
  `<div class="settings-actions controls"><button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button><button class="primary">${tr("Сохранить")}</button></div>`+
  '<div class="settings-credit">'+appCredit+'</div></form>');
  const form=byId('settingsForm');
@@ -62,23 +59,20 @@ function editSettings() {
   data.preferences={...preferences(),theme:e.target.value};
   refreshMapTheme();save();
  });
- form.elements.mapsKey.addEventListener('input',()=>form.elements.mapsKey.setCustomValidity(''));
  form.onsubmit=e=>{
   e.preventDefault();
-  const {mapsKey:key,language,...settings}=Object.fromEntries(new FormData(form));
-  const clean=key.trim();
-  if (clean&&!mapKeyPattern.test(clean)) {
-   form.elements.mapsKey.setCustomValidity(tr("Проверь формат ключа JavaScript API Яндекс Карт."));
-   form.reportValidity();return;
-  }
-  mapsKey=clean;
-  const native=window.webkit?.messageHandlers?.saveMapsKey;
-  if(native) native.postMessage(clean);
-  else try {localStorage.setItem('flightdeck.yandexMapsKey',clean);} catch {notice(tr("Ключ действует до закрытия этой вкладки."));}
-  data.preferences={...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()||'Валерий Вахрушев'};
+  const {language,...settings}=Object.fromEntries(new FormData(form));
+  data.preferences={...p,...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()};
   saveLanguage(language);
   save();byId('dialog').close();render();
  };
+}
+
+const sceneryFields=[['developer','Разработчик',120],['version','Версия',60]];
+function airportSceneryDetails(airport) {
+ return `<details class="airport-scenery full"><summary>${tr('Сведения о сценарии')}</summary><div class="settings-fields">`+
+  sceneryFields.map(([key,label,limit])=>`<label>${tr(label)}<input name="${key}" maxlength="${limit}" value="${esc(airport?.[key])}"${airport?` data-airport-scenery="${key}"`:''}></label>`).join('')+
+  '</div></details>';
 }
 
 function addAirport() {
@@ -93,6 +87,7 @@ function addAirport() {
  `<label>${tr("Широта")}<input name="lat" type="number" step="any" min="-90" max="90"></label>`+
  `<label>${tr("Долгота")}<input name="lon" type="number" step="any" min="-180" max="180"></label>`+
  `<p class="full muted">${tr("Координаты можно оставить пустыми. Для отображения аэропорта на карте укажи обе.")}</p>`+
+ airportSceneryDetails()+
  `<div class="full controls"><button class="primary">${tr("Добавить")}</button><button type="button" data-action="close">${tr("Отмена")}</button></div></form>`);
  const form=byId('airportForm');
  form.addEventListener('input',()=>Array.from(form.elements).forEach(f=>f.setCustomValidity?.('')));
@@ -107,10 +102,10 @@ function addAirport() {
    lon:values.lon===''&&values.lat!==''?tr("Укажи долготу."):''};
   const invalid=Object.keys(errors).find(k=>errors[k]);
   if(invalid){form.elements[invalid].setCustomValidity(errors[invalid]);form.reportValidity();return;}
-  const {cityRu,cityEn,nameRu,nameEn,countryCode,continent}=values;
+  const {cityRu,cityEn,nameRu,nameEn,countryCode,continent,developer,version}=values;
   data.airports.push({icao,iata,name:nameRu,country:displayCountries.ru.of(countryCode),countryCode,continent,
    cityRu,cityEn,nameRu,nameEn,lat:values.lat===''?null:Number(values.lat),lon:values.lon===''?null:Number(values.lon),
-   custom:true,scenery:false,gsx:false,python:false,stands:{narrow:'',wide:''}});
+   developer,version,custom:true,scenery:false,gsx:false,python:false,stands:{narrow:'',wide:''}});
   airportCode=icao;airportCountryFilter=countryCode;query='';airportFilter='all';regionFilter='all';airportListPage=Math.ceil(filteredAirports().length/airportPageSize)-1;
   save();byId('dialog').close();render();
  };
@@ -226,12 +221,8 @@ function initializeYandexFrame(payload) {
 
 function mountYandexMap() {
  const target=byId('onlineMap');
- if(!target||preferences().mapProvider!=='yandex') return;
+ if(!target||!mapsKey) return;
  const status=byId('mapProviderStatus'), fallback=byId('offlineMap');
- if(!mapKeyPattern.test(mapsKey)){
-  status.textContent=tr("Встроенная карта · ключ Яндекс Карт можно добавить в настройках");
-  return;
- }
  const {routes}=completedRoutes(summaryFlights());
  if(!routes.length) return;
  const codes=[...new Set(routes.flatMap(r=>r.codes))];

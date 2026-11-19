@@ -7,3 +7,4 @@ releases/
 .DS_Store
 FlightDesk/FlightDesk.html
 FlightDeck-Windows/FlightDesk.html
+FlightDesk/seed.json

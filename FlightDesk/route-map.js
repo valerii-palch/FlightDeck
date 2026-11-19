@@ -1,5 +1,8 @@
 const airportReference = JSON.parse(byId('airport-reference').textContent);
-const airportInfo = code => Object.hasOwn(airportReference,code) ? airportReference[code] : airport(code);
+const airportInfo = code => {
+ const entry=airport(code);
+ return entry?.custom ? entry : Object.hasOwn(airportReference,code) ? airportReference[code] : entry;
+};
 const airportCity = code => {
  const info = airportInfo(code);
  return (appLanguage()==='en'?info?.cityEn:info?.cityRu)||info?.cityRu||info?.cityEn||airport(code)?.name||code;

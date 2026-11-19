@@ -758,3 +758,48 @@ button:not(.icon-button,.sidebar-sync), input:not([type="checkbox"],[type="radio
 .tour-card h2 { font-size:20px; margin:10px 0; }
 .tour-card .controls { justify-content:flex-end; margin-top:18px; }
 .tour-card .row button { min-height:30px; padding:3px 8px; font-size:12px; }
+
+/* Flight editor keeps the route and form actions visible while the fields scroll. */
+dialog[data-layout="flight"] {
+ width:min(780px,calc(100% - 32px));
+ max-height:calc(100dvh - 32px);
+ padding:0;
+ overflow:hidden;
+}
+.flight-editor-header,.flight-editor-footer {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ padding:14px 22px;
+ background:var(--panel);
+}
+.flight-editor-header { border-bottom:1px solid var(--border); }
+.flight-editor-header h2 { margin:0; }
+.flight-editor { display:grid; grid-template-rows:minmax(0,1fr) auto; gap:0; max-height:calc(100dvh - 100px); }
+.flight-editor-body { display:grid; gap:12px; padding:16px 22px; overflow:auto; overscroll-behavior:contain; }
+.flight-editor-section { min-width:0; padding:14px; border:1px solid var(--border); border-radius:15px; background:var(--panel); }
+.flight-editor-section h3,.flight-editor-extra summary { margin:0; font-size:15px; font-weight:670; }
+.flight-editor-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; margin-top:10px; }
+.flight-editor-fields label { min-width:0; }
+.flight-editor-fields .full { grid-column:1/-1; }
+.flight-editor-route { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:end; }
+.flight-editor-route svg { width:19px; height:19px; margin-bottom:11px; color:var(--blue); }
+.flight-editor-route input { font-variant-numeric:tabular-nums; text-transform:uppercase; font-weight:680; letter-spacing:.065em; }
+.flight-editor-estimate,.flight-editor-empty { display:flex; gap:8px 12px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+.flight-editor-estimate p,.flight-editor-empty p { margin:0; font-size:13px; }
+.flight-editor-extra summary,.airport-scenery summary { cursor:pointer; }
+.flight-editor-footer { justify-content:flex-end; border-top:1px solid var(--border); }
+.airport-list .code { font-size:14px; font-weight:680; letter-spacing:0; }
+.airport-codes .code { font-size:18px; font-weight:700; letter-spacing:0; }
+.airport-list .code small,.airport-codes .code small { font-size:.75em; }
+.airport-list button { padding:9px 12px; }
+.airport-list button .row { gap:9px; }
+.airport-scenery { margin-top:12px; padding:10px 0 0; border-top:1px solid var(--border); }
+.airport-scenery summary { color:var(--muted); font-size:13px; }
+.airport-scenery .settings-fields { margin-top:10px; }
+@media(max-width:540px) {
+ .flight-editor-body,.flight-editor-header,.flight-editor-footer { padding-left:12px; padding-right:12px; }
+ .flight-editor-fields { grid-template-columns:minmax(0,1fr); }
+ .flight-editor-route { gap:8px; }
+}

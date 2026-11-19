@@ -28,6 +28,12 @@ enum FlightLanguage {
     }
 
     private static let english = [
+        "Запуск FlightDeck": "Starting FlightDeck",
+        "Оформление": "Appearance",
+        "Светлая": "Light",
+        "Темная": "Dark",
+        "Имя в профиле": "Profile name",
+        "Не удалось открыть окно входа Google. Попробуй еще раз.": "Could not open Google sign-in. Try again.",
         "Добавь первый рейс": "Add your first flight",
         "Укажи маршрут и время вылета. FlightDeck предложит длительность по журналу и реальным рейсам.": "Enter a route and departure time. FlightDeck suggests a duration from your logbook and real flights.",
         "Актуальный рейс под рукой": "Your current flight",

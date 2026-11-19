@@ -122,9 +122,8 @@ const cloudSame=(a,b)=>JSON.stringify(cloudCanonical(a))===JSON.stringify(cloudC
 function applyCloudCopy(copy){
  if(!validBackup(copy)) throw Error('Формат облачного журнала не поддерживается.');
  data={...data,...JSON.parse(JSON.stringify({flights:copy.flights,airports:copy.airports}))};
- if(typeof copy.profileName==='string'&&copy.profileName.trim()) data.preferences={...preferences(),profileName:copy.profileName.trim().slice(0,80)};
- mergeCodes(data);
- if(!airport(airportCode)) airportCode=data.airports[0].icao;
+ if(typeof copy.profileName==='string') data.preferences={...preferences(),profileName:copy.profileName.trim().slice(0,80)};
+ if(!airport(airportCode)) airportCode=data.airports[0]?.icao||'';
  if(!flight()) pickTail(tail);
  save(false);
 }
@@ -150,7 +149,8 @@ async function synchronizeCloud(choice='',expected,automatic=false){
  if(remote&&cloudBase&&cloudSame(local,cloudBase)&&cloudSame(remoteJournal,cloudRemoteBase)&&!choice){
   return {message:'Журналы совпадают.'};
  }
- if(remote&&(choice==='download'||(!choice&&cloudBase&&cloudSame(local,cloudBase)))){
+ const freshJournal=!local.flights.length&&!local.airports.length&&!local.profileName&&!cloudBase;
+ if(remote&&(choice==='download'||(!choice&&(freshJournal||(cloudBase&&cloudSame(local,cloudBase)))))){
   applyCloudCopy(remoteJournal);
   cloudBase=cloudSnapshot();
   cloudRemoteBase=remoteJournal;

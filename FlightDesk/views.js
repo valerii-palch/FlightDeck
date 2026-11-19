@@ -84,7 +84,7 @@ function home() {
  const recent=newest(rows).slice(0,6), working=workingFlight(rows), latest=working||recent[0];
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const city=code=>esc(airportCity(code));
- return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1><p class="muted">${tr("Привет,")} `+esc(name)+`!</p></div><button class="primary" data-action="new">＋ ${tr("Добавить рейс")}</button></header>`+
+ return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+`</div><button class="primary" data-action="new">＋ ${tr("Добавить рейс")}</button></header>`+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(working.status==='Запланирован'?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div>'+planeIcon+'<div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+esc(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`:`<p class="muted">${tr("Журнал пуст")}</p>`)+
@@ -137,7 +137,8 @@ function pilot() {
  const routes = completed.filter(f=>airport(f.dep)&&airport(f.arr));
  const domestic = routes.filter(f=>isDomestic(airport(f.dep))&&isDomestic(airport(f.arr))).length;
  const international = routes.filter(f=>airport(f.dep).country!==airport(f.arr).country).length;
- return `<section class="panel welcome"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><h2>`+esc(preferences().profileName)+`</h2><p class="muted">${tr("Налет и перелеты по записям журнала")}</p></section>`+cloudProfilePanel()+
+ const name=preferences().profileName;
+ return `<section class="panel welcome"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><div class="row"><h2>${esc(name||tr('Летная книжка'))}</h2><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button></div><p class="muted">${tr("Налет и перелеты по записям журнала")}</p></section>`+cloudProfilePanel()+
  '<div class="profile-metrics facts">'+metric(tr("Общее время"),duration(stats.minutes))+metric(tr("Выполнено перелетов"),stats.count)+metric(tr("Посадки по факту прибытия"),landings)+metric(tr("Посещено стран и территорий"),travelAchievements(rows).countries.size)+'</div>'+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Налет по типам")}</h2>`+
  fleet.map(a=>{const part=flightStats(rows.filter(f=>f.tail===a.tail));return '<div class="strip row"><span>'+a.type+'</span><strong>'+duration(part.minutes)+' · '+part.count+` ${tr("перел.")}</strong></div>`;}).join('')+'</section>'+

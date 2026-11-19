@@ -1,6 +1,9 @@
 import ActivityKit
 import AuthenticationServices
+import BackgroundTasks
 import SwiftUI
+
+private let flightRefreshInterval: TimeInterval = 120
 
 @MainActor
 final class FlightStore: ObservableObject {
@@ -17,6 +20,7 @@ final class FlightStore: ObservableObject {
     private let cloud = Cloud()
     private var session: CloudSession?
     private var expires = Date.distantPast
+    private(set) var canRestoreSession = true
 
     func signIn(email: String, password: String) async {
         guard !busy else { return }
@@ -29,8 +33,12 @@ final class FlightStore: ObservableObject {
         } catch { await report(error) }
     }
 
-    func signInWithGoogle(anchor: ASPresentationAnchor) async {
+    func signInWithGoogle(anchor: ASPresentationAnchor?) async {
         guard !busy else { return }
+        guard let anchor else {
+            error = "Не удалось открыть окно входа Google. Попробуй еще раз."
+            return
+        }
         busy = true
         error = nil
         defer { busy = false }
@@ -45,12 +53,19 @@ final class FlightStore: ObservableObject {
     }
 
     func refresh() async {
-        guard !busy else { return }
-        guard session != nil || SessionKeychain.load() != nil else { return }
+        guard !busy, !Task.isCancelled, session != nil || canRestoreSession else { return }
         busy = true
-        error = nil
         defer { busy = false }
-        do { try await download() } catch { await report(error) }
+        var savedToken: String?
+        if session == nil {
+            guard UIApplication.shared.isProtectedDataAvailable else { return }
+            savedToken = await Task.detached(priority: .utility) { SessionKeychain.load() }.value
+            guard !Task.isCancelled else { return }
+            canRestoreSession = savedToken != nil
+            guard canRestoreSession else { return }
+        }
+        error = nil
+        do { try await download(restoringWith: savedToken) } catch { await report(error) }
     }
 
     func signOut() async {
@@ -64,6 +79,7 @@ final class FlightStore: ObservableObject {
     private func clear() async {
         SessionKeychain.clear()
         session = nil
+        canRestoreSession = false
         signedIn = false
         email = nil
         journal = nil
@@ -78,20 +94,23 @@ final class FlightStore: ObservableObject {
     private func accept(_ session: CloudSession) throws {
         try SessionKeychain.save(session.refresh_token)
         self.session = session
+        canRestoreSession = true
         expires = .now.addingTimeInterval(TimeInterval(session.expires_in))
         email = session.user.email
         signedIn = true
     }
 
-    private func download() async throws {
+    private func download(restoringWith savedToken: String? = nil) async throws {
         if session == nil || expires.timeIntervalSinceNow < 60 {
-            guard let token = session?.refresh_token ?? SessionKeychain.load() else { throw CloudError.session }
+            guard UIApplication.shared.isProtectedDataAvailable else { return }
+            guard let token = session?.refresh_token ?? savedToken else { throw CloudError.session }
             try accept(await cloud.renew(token))
         }
         guard let session else { throw CloudError.session }
         do {
             journal = try await cloud.journal(session)
         } catch CloudError.service(401) {
+            guard UIApplication.shared.isProtectedDataAvailable else { return }
             let renewed = try await cloud.renew(session.refresh_token)
             try accept(renewed)
             journal = try await cloud.journal(renewed)
@@ -174,7 +193,7 @@ final class FlightStore: ObservableObject {
             diversionAirport: flight.diverted ? flight.diversionAirport : nil,
             language: FlightLanguage.current
         )
-        return ActivityContent(state: state, staleDate: (updated ?? .now).addingTimeInterval(120))
+        return ActivityContent(state: state, staleDate: (updated ?? .now).addingTimeInterval(flightRefreshInterval + 30))
     }
 
     private func report(_ failure: Error) async {
@@ -193,27 +212,100 @@ final class FlightStore: ObservableObject {
 @main
 @MainActor
 struct FlightDeckApp: App {
+    private static let refreshIdentifier = "app.flightdeck.mobile.refresh"
     @StateObject private var store = FlightStore()
     @Environment(\.scenePhase) private var phase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var launchComplete = false
 
     var body: some Scene {
         WindowGroup {
-            FlightDeckView(store: store)
-                .task(id: store.activity?.id) { await store.observeActivity() }
-                .task(id: phase) {
-                    guard phase == .active else { return }
-                    while !Task.isCancelled {
-                        await store.refresh()
-                        do { try await Task.sleep(for: .seconds(45)) } catch { return }
+            ZStack {
+                if launchComplete {
+                    FlightDeckView(store: store)
+                } else {
+                    FlightLaunchView()
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: launchComplete)
+            .task {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                launchComplete = true
+            }
+            .task(id: store.activity?.id) { await store.observeActivity() }
+            .task(id: phase) {
+                guard phase == .active else { return }
+                let clock = ContinuousClock()
+                while !Task.isCancelled {
+                    let next = clock.now.advanced(by: .seconds(flightRefreshInterval))
+                    // A scene change must not interrupt a refresh-token rotation.
+                    await Task { await store.refresh() }.value
+                    guard !Task.isCancelled else { return }
+                    launchComplete = true
+                    do { try await clock.sleep(until: next) } catch { return }
+                }
+            }
+            .onChange(of: store.signedIn) { _, signedIn in
+                if !signedIn {
+                    BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.refreshIdentifier)
+                }
+            }
+        }
+        .onChange(of: phase) { _, phase in
+            if phase == .background, store.signedIn { scheduleRefresh() }
+        }
+        .backgroundTask(.appRefresh(Self.refreshIdentifier)) {
+            await store.refresh()
+            if store.canRestoreSession { scheduleRefresh() }
+        }
+    }
+
+    private func scheduleRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.refreshIdentifier)
+        request.earliestBeginDate = .now.addingTimeInterval(flightRefreshInterval)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            // Foreground refresh still works when iOS disables background refresh.
+        }
+    }
+}
+
+private struct FlightLaunchView: View {
+    var body: some View {
+        ZStack {
+            Color("LaunchNavy")
+            RadialGradient(colors: [Color(red: 0.10, green: 0.32, blue: 0.64).opacity(0.66), .clear],
+                           center: .center, startRadius: 28, endRadius: 260)
+            Image("LaunchMark")
+                .resizable()
+                .frame(width: 120, height: 120)
+                .shadow(color: .blue.opacity(0.42), radius: 30)
+                .accessibilityHidden(true)
+                .overlay(alignment: .top) {
+                    VStack(spacing: 18) {
+                        Text("FlightDeck")
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .tracking(-0.8)
+                            .foregroundStyle(.white)
+                        ProgressView()
+                            .tint(Color(red: 0.58, green: 0.79, blue: 1))
+                            .accessibilityLabel(FlightLanguage.text("Запуск FlightDeck", language: FlightLanguage.current))
                     }
+                    .fixedSize()
+                    .offset(y: 138)
                 }
         }
+        .ignoresSafeArea()
+        .environment(\.colorScheme, .dark)
+        .statusBarHidden()
     }
 }
 
 struct FlightDeckView: View {
     @ObservedObject var store: FlightStore
     @AppStorage("includeDemo") private var includeDemo = false
+    @AppStorage("flightdeck.theme") private var theme = "system"
     @State private var tab = 0
     @AppStorage("flightdeck.onboarding.v1") private var helpCompleted = false
     @State private var helpStep: Int?
@@ -247,7 +339,7 @@ struct FlightDeckView: View {
 
             NavigationStack {
                 ProfileView(store: store, includeDemo: $includeDemo, language: $language, languageCode: languageCode,
-                            replayHelp: { tab = 0; helpStep = 0 })
+                            theme: $theme, replayHelp: { tab = 0; helpStep = 0 })
                     .navigationTitle(t("Профиль"))
             }
             .tabItem { Label(t("Профиль"), systemImage: "person.crop.circle") }
@@ -273,6 +365,7 @@ struct FlightDeckView: View {
             .allowsHitTesting(helpStep != nil)
         }
         .task { if !helpCompleted { tab = 0; helpStep = 0 } }
+        .preferredColorScheme(theme == "dark" ? .dark : theme == "light" ? .light : nil)
         .tint(.blue)
         .task(id: languageCode) { await store.updateActivityLanguage(languageCode) }
     }
@@ -433,16 +526,26 @@ struct ProfileView: View {
     @Binding var includeDemo: Bool
     @Binding var language: String
     let languageCode: String
+    @Binding var theme: String
     let replayHelp: () -> Void
     private func t(_ key: String) -> String { FlightLanguage.text(key, language: languageCode) }
     @State private var email = ""
     @State private var password = ""
+    @AppStorage("flightdeck.displayName") private var displayName = ""
+
+    private var googleWindow: ASPresentationAnchor? {
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }.flatMap(\.windows)
+        return windows.first(where: \.isKeyWindow)
+            ?? windows.first { !$0.isHidden && $0.windowLevel == .normal }
+    }
 
     var body: some View {
         Form {
             Section(t("Аккаунт FlightDeck")) {
                 if store.signedIn {
-                    if let name = store.journal?.profileName, !name.isEmpty { Text(name).font(.headline) }
+                    if let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? store.journal?.profileName : displayName,
+                       !name.isEmpty { Text(name).font(.headline) }
                     if let email = store.email { Text(email).foregroundStyle(.secondary) }
                     Button(t("Обновить журнал")) { Task { await store.refresh() } }
                         .disabled(store.busy)
@@ -450,8 +553,7 @@ struct ProfileView: View {
                         .disabled(store.busy)
                 } else {
                     Button(t("Продолжить с Google")) {
-                        guard let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-                              let window = scene.windows.first(where: { $0.isKeyWindow }) else { return }
+                        let window = googleWindow
                         Task { await store.signInWithGoogle(anchor: window) }
                     }
                     .disabled(store.busy)
@@ -474,10 +576,20 @@ struct ProfileView: View {
             }
             .anchorPreference(key: HelpAnchorKey.self, value: .bounds) { ["account": $0] }
             Section(t("Настройки")) {
+                TextField(t("Имя в профиле"), text: $displayName)
+                    .textContentType(.nickname)
+                    .onChange(of: displayName) { _, value in
+                        if value.count > 80 { displayName = String(value.prefix(80)) }
+                    }
                 Picker(t("Язык"), selection: $language) {
                     Text(t("Как в системе")).tag("system")
                     Text("Русский").tag("ru")
                     Text("English").tag("en")
+                }
+                Picker(t("Оформление"), selection: $theme) {
+                    Text(t("Как в системе")).tag("system")
+                    Text(t("Светлая")).tag("light")
+                    Text(t("Темная")).tag("dark")
                 }
             }
             Section {

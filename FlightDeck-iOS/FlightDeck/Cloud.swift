@@ -70,7 +70,7 @@ struct Cloud {
         var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
         components.path = path
         components.queryItems = query
-        var request = URLRequest(url: components.url!, timeoutInterval: 15)
+        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.setValue(key, forHTTPHeaderField: "apikey")
         if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         if let body {

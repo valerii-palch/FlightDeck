@@ -1,7 +1,10 @@
 from argparse import ArgumentParser
 from base64 import b64encode
 from pathlib import Path
+import json
+import os
 import plistlib
+import re
 
 root = Path(__file__).resolve().parent
 parser = ArgumentParser(description='Build the standalone FlightDeck web interface.')
@@ -30,5 +33,8 @@ html = html.replace('__ROUTE_MAP__', (root / 'route-map.js').read_text(encoding=
 reference = (root / 'airport-reference.json').read_text(encoding='utf-8').replace('<', '\\u003c')
 html = html.replace('__AIRPORT_REFERENCE__', reference)
 html = html.replace('__AIRPORT_PHOTOS__', (root / 'airport-photos.json').read_text(encoding='utf-8').replace('<', r'\u003c'))
-html = html.replace('__SEED__', (root / 'seed.json').read_text(encoding='utf-8').replace('<', '\\u003c'))
+map_key = os.environ.get('FLIGHTDECK_YANDEX_MAPS_KEY', '').strip()
+if map_key and not re.fullmatch(r'[A-Za-z0-9_-]{20,120}', map_key):
+    parser.error('FLIGHTDECK_YANDEX_MAPS_KEY has an invalid format')
+html = html.replace('__MAP_CONFIG__', json.dumps({'yandexKey': map_key}))
 args.output.write_text(html, encoding='utf-8')

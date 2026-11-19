@@ -65,7 +65,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         controller.add(self, name: "closeWindow")
         controller.add(self, name: "toggleFullscreen")
         if !testing {
-            controller.add(self, name: "saveMapsKey")
             if let key = UserDefaults.standard.string(forKey: "yandexMapsJavaScriptKey"),
                let encoded = try? JSONEncoder().encode(key),
                let json = String(data: encoded, encoding: .utf8) {
@@ -155,10 +154,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             }
             return
         }
-        if message.name == "saveMapsKey" {
-            UserDefaults.standard.set(text, forKey: "yandexMapsJavaScriptKey")
-            return
-        }
         if message.name == "saveState" {
             do {
                 try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -184,7 +179,8 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if action.navigationType == .linkActivated, action.sourceFrame.isMainFrame,
            let url = action.request.url,
-           (url.scheme == "mailto" && url.path.lowercased() == "valvah2000@gmail.com" ||
+           action.sourceFrame.request.url == Bundle.main.url(forResource: "FlightDesk", withExtension: "html"),
+           (url.scheme == "mailto" && !url.path.isEmpty ||
             url.scheme == "https" && url.host == "mail.google.com") {
             if !NSWorkspace.shared.open(url) {
                 webView.evaluateJavaScript("notice(tr('Открой ссылку Gmail в форме обратной связи.'))")
@@ -206,11 +202,52 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard testing else { return }
+        var fixture = "null"
+        if let path = ProcessInfo.processInfo.environment["FLIGHTDECK_SELF_TEST_FIXTURE"],
+           let raw = try? Data(contentsOf: URL(fileURLWithPath: path)),
+           let json = try? JSONSerialization.jsonObject(with: raw),
+           let encoded = try? JSONSerialization.data(withJSONObject: json),
+           let serialized = String(data: encoded, encoding: .utf8) {
+            fixture = serialized
+        }
         webView.evaluateJavaScript("""
         (() => {
           const check = (condition, name) => { if (!condition) throw Error(name); };
-          check(data.airports.length === 104 && data.flights.length === 56, 'seed');
+          check(data.airports.length === 0 && data.flights.length === 0 && preferences().profileName === '', 'empty installation');
           check(document.querySelector('h1').textContent === 'Главная', 'initial view');
+          check(validBackup(data), 'empty backup');
+          applyCloudCopy({airports: [], flights: [], profileName: ''});
+          document.querySelector('[data-page=pilot]').click();
+          document.querySelector('[data-action=profile-name]').click();
+          const settings = document.querySelector('#settingsForm');
+          check(!settings.elements.mapsKey && !settings.elements.mapProvider, 'map settings hidden');
+          settings.elements.profileName.value = 'Тестовый пилот';
+          settings.requestSubmit();
+          check(preferences().profileName === 'Тестовый пилот', 'editable profile');
+          document.querySelector('[data-page=airports]').click();
+          document.querySelector('[data-action=add-airport]').click();
+          const airportForm = document.querySelector('#airportForm');
+          airportForm.elements.icao.value = 'TEST';
+          airportForm.elements.cityRu.value = 'Тестовый город';
+          airportForm.elements.nameRu.value = 'Тестовый аэропорт';
+          airportForm.elements.developer.value = 'Test Studio';
+          airportForm.elements.version.value = '1.2';
+          airportForm.requestSubmit();
+          check(airport('TEST')?.developer === 'Test Studio' && airport('TEST')?.version === '1.2', 'airport scenery details');
+          const version = document.querySelector('[data-airport-scenery=version]');
+          version.value = '1.3';
+          version.dispatchEvent(new Event('change', {bubbles:true}));
+          check(cloudSnapshot().airports[0].version === '1.3', 'airport scenery edit persisted');
+          document.querySelector('[data-action=new]').click();
+          check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
+          document.querySelector('#dialog').close();
+          const fixture = \(fixture);
+          if (!fixture) return 'PASS: empty installation, profile, airport details and flight editor';
+          check(validBackup(fixture), 'legacy backup format');
+          data = migrateDiversion(fixture);
+          airportCode = '';
+          pickTail(tail);
+          render();
           check(capacity(fleet[2]) === 402 && fleet[2].stands === fleet[1].stands, '777');
           check(stands('UUEE').some(s => s.includes('118')), 'standing range');
           const sample = {...flight(), date:'2026-02-07', std:'09:10', status:'Идет посадка',
@@ -234,7 +271,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           document.querySelector('[data-aircraft="RA-73155"]').click();
           check(document.querySelector('h1').textContent==='RA-73155','aircraft detail');
           document.querySelector('[data-page=pilot]').click();
-          check(document.querySelector('main').textContent.includes('Валерий Вахрушев'),'pilot logbook');
+          check(document.querySelector('[data-action=profile-name]'),'pilot logbook');
           document.querySelector('[data-page=journal]').click();
           check(document.querySelectorAll('.arrival-late').length>0,'journal late styling');
           document.querySelector('[data-page=airports]').click();
@@ -248,6 +285,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           document.querySelector('[data-tail="RA-73132"]').click();
           document.querySelector('[data-action=new]').click();
           const form = document.querySelector('#editForm');
+          form.elements.dep.value = 'UUEE';
           form.elements.arr.value = 'URSS';
           form.elements.std.value = '23:50';
           form.elements.sta.value = '03:45';
