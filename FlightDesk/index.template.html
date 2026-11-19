@@ -32,6 +32,7 @@ __EXTRA_CSS__
   <span class="version">v__VERSION__</span>
  </div>
 </div>
+<section id="accessGate" hidden></section>
 <div class="shell">
  <div id="windowControls" class="window-controls"></div>
  <aside class="sidebar" id="nav"></aside>
@@ -48,11 +49,16 @@ __EXTRA_CSS__
 'use strict';
 __LOCALIZATION__
 applyLanguage();
-const fleet = [
- {tail:'RA-73709', short:'A321', type:'Airbus A321-211', name:'А. Шнитке', seats:[167,0,16], stands:'narrow'},
- {tail:'RA-73155', short:'A350', type:'Airbus A350-900', name:'А. Дементьев', seats:[264,24,28], stands:'wide'},
- {tail:'RA-73132', short:'B777', type:'Boeing 777-300ER', name:'М. Лермонтов', seats:[324,48,30], stands:'wide'}
+// Public Aeroflot fleet registrations. Existing logbooks use these identifiers as keys.
+// https://www.flightradar24.com/data/aircraft/RA-73709
+// https://www.flightradar24.com/data/aircraft/RA-73155
+// https://www.flightradar24.com/data/aircraft/RA-73132
+const personalFleet = [
+ {tail:'RA-73709', short:'A321', type:'Airbus A321-211', name:'Узкофюзеляжный', seats:[167,0,16], stands:'narrow'},
+ {tail:'RA-73155', short:'A350', type:'Airbus A350-900', name:'Широкофюзеляжный', seats:[264,24,28], stands:'wide'},
+ {tail:'RA-73132', short:'B777', type:'Boeing 777-300ER', name:'Широкофюзеляжный', seats:[324,48,30], stands:'wide'}
 ];
+let fleet=personalFleet;
 const aircraftModel = a => a.type;
 const aircraftFor = tail => fleet.find(a=>a.tail===tail);
 const appCredit = '<small class="version">v__VERSION__</small>';
@@ -78,6 +84,7 @@ function notice(message) {
  noticeTimer = setTimeout(() => byId('notice').textContent = '', 4200);
 }
 function save(sync=true) {
+ if(demoWorkspace) return;
  if(sync) queueCloudSync();
  if (nativeStorage) { nativeStorage.postMessage(JSON.stringify(data)); return; }
  try { localStorage.setItem(storageKey, JSON.stringify(data)); storageAvailable = true; }
@@ -262,6 +269,7 @@ __JOURNAL__
 __ROUTE_MAP__
 __EXPERIENCE__
 __CLOUD__
+__ACCESS__
 __GOOGLE_AUTH__
 __REAL_FLIGHT_DATA__
 __PLANNING__
@@ -348,17 +356,22 @@ let mapCleanup, renderedPage;
 function render() {
  mapCleanup?.();
  applyTheme();
+ const gated=!demoWorkspace&&!data.workspaceUnlocked;
+ document.querySelector('.shell').hidden=gated;
+ byId('accessGate').hidden=!gated;
+ if(gated){renderAccessGate();return;}
+ byId('accessGate').replaceChildren();
  const pageChanged=renderedPage!==page;
  renderedPage=page;
  const native=!!window.webkit?.messageHandlers?.closeWindow;
  byId('windowControls').innerHTML='<div class="window-buttons">'+(native?`<button class="icon-button" data-action="window-close" aria-label="${tr("Закрыть окно")}">`+toolbarIcon('close')+'</button>':'')+
  `<button class="icon-button" data-action="fullscreen" aria-label="${tr("Полноэкранный режим")}">`+toolbarIcon('fullscreen')+'</button></div>'+
- '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck</div>'+
+ '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
  byId('nav').innerHTML=`<button class="primary sidebar-new" data-action="new">＋ ${tr("Добавить рейс")}</button>`+pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id||page==='aircraft'&&id==='fleet'?'active':'')+'">'+tr(label)+'</button>').join('')+
  '<div class="grow"></div>'+fleet.map(a=>'<button class="tail '+(tail===a.tail?'active':'')+'" data-tail="'+a.tail+'">'+aircraftModel(a)+'<small>'+tr(a.name)+'</small><small class="tail-registration">'+a.tail+'</small></button>').join('')+
- '<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>'+
+ (demoWorkspace?'<button data-action="exit-demo">'+tr('Выйти из демо')+'</button>':'<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+
  '<button data-action="feedback">'+tr('Обратная связь')+'</button><div class="sidebar-credit">'+appCredit+'</div>';
  byId('main').dataset.page = page;
  byId('main').innerHTML=(page==='home'?'':'<header class="top"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1><div class="controls">'+
@@ -508,6 +521,7 @@ function validBackup(value) {
  Number.isFinite(clockOn(f.date,f.std)) && typeof f.sta==='string');
 }
 function backup() {
+ if(demoWorkspace){notice(tr('Резервные копии доступны в личном журнале.'));return;}
  openDialog(`<h2>${tr("Резервная копия")}</h2><div class="stack"><p>${tr("Сохрани рейсы и настройки аэропортов в JSON. Загрузка копии заменит текущие данные.")}</p>`+
  `<div class="controls"><button id="exportBackup">${tr("Сохранить JSON")}</button><button data-action="close">${tr("Закрыть")}</button></div>`+
  `<label>${tr("Загрузить копию")}<input id="backupFile" type="file" accept=".json,application/json"></label><button id="importBackup" disabled>${tr("Заменить данные из копии")}</button></div>`);
@@ -524,7 +538,7 @@ function backup() {
   try {
    const restored=JSON.parse(await byId('backupFile').files[0].text());
    if(!validBackup(restored)) throw Error('format');
-   data=migrateDiversion(restored); airportCode=data.airports[0]?.icao||''; pickTail(tail);
+   data={...migrateDiversion(restored),workspaceUnlocked:data.workspaceUnlocked}; airportCode=data.airports[0]?.icao||''; pickTail(tail);
    save(); byId('dialog').close(); render(); notice(tr("Копия загружена."));
   } catch {notice(tr("Не удалось прочитать резервную копию."));}
  };
@@ -563,6 +577,8 @@ document.addEventListener('click',e=>{
  }
  if(d.action==='clear-journal-date'){journalDate='';render();byId('journalDate')?.focus();}
  if(d.action==='settings') editSettings();
+ if(d.action==='exit-demo') exitDemoWorkspace();
+ if(d.action==='reset-profile'&&!demoWorkspace) confirmProfileReset();
  if(d.action==='profile-name'){editSettings();byId('settingsForm').elements.profileName.focus();}
  if(d.action==='add-airport') addAirport();
  if(d.action==='new') editFlight();
@@ -630,7 +646,7 @@ setTimeout(() => {
  splash.classList.add('ready');
  splash.setAttribute('aria-hidden','true');
  shell.inert = false;
- if(!tourCompleted()&&!byId('dialog').open)startTour();
+ if(data.workspaceUnlocked&&!demoWorkspace&&!tourCompleted()&&!byId('dialog').open)startTour();
 }, 2000);
 if(!storageAvailable) notice(tr("Хранилище недоступно. Выгрузи резервную копию после работы."));
 setInterval(()=>queueCloudSync(0),45000);

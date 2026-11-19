@@ -27,7 +27,7 @@ function cloudEditing(){
 }
 
 function queueCloudSync(delay=900){
- if(!cloudSession||cloudConflict) return;
+ if(demoWorkspace||!cloudSession||cloudConflict) return;
  if(delay&&cloudState==='ready'){
   cloudState='pending';
   updateCloudIndicator();
@@ -178,7 +178,34 @@ function cloudMessage(message) {
  return tr(message);
 }
 
+async function resetCloudProfile() {
+ if(!cloudSession||cloudBusy) throw Error('Дождись завершения синхронизации.');
+ clearTimeout(cloudTimer);
+ cloudBusy=true;
+ try {
+  const token=await cloudToken();
+  const owner=cloudSession.user.id;
+  const endpoint='/rest/v1/flightdeck_journals';
+  const filter='?owner_id=eq.'+encodeURIComponent(owner);
+  const [remote]=await cloudRequest(endpoint+filter+'&select=version,journal',{token});
+  if(remote&&!validBackup(remote.journal)) throw Error('Формат облачного журнала не поддерживается.');
+  const local={...cloudSnapshot(),flights:[],profileName:''};
+  const journal={...local,airports:remote?.journal.airports??local.airports};
+  const body={journal,version:(remote?.version??0)+1};
+  const updated=await cloudRequest(remote?endpoint+filter+'&version=eq.'+remote.version:endpoint,{
+   token,method:remote?'PATCH':'POST',representation:true,
+   body:remote?body:{...body,owner_id:owner}
+  });
+  if(!updated?.length) throw Error('Журнал изменился. Подтверди сброс снова.');
+  cloudBase=local;cloudRemoteBase=journal;
+  cloudConflict=cloudSame(local,journal)?null:{version:body.version,local,remote:journal};
+  cloudState='ready';
+  cloudStatus='Рейсы и профиль очищены.';
+ } finally {cloudBusy=false;}
+}
+
 function cloudProfilePanel(){
+ if(demoWorkspace) return '<section class="panel facts"><p>'+tr('Это демо. Изменения исчезнут при выходе.')+'</p></section>';
  const disabled=cloudBusy?' disabled':'';
  const conflict=cloudConflict;
  return `<section class="panel facts cloud-profile" aria-labelledby="cloudHeading"><h2 id="cloudHeading">${tr("Аккаунт и синхронизация")}</h2>`+
@@ -189,8 +216,7 @@ function cloudProfilePanel(){
  `<p>${tr("Копии различаются. Локально:")} `+conflict.local.flights.length+' '+tr('рейсов ·')+' '+esc(conflict.local.profileName)+'. '+tr('В облаке:')+' '+conflict.remote.flights.length+' '+tr('рейсов')+(conflict.remote.profileName?' · '+esc(conflict.remote.profileName):'')+'.</p>'+
  '<div class="controls facts"><button id="cloudDownload"'+disabled+`>${tr("Использовать облачную копию")}</button><button id="cloudUpload"`+disabled+`>${tr("Использовать локальную копию")}</button><button data-action="backup">${tr("Резервная копия")}</button></div>`:
  `<p>${tr("Облачной копии пока нет.")}</p><button id="cloudUpload" class="facts"`+disabled+`>${tr("Загрузить в облако")}</button>`)+'</div>':''):
- `<form id="cloudLoginForm" class="cloud-login"><label>${tr("Электронная почта")}<input name="email" type="email" autocomplete="username" required></label>`+
- `<label>${tr("Пароль")}<input name="password" type="password" autocomplete="current-password" required></label><button class="primary"`+disabled+`>${tr("Войти")}</button></form><button id="googleLogin" class="facts" type="button"`+disabled+`>${tr("Продолжить с Google")}</button>`)+
+ signInFields(disabled))+
  `<p class="muted facts">${tr("Синхронизируются имя профиля, рейсы и аэропорты.")}</p>`+
  '<p id="cloudStatus" class="muted" role="status">'+esc(cloudBusy?tr("Подождите…"):cloudMessage(cloudStatus))+'</p></section>';
 }
@@ -209,7 +235,7 @@ function bindCloudProfile(){
   catch(error){cloudStatus=error.message;cloudState='error';}
   finally {
    cloudBusy=false;
-   if(page==='pilot'&&!byId('dialog')?.open) render();
+   if((page==='pilot'||!byId('accessGate').hidden||form)&&!byId('dialog')?.open) render();
    else updateCloudIndicator();
   }
  };
@@ -223,9 +249,7 @@ function bindCloudProfile(){
     acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=password',{
      method:'POST',body:{email,password}
     }));
-    cloudBase=null;cloudRemoteBase=null;cloudConflict=null;cloudState='pending';
-    queueCloudSync(0);
-    return 'Вход выполнен. Проверяем облачную копию.';
+    return unlockWorkspace();
    });
   };
   return;
@@ -243,7 +267,10 @@ function bindCloudProfile(){
  if(byId('cloudDownload')) byId('cloudDownload').onclick=()=>perform(()=>sync('download',conflict));
  byId('cloudLogout').onclick=()=>perform(async()=>{
   try {await cloudRequest('/auth/v1/logout?scope=local',{method:'POST',token:await cloudToken()});}
-  finally {clearTimeout(cloudTimer);cloudSession=null;cloudBase=null;cloudRemoteBase=null;cloudConflict=null;}
+  finally {
+   clearTimeout(cloudTimer);cloudSession=null;cloudBase=null;cloudRemoteBase=null;cloudConflict=null;
+   data.workspaceUnlocked=false;save(false);
+  }
   return 'Выход выполнен.';
  });
 }

@@ -214,6 +214,15 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         (() => {
           const check = (condition, name) => { if (!condition) throw Error(name); };
           check(data.airports.length === 0 && data.flights.length === 0 && preferences().profileName === '', 'empty installation');
+          check(!byId('accessGate').hidden && document.querySelector('.shell').hidden, 'initial authorization gate');
+          byId('openDemo').click();
+          check(data.flights.length > 0 && data.airports.length > 0 && fleet.every(a=>a.tail.startsWith('DEMO')), 'fictional workspace');
+          data.flights.length=0;
+          save();
+          exitDemoWorkspace();
+          check(data.flights.length === 0 && !byId('accessGate').hidden, 'demo remains separate');
+          data.workspaceUnlocked=true;
+          render();
           check(document.querySelector('h1').textContent === 'Главная', 'initial view');
           check(validBackup(data), 'empty backup');
           applyCloudCopy({airports: [], flights: [], profileName: ''});

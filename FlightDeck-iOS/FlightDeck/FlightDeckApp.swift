@@ -76,6 +76,28 @@ final class FlightStore: ObservableObject {
         error = nil
     }
 
+    func resetProfile() async -> Bool {
+        guard let session, !busy else { return false }
+        busy = true
+        error = nil
+        defer { busy = false }
+        do {
+            do {
+                journal = try await cloud.resetProfile(session)
+            } catch CloudError.service(401) {
+                let renewed = try await cloud.renew(session.refresh_token)
+                try accept(renewed)
+                journal = try await cloud.resetProfile(renewed)
+            }
+            updated = .now
+            await updateActivity()
+            return true
+        } catch {
+            await report(error)
+            return false
+        }
+    }
+
     private func clear() async {
         SessionKeychain.clear()
         session = nil
@@ -307,11 +329,12 @@ struct FlightDeckView: View {
     @AppStorage("includeDemo") private var includeDemo = false
     @AppStorage("flightdeck.theme") private var theme = "system"
     @State private var tab = 0
+    @State private var demoMode = false
     @AppStorage("flightdeck.onboarding.v1") private var helpCompleted = false
     @State private var helpStep: Int?
     private let helpPages = [0, 1, 1]
-    private var helpTitles: [String] { ["Актуальный рейс под рукой", "Подключи облако", "Настрой FlightDeck под себя"] }
-    private var helpMessages: [String] { ["Здесь виден актуальный рейс, время и статус. Потяни экран вниз, чтобы обновить журнал.", "Войди через Google или по почте. Один аккаунт открывает общий журнал на компьютере и iPhone.", "В профиле можно выбрать язык, повторить обучение и написать обратную связь."] }
+    private var helpTitles: [String] { ["Актуальный рейс под рукой", "Аккаунт FlightDeck", "Настрой FlightDeck под себя"] }
+    private var helpMessages: [String] { ["Здесь виден актуальный рейс, время и статус. Потяни экран вниз, чтобы обновить журнал.", "Один аккаунт открывает общий журнал на компьютере и iPhone.", "В профиле можно выбрать язык, повторить обучение и написать обратную связь."] }
     private func finishHelp() { helpCompleted = true; helpStep = nil }
 
     @AppStorage(FlightLanguage.preferenceKey) private var language = "system"
@@ -319,6 +342,33 @@ struct FlightDeckView: View {
     private func t(_ key: String, _ args: String...) -> String { FlightLanguage.text(key, language: languageCode, args: args) }
 
     var body: some View {
+        Group {
+            if store.signedIn {
+                personalWorkspace
+            } else if demoMode {
+                NavigationStack {
+                    DemoFlightView(languageCode: languageCode) { demoMode = false }
+                        .background(background)
+                        .navigationTitle("FlightDeck")
+                }
+            } else {
+                NavigationStack {
+                    ProfileView(store: store, includeDemo: $includeDemo, language: $language, languageCode: languageCode,
+                                theme: $theme, replayHelp: {}, openDemo: { demoMode = true })
+                        .navigationTitle(t("Вход в FlightDeck"))
+                }
+            }
+        }
+        .onChange(of: store.signedIn) { _, signedIn in
+            if signedIn { demoMode = false; tab = 0 }
+            else { helpStep = nil }
+        }
+        .preferredColorScheme(theme == "dark" ? .dark : theme == "light" ? .light : nil)
+        .tint(.blue)
+        .task(id: languageCode) { await store.updateActivityLanguage(languageCode) }
+    }
+
+    private var personalWorkspace: some View {
         TabView(selection: $tab) {
             NavigationStack {
                 ScrollView {
@@ -365,9 +415,6 @@ struct FlightDeckView: View {
             .allowsHitTesting(helpStep != nil)
         }
         .task { if !helpCompleted { tab = 0; helpStep = 0 } }
-        .preferredColorScheme(theme == "dark" ? .dark : theme == "light" ? .light : nil)
-        .tint(.blue)
-        .task(id: languageCode) { await store.updateActivityLanguage(languageCode) }
     }
 
     private var background: some View {
@@ -522,12 +569,14 @@ struct FlightCard: View {
 
 struct ProfileView: View {
     @State private var feedbackPresented = false
+    @State private var resetPresented = false
     @ObservedObject var store: FlightStore
     @Binding var includeDemo: Bool
     @Binding var language: String
     let languageCode: String
     @Binding var theme: String
     let replayHelp: () -> Void
+    var openDemo: (() -> Void)? = nil
     private func t(_ key: String) -> String { FlightLanguage.text(key, language: languageCode) }
     @State private var email = ""
     @State private var password = ""
@@ -570,38 +619,110 @@ struct ProfileView: View {
                         }
                     }
                     .disabled(store.busy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
+                    if let openDemo {
+                        Button(t("Продолжить без входа · Демо"), action: openDemo)
+                            .disabled(store.busy)
+                    }
                 }
                 if store.busy { ProgressView() }
                 if let error = store.error { Text(FlightLanguage.error(error, language: languageCode)).foregroundStyle(.orange) }
             }
             .anchorPreference(key: HelpAnchorKey.self, value: .bounds) { ["account": $0] }
-            Section(t("Настройки")) {
-                TextField(t("Имя в профиле"), text: $displayName)
-                    .textContentType(.nickname)
-                    .onChange(of: displayName) { _, value in
-                        if value.count > 80 { displayName = String(value.prefix(80)) }
+            if store.signedIn {
+                Section(t("Настройки")) {
+                    TextField(t("Имя в профиле"), text: $displayName)
+                        .textContentType(.nickname)
+                        .onChange(of: displayName) { _, value in
+                            if value.count > 80 { displayName = String(value.prefix(80)) }
+                        }
+                    Picker(t("Язык"), selection: $language) {
+                        Text(t("Как в системе")).tag("system")
+                        Text("Русский").tag("ru")
+                        Text("English").tag("en")
                     }
-                Picker(t("Язык"), selection: $language) {
-                    Text(t("Как в системе")).tag("system")
-                    Text("Русский").tag("ru")
-                    Text("English").tag("en")
+                    Picker(t("Оформление"), selection: $theme) {
+                        Text(t("Как в системе")).tag("system")
+                        Text(t("Светлая")).tag("light")
+                        Text(t("Темная")).tag("dark")
+                    }
                 }
-                Picker(t("Оформление"), selection: $theme) {
-                    Text(t("Как в системе")).tag("system")
-                    Text(t("Светлая")).tag("light")
-                    Text(t("Темная")).tag("dark")
+                Section {
+                    Button(t("Повторить обучение"), action: replayHelp)
+                    Button(t("Обратная связь")) { feedbackPresented = true }
                 }
-            }
-            Section {
-                Button(t("Повторить обучение"), action: replayHelp)
-                Button(t("Обратная связь")) { feedbackPresented = true }
-            }
-            .anchorPreference(key: HelpAnchorKey.self, value: .bounds) { ["help": $0] }
-            Section(t("Отображение")) {
-                Toggle(t("Показывать деморейсы"), isOn: $includeDemo)
+                .anchorPreference(key: HelpAnchorKey.self, value: .bounds) { ["help": $0] }
+                Section(t("Отображение")) {
+                    Toggle(t("Показывать деморейсы"), isOn: $includeDemo)
+                }
+                Section {
+                    Button(t("Сбросить рейсы и профиль"), role: .destructive) { resetPresented = true }
+                        .disabled(store.busy)
+                }
             }
         }
         .sheet(isPresented: $feedbackPresented) { FeedbackView(language: languageCode) }
+        .alert(t("Сбросить рейсы и профиль?"), isPresented: $resetPresented) {
+            Button(t("Отмена"), role: .cancel) {}
+            Button(t("Удалить все рейсы"), role: .destructive) {
+                Task { if await store.resetProfile() { displayName = "" } }
+            }
+        } message: {
+            Text(t("Все рейсы и имя профиля будут удалены из облака. Аэропорты сохранятся."))
+        }
+    }
+}
+
+private struct DemoFlightView: View {
+    let languageCode: String
+    let exit: () -> Void
+    @State private var selected = 0
+
+    private func t(_ key: String) -> String { FlightLanguage.text(key, language: languageCode) }
+
+    private let airports = [
+        Airport(icao: "ZZNA", iata: "ZNA", name: "North Bay", cityRu: "Норд-Бей", cityEn: "North Bay"),
+        Airport(icao: "ZZSC", iata: "ZSC", name: "Sun Coast", cityRu: "Солнечный Берег", cityEn: "Sun Coast"),
+        Airport(icao: "ZZSP", iata: "ZSP", name: "Silver Port", cityRu: "Серебряный Порт", cityEn: "Silver Port")
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(t("Демо")).font(.title2.bold())
+                Picker(t("Рейс"), selection: $selected) {
+                    Text("FD 100").tag(0)
+                    Text("FD 101").tag(1)
+                    Text("FD 102").tag(2)
+                }
+                .pickerStyle(.segmented)
+                if let flight = demoFlight {
+                    FlightCard(languageCode: languageCode,
+                               selection: FlightSelection(flight: flight, title: "Демо"), airports: airports)
+                }
+                Button(t("Выйти из демо"), action: exit).buttonStyle(.bordered)
+            }
+            .padding(20)
+            .frame(maxWidth: 580)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var demoFlight: Flight? {
+        let day = ISO8601DateFormatter.string(from: .now,
+            timeZone: TimeZone(secondsFromGMT: 0)!, formatOptions: [.withFullDate])
+        let examples = [
+            ("ZZNA", "ZZSC", "DEMO-A1", "Идет посадка"),
+            ("ZZSC", "ZZSP", "DEMO-A2", "Выполнен"),
+            ("ZZSP", "ZZNA", "DEMO-B1", "Запланирован")
+        ]
+        let (departure, arrival, tail, status) = examples[selected]
+        var row = [
+            "id": "example-\(selected)", "number": "FD \(100 + selected)", "tail": tail,
+            "date": day, "dep": departure, "arr": arrival, "status": status, "std": "11:00", "sta": "14:00"
+        ]
+        if selected == 1 { row["atd"] = "11:15"; row["ata"] = "14:36" }
+        guard let encoded = try? JSONEncoder().encode(row) else { return nil }
+        return try? JSONDecoder().decode(Flight.self, from: encoded)
     }
 }
 

@@ -30,9 +30,7 @@ async function completeGoogleSignIn(result){
  acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=pkce',{
   method:'POST',body:{auth_code:result.code,code_verifier:result.verifier}
  }));
- cloudBase=null;cloudRemoteBase=null;cloudConflict=null;cloudState='pending';
- queueCloudSync(0);
- return 'Вход выполнен. Проверяем облачную копию.';
+ return unlockWorkspace();
 }
 async function resumeGoogleSignIn(){
  if(location.protocol!=='https:'&&location.protocol!=='http:') return;

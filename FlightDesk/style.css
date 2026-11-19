@@ -803,3 +803,21 @@ dialog[data-layout="flight"] {
  .flight-editor-fields { grid-template-columns:minmax(0,1fr); }
  .flight-editor-route { gap:8px; }
 }
+
+.shell[hidden], #accessGate[hidden] { display: none; }
+#accessGate {
+ min-height: 100vh;
+ display: grid;
+ place-items: center;
+ padding: 30px 20px;
+ background: radial-gradient(ellipse at 50% 18%, var(--accent-soft, #233958), transparent 63%);
+}
+.access-card { width: min(100%, 430px); padding: 32px; display: grid; gap: 14px; }
+.access-brand { display: flex; align-items: center; gap: 12px; font-size: 20px; }
+.access-brand img { width: 44px; height: 44px; border-radius: 12px; }
+.access-card h1 { margin-top: 8px; font-size: clamp(24px, 5vw, 34px); }
+.access-card p { margin: 0; }
+.access-card form { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.access-card form button { margin-top: 3px; }
+.access-card #cloudStatus:empty { display: none; }
+.access-card #openDemo { margin-top: 4px; }

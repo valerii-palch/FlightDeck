@@ -138,7 +138,7 @@ function pilot() {
  const domestic = routes.filter(f=>isDomestic(airport(f.dep))&&isDomestic(airport(f.arr))).length;
  const international = routes.filter(f=>airport(f.dep).country!==airport(f.arr).country).length;
  const name=preferences().profileName;
- return `<section class="panel welcome"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><div class="row"><h2>${esc(name||tr('Летная книжка'))}</h2><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button></div><p class="muted">${tr("Налет и перелеты по записям журнала")}</p></section>`+cloudProfilePanel()+
+ return `<section class="panel welcome"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><div class="row"><h2>${esc(name||tr('Летная книжка'))}</h2><div class="controls"><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button>${demoWorkspace?'':`<button data-action="reset-profile">${tr('Сбросить рейсы и профиль')}</button>`}</div></div><p class="muted">${tr("Налет и перелеты по записям журнала")}</p></section>`+cloudProfilePanel()+
  '<div class="profile-metrics facts">'+metric(tr("Общее время"),duration(stats.minutes))+metric(tr("Выполнено перелетов"),stats.count)+metric(tr("Посадки по факту прибытия"),landings)+metric(tr("Посещено стран и территорий"),travelAchievements(rows).countries.size)+'</div>'+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Налет по типам")}</h2>`+
  fleet.map(a=>{const part=flightStats(rows.filter(f=>f.tail===a.tail));return '<div class="strip row"><span>'+a.type+'</span><strong>'+duration(part.minutes)+' · '+part.count+` ${tr("перел.")}</strong></div>`;}).join('')+'</section>'+

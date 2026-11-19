@@ -51,7 +51,7 @@ function editSettings() {
  `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
  '<label>'+tr('Плотность журнала')+'<select name="density">'+option('normal',tr("Обычная"),p.density)+option('compact',tr("Компактная"),p.density)+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
- `<div class="settings-actions controls"><button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button><button class="primary">${tr("Сохранить")}</button></div>`+
+ '<div class="settings-actions controls">'+(demoWorkspace?'':`<button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button>`)+`<button class="primary">${tr("Сохранить")}</button></div>`+
  '<div class="settings-credit">'+appCredit+'</div></form>');
  const form=byId('settingsForm');
  form.addEventListener('change',e=>{
@@ -63,7 +63,7 @@ function editSettings() {
   e.preventDefault();
   const {language,...settings}=Object.fromEntries(new FormData(form));
   data.preferences={...p,...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()};
-  saveLanguage(language);
+  if(!demoWorkspace)saveLanguage(language);
   save();byId('dialog').close();render();
  };
 }

@@ -14,7 +14,7 @@ struct CloudSession: Codable {
 }
 
 enum CloudError: LocalizedError {
-    case credentials, emailNotConfirmed, rateLimited, session, service(Int), secureStorage(OSStatus)
+    case credentials, emailNotConfirmed, rateLimited, session, service(Int), secureStorage(OSStatus), changedJournal
     var errorDescription: String? {
         switch self {
         case .credentials: return "Проверь email и пароль."
@@ -23,6 +23,7 @@ enum CloudError: LocalizedError {
         case .session: return "Сеанс закончился. Войди снова."
         case .service(let code): return "Облако недоступно (HTTP \(code))."
         case .secureStorage: return "Не удалось сохранить сеанс в защищенном хранилище."
+        case .changedJournal: return "Журнал изменился. Подтверди сброс снова."
         }
     }
 }
@@ -67,16 +68,50 @@ struct Cloud {
     private func request<T: Decodable>(_ path: String, query: [URLQueryItem],
                                       token: String? = nil, body: [String: String]? = nil,
                                       passwordSignIn: Bool = false) async throws -> T {
+        let encoded = try body.map { try JSONEncoder().encode($0) }
+        let data = try await responseData(path, query: query, token: token,
+                                          method: encoded == nil ? "GET" : "POST", body: encoded,
+                                          passwordSignIn: passwordSignIn)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    func resetProfile(_ session: CloudSession) async throws -> Journal? {
+        let path = "/rest/v1/flightdeck_journals"
+        let owner = URLQueryItem(name: "owner_id", value: "eq." + session.user.id.uuidString.lowercased())
+        let data = try await responseData(path, query: [owner, .init(name: "select", value: "version,journal")],
+                                          token: session.access_token)
+        guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw CloudError.service(502)
+        }
+        guard let row = rows.first else { return nil }
+        guard let version = row["version"] as? Int, var journal = row["journal"] as? [String: Any],
+              journal["airports"] is [Any] else { throw CloudError.service(502) }
+        journal["flights"] = [Any]()
+        journal["profileName"] = ""
+        let body = try JSONSerialization.data(withJSONObject: ["journal": journal, "version": version + 1])
+        struct UpdatedRow: Decodable { let journal: Journal }
+        let updated = try await responseData(path, query: [owner, .init(name: "version", value: "eq.\(version)")],
+                                             token: session.access_token, method: "PATCH", body: body, representation: true)
+        guard let result = try JSONDecoder().decode([UpdatedRow].self, from: updated).first else {
+            throw CloudError.changedJournal
+        }
+        return result.journal
+    }
+
+    private func responseData(_ path: String, query: [URLQueryItem], token: String?,
+                              method: String = "GET", body: Data? = nil,
+                              passwordSignIn: Bool = false, representation: Bool = false) async throws -> Data {
         var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
         components.path = path
         components.queryItems = query
         var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        request.httpMethod = method
         request.setValue(key, forHTTPHeaderField: "apikey")
         if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
+        if representation { request.setValue("return=representation", forHTTPHeaderField: "Prefer") }
         if let body {
-            request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(body)
+            request.httpBody = body
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -92,7 +127,7 @@ struct Cloud {
             }
             throw CloudError.service(status)
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        return data
     }
 }
 

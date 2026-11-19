@@ -28,6 +28,16 @@ enum FlightLanguage {
     }
 
     private static let english = [
+        "Вход в FlightDeck": "Sign in to FlightDeck",
+        "Продолжить без входа · Демо": "Continue without signing in · Demo",
+        "Выйти из демо": "Exit demo",
+        "Демо": "Demo",
+        "Сбросить рейсы и профиль": "Reset flights and profile",
+        "Сбросить рейсы и профиль?": "Reset flights and profile?",
+        "Все рейсы и имя профиля будут удалены из облака. Аэропорты сохранятся.": "All flights and your profile name will be deleted from the cloud. Airports will be kept.",
+        "Удалить все рейсы": "Delete all flights",
+        "Журнал изменился. Подтверди сброс снова.": "The logbook changed. Confirm the reset again.",
+        "Один аккаунт открывает общий журнал на компьютере и iPhone.": "Use the same account to access your logbook on your computer and iPhone.",
         "Запуск FlightDeck": "Starting FlightDeck",
         "Оформление": "Appearance",
         "Светлая": "Light",
