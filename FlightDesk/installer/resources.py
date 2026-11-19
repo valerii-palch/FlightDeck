@@ -3,7 +3,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
 work = Path(sys.argv[1])
-version, minimum, architectures = sys.argv[2:]
+version, build, minimum, architectures = sys.argv[2:]
 resources = work / "resources"
 
 
@@ -54,6 +54,6 @@ for locale, pages in {
   <volume-check><allowed-os-versions><os-version min={quoteattr(minimum)}/></allowed-os-versions></volume-check>
   <choices-outline><line choice="flightdeck"/></choices-outline>
   <choice id="flightdeck" visible="false"><pkg-ref id="local.flightdesk.installer"/></choice>
-  <pkg-ref id="local.flightdesk.installer" version={quoteattr(version)}>FlightDeck.pkg</pkg-ref>
+  <pkg-ref id="local.flightdesk.installer" version={quoteattr(build)}>FlightDeck.pkg</pkg-ref>
 </installer-gui-script>
 """, encoding="utf-8")

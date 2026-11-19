@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 app="$(cd "$(dirname "${1:-FlightDeck.app}")" && pwd)/$(basename "${1:-FlightDeck.app}")"
 plist="$app/Contents/Info.plist"
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
+build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
 minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$plist")
 executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
 architectures=$(lipo -archs "$app/Contents/MacOS/$executable" | tr ' ' ',')
@@ -28,11 +29,11 @@ for component in components:
 path.write_bytes(plistlib.dumps(components))
 PLIST
 pkgbuild --root "$work/root" --component-plist "$work/components.plist" \
-  --identifier local.flightdesk.installer --version "$version" \
+  --identifier local.flightdesk.installer --version "$build" \
   --install-location /Applications "$work/FlightDeck.pkg"
 
 swift -module-cache-path "$work/module-cache" installer/Artwork.swift "$work/resources"
-python3 installer/resources.py "$work" "$version" "$minimum" "$architectures"
+python3 installer/resources.py "$work" "$version" "$build" "$minimum" "$architectures"
 signing=()
 if [[ -n "${INSTALLER_SIGN_IDENTITY:-}" ]]; then
   signing=(--sign "$INSTALLER_SIGN_IDENTITY")

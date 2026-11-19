@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag matching the app version, for example v0.22.0'
+        description: 'Public release tag matching the app version, for example v0.1.0'
         required: true
 permissions:
   contents: write
@@ -20,8 +20,9 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           python3 - <<'PY'
-          import os, plistlib, json
+          import os, plistlib, json, re
           with open('FlightDesk/Info.plist','rb') as f: version=plistlib.load(f)['CFBundleShortVersionString']
+          assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0', version), 'Public releases must end in .0'
           assert os.environ['RELEASE_TAG'] == 'v'+version, 'Tag must match Info.plist'
           assert json.load(open('FlightDeck-Windows/package.json'))['version'] == version
           PY
@@ -40,6 +41,10 @@ jobs:
         run: |
           version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' FlightDesk/Info.plist)
           swift tools/sign-update.swift sign "releases/FlightDeck-macOS-$version.pkg" "$RELEASE_TAG" releases/macos-update.json
+      - name: Verify macOS manifest and package checksum
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' FlightDesk/Info.plist)
+          swift tools/sign-update.swift verify "releases/FlightDeck-macOS-$version.pkg" releases/macos-update.json
       - uses: actions/upload-artifact@v4
         with:
           name: mac-release
@@ -69,6 +74,9 @@ jobs:
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $setup = Resolve-Path "dist/FlightDeck-$version-Windows-Setup.exe"
+          $manifest = Get-Content dist/latest.yml -Raw
+          $checksum = [Convert]::ToBase64String([Convert]::FromHexString((Get-FileHash $setup -Algorithm SHA512).Hash))
+          if ($manifest -notmatch "(?m)^sha512: $([regex]::Escape($checksum))\r?$") { throw "Installer checksum does not match latest.yml" }
           $install = Start-Process $setup -ArgumentList '/S' -PassThru -Wait
           if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)" }
           $exe = Join-Path $env:LOCALAPPDATA 'Programs\FlightDeck\FlightDeck.exe'
@@ -96,4 +104,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          gh release create "$RELEASE_TAG" release-assets/* --target "$GITHUB_SHA" --title "FlightDeck $RELEASE_TAG" --generate-notes --latest
+          notes="$RUNNER_TEMP/flightdeck-release-notes.md"
+          awk -v heading="## $RELEASE_TAG" '$0 == heading { found=1; next } found && /^## / { exit } found' CHANGELOG.md > "$notes"
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "Add release notes to CHANGELOG.md for $RELEASE_TAG"
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* --target "$GITHUB_SHA" --title "FlightDeck $RELEASE_TAG" --notes-file "$notes" --latest
