@@ -5,7 +5,7 @@ const tourSteps=[
  {page:'home',target:'.sidebar-new',title:'Добавь первый рейс',body:'Укажи маршрут и время вылета. FlightDeck предложит длительность по журналу и реальным рейсам.'},
  {page:'home',target:'.dashboard-latest',title:'Актуальный рейс под рукой',body:'На главной появляется текущий или ближайший рейс. Открой его данные, чтобы отмечать этапы полета.'},
  {page:'journal',target:'.board-panel',title:'Весь журнал полетов',body:'Здесь можно найти рейс, проверить время прилета и открыть его для редактирования.'},
- {page:'pilot',target:'.cloud-profile',title:'Подключи облако',body:'Войди через Google или по почте. Один аккаунт открывает общий журнал на компьютере и iPhone.'},
+ {page:'pilot',target:'.cloud-profile',title:'Подключи облако',body:'Войди через Google или по почте. Один аккаунт открывает общий журнал на macOS и Windows.'},
  {page:'home',target:'[data-action="settings"]',title:'Настрой FlightDeck под себя',body:'Выбери язык и тему. В настройках можно повторить обучение и написать обратную связь.'}
 ];
 function tourCompleted(){
