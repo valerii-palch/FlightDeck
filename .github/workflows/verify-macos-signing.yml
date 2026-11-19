@@ -1,0 +1,43 @@
+name: Verify FlightDeck update signing
+on:
+  push:
+    branches: [verify/macos-release-signing]
+permissions:
+  contents: read
+jobs:
+  sign-and-verify:
+    runs-on: macos-15-intel
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign a temporary update manifest with the release workflow key
+        env:
+          FLIGHTDECK_UPDATE_PRIVATE_KEY: ${{ secrets.FLIGHTDECK_UPDATE_PRIVATE_KEY }}
+        run: |
+          set -eu
+          working_dir="$(mktemp -d)"
+          printf 'FlightDeck signing verification\n' > "$working_dir/signing-test.pkg"
+          swift tools/sign-update.swift sign "$working_dir/signing-test.pkg" v0.22.1 "$working_dir/manifest.json"
+          printf 'FLIGHTDECK_SIGNING_TEST_DIR=%s\n' "$working_dir" >> "$GITHUB_ENV"
+      - name: Verify the signature against the public key embedded in FlightDeck
+        run: |
+          set -eu
+          cat > "$FLIGHTDECK_SIGNING_TEST_DIR/verify.swift" <<'SWIFT'
+          import CryptoKit
+          import Foundation
+
+          let dir = URL(fileURLWithPath: CommandLine.arguments[1])
+          let info = try Data(contentsOf: URL(fileURLWithPath: "FlightDesk/Info.plist"))
+          let plist = try PropertyListSerialization.propertyList(from: info, format: nil) as! [String: Any]
+          let publicKeyData = Data(base64Encoded: plist["FlightDeckUpdatePublicKey"] as! String)!
+          let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData)
+          let manifestData = try Data(contentsOf: dir.appendingPathComponent("manifest.json"))
+          let manifest = try JSONDecoder().decode([String: String].self, from: manifestData)
+          let payload = Data(base64Encoded: manifest["payload"]!)!
+          let signature = Data(base64Encoded: manifest["signature"]!)!
+          guard publicKey.isValidSignature(signature, for: payload) else {
+              fatalError("The installed FlightDeck public key cannot verify the CI signature.")
+          }
+          print("Verified the GitHub Actions signature against the embedded FlightDeck public key.")
+          SWIFT
+          swift "$FLIGHTDECK_SIGNING_TEST_DIR/verify.swift" "$FLIGHTDECK_SIGNING_TEST_DIR"
