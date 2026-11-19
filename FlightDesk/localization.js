@@ -414,7 +414,7 @@ const english = {
  "Весь журнал полетов": "Your flight logbook",
  "Здесь можно найти рейс, проверить время прилета и открыть его для редактирования.": "Find a flight, check its arrival time and open it to make changes.",
  "Подключи облако": "Connect your account",
- "Войди через Google или по почте. Один аккаунт открывает общий журнал на компьютере и iPhone.": "Sign in with Google or email to access your logbook on your computer and iPhone.",
+ "Войди через Google или по почте. Один аккаунт открывает общий журнал на macOS и Windows.": "Sign in with Google or email to access your logbook on macOS and Windows.",
  "Настрой FlightDeck под себя": "Make FlightDeck yours",
  "Выбери язык и тему. В настройках можно повторить обучение и написать обратную связь.": "Choose your language and theme. Settings also lets you replay this guide and send feedback.",
  "Здесь виден актуальный рейс, время и статус. Потяни экран вниз, чтобы обновить журнал.": "See your current flight, times and status here. Pull down to refresh the logbook.",

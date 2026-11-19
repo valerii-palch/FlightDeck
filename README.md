@@ -32,9 +32,8 @@
 | --- | --- |
 | Общий настольный интерфейс и оболочка macOS | [FlightDesk](FlightDesk/) |
 | Electron и установщик Windows | [FlightDeck-Windows](FlightDeck-Windows/) |
-| Приложение iOS и Live Activity | [FlightDeck-iOS](FlightDeck-iOS/) |
 | Облачные функции и схема журнала | [supabase](supabase/) |
 
-Команды сборки macOS и правила публикации описаны в [руководстве по выпуску](SETUP-UPDATES.md). Инструкции для [Windows](FlightDeck-Windows/README.md) и [iOS](FlightDeck-iOS/README.md) находятся рядом с исходниками. Версии iOS ведутся отдельно.
+Команды сборки macOS и правила публикации описаны в [руководстве по выпуску](SETUP-UPDATES.md). Инструкции для [Windows](FlightDeck-Windows/README.md) находятся рядом с исходниками.
 
 Публичные настольные версии имеют вид `vMAJOR.MINOR.0`. Третья цифра зарезервирована для внутренних сборок.
