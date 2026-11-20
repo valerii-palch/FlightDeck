@@ -968,10 +968,7 @@ dialog[data-layout="update"] { width:min(570px,calc(100% - 32px)); padding:clamp
 .update-actions { display:grid; gap:8px; margin-top:16px; }
 #installUpdate { width:100%; min-height:55px; font-size:17px; border-radius:var(--control-radius); }
 .flight-next { overflow-wrap:anywhere; }
-input:is([data-flight-date],[type="time"],[type="number"]) { color:#fff; -webkit-text-fill-color:#fff; font-variant-numeric:tabular-nums; }
-input[type="time"]::-webkit-datetime-edit { color:#fff; -webkit-text-fill-color:#fff; }
-input[type="time"]::-webkit-datetime-edit-hour-field { color:#fff; -webkit-text-fill-color:#fff; }
-input[type="time"]::-webkit-datetime-edit-minute-field { color:#fff; -webkit-text-fill-color:#fff; }
+input:is([data-flight-date],[data-flight-time],[type="number"]) { color:#fff; -webkit-text-fill-color:#fff; font-variant-numeric:tabular-nums; }
 .date-editor { display:grid; grid-template-columns:minmax(0,1fr); position:relative; align-items:center; }
 .date-editor [data-flight-date] { width:100%; padding-inline-end:42px; }
 .date-editor button,.date-editor-picker { position:absolute; right:4px; width:34px; }

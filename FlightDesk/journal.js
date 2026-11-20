@@ -42,7 +42,7 @@ function editContinuation(f) {
  const next=continuationLeg(f);
  const date=Number.isFinite(inbound)?new Date(inbound).toISOString().slice(0,10):f.date;
  const leg=next||{date,status:'Запланирован'};
- const field=(key,label,type,required=false)=>'<label>'+label+(type==='date'?dateField(key,leg[key],required):'<input name="'+key+'" type="'+type+'" value="'+esc(leg[key])+'" '+(required?'required':'')+'>')+'</label>';
+ const field=(key,label,type,required=false)=>'<label>'+label+(type==='date'?dateField(key,leg[key],required):type==='time'?timeField(key,leg[key],required):'<input name="'+key+'" type="'+type+'" value="'+esc(leg[key])+'" '+(required?'required':'')+'>')+'</label>';
  const allowed=['Запланирован','Задержан','Вылетел','Выполнен','Отменен'];
  openDialog(`<h2>${tr("Продолжение ·")} `+flightNumber(f)+'</h2><p>'+codeLabel(alternate(f))+' → '+codeLabel(f.arr)+'</p>'+
  '<form id="continuationForm" class="editor two facts">'+field('date',tr("Дата вылета по плану UTC"),'date',true)+

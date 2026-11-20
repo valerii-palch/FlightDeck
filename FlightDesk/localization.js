@@ -1,4 +1,6 @@
 const english = {
+ "Введи время в формате ЧЧ:ММ, от 00:00 до 23:59.": "Enter the time as HH:MM, from 00:00 to 23:59.",
+ "Пока фактическое время не записано, в полях показано плановое.": "The fields show the scheduled times until actual times are recorded.",
  "ДД.ММ.ГГГГ": "DD.MM.YYYY",
  "Выбрать дату": "Choose date",
  "Навигация": "Navigation",

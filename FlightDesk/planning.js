@@ -23,7 +23,7 @@ function bindDurationEstimate(form) {
   estimate=local||remote;
   output.textContent=estimate?tr('Примерное время')+': '+duration(estimate.minutes)+' · '+tr(estimate.source==='journal'?'По журналу':'Реальные рейсы')+' ('+estimate.count+')':tr('Нет данных для оценки этого маршрута.');
   if(local&&remote) output.textContent+=' · '+tr('Реальные рейсы')+': '+duration(remote.minutes)+' ('+remote.count+')';
-  apply.disabled=!estimate||!form.elements.std.value;
+  apply.disabled=!estimate||!parseFlightTime(form.elements.std.value);
  };
  const update=()=>{
   generation++;const current=generation;delete form.dataset.estimatedMinutes;
@@ -51,10 +51,11 @@ function bindDurationEstimate(form) {
  for(const key of ['dep','arr','tail']) form.elements[key].addEventListener('input',update);
  form.elements.std.addEventListener('input',renderEstimate);
  apply.onclick=()=>{
-  if(!estimate||!form.elements.std.value) return;
-  const [hours,minutes]=form.elements.std.value.split(':').map(Number);
+  if(!estimate||!parseFlightTime(form.elements.std.value)) return;
+  const [hours,minutes]=parseFlightTime(form.elements.std.value).split(':').map(Number);
   const arrival=(hours*60+minutes+estimate.minutes)%1440;
   form.elements.sta.value=String(Math.floor(arrival/60)).padStart(2,'0')+':'+String(arrival%60).padStart(2,'0');
+  form.elements.sta.dispatchEvent(new Event('input',{bubbles:true}));
   form.dataset.estimatedMinutes=String(estimate.minutes);
  };
  form.addEventListener('input',e=>{if(e.target.name==='sta')delete form.dataset.estimatedMinutes;});

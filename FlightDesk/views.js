@@ -22,6 +22,29 @@ function flightTimes(f) {
  }
  return {scheduledDeparture,scheduledArrival,actualDeparture,actualArrival};
 }
+function setFlightStatus(f,status,now=Date.now()) {
+ if(f.status===status)return true;
+ const mark=status==='Вылетел'&&!f.atd?'atd':status==='Выполнен'&&!f.ata?'ata':null;
+ if(mark){
+  const stamp=new Date(now).toISOString();
+  const fieldDate=mark+'Date';
+  const candidate={...f,[mark]:stamp.slice(11,16),[fieldDate]:stamp.slice(0,10)};
+  const {actualDeparture,actualArrival}=flightTimes(candidate);
+  if(actualArrival<actualDeparture)return false;
+  f[mark]=candidate[mark];
+  f[fieldDate]=candidate[fieldDate];
+ }
+ f.status=status;
+ return true;
+}
+function changeFlightStatus(f,status){
+ if(!setFlightStatus(f,status)){
+  notice(tr("Прилет должен быть после вылета."));
+  return;
+ }
+ save();
+ render();
+}
 const stampLabel = (value,date) => Number.isFinite(value)?formatTime(value,date)+' UTC':'—';
 function destinationArrival(f,times=flightTimes(f)) {
  if(f.status==='Отменен') return NaN;
@@ -88,9 +111,7 @@ function advanceFlight(id) {
  const f=workingFlight(summaryFlights());
  const next=f&&nextStatus[f.status];
  if(!next||id!==f.id)return;
- f.status=next;
- save();
- render();
+ changeFlightStatus(f,next);
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
