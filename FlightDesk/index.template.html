@@ -43,6 +43,8 @@ __EXTRA_CSS__
  </div>
 </div>
 <dialog id="dialog"></dialog><div id="notice" class="badge" role="status"></div>
+<!-- __AIRPORT_DATA_LICENSE__ -->
+<script id="worldwide-airports" type="application/json">__WORLDWIDE_AIRPORTS__</script>
 <script id="airport-reference" type="application/json">__AIRPORT_REFERENCE__</script>
 <script id="airport-photos" type="application/json">__AIRPORT_PHOTOS__</script>
 <script id="map-config" type="application/json">__MAP_CONFIG__</script>
@@ -65,6 +67,7 @@ const aircraftFor = tail => fleet.find(a=>a.tail===tail);
 const appCredit = '<small class="version">v__VERSION__</small>';
 const statuses = ['Запланирован','Подготовка','Идет посадка','Посадка завершена','Вылетел','Выполнен','Уход на запасной','Отменен','Задержан'];
 const stages = [['fuel','Начало заправки',50],['bags','Начало загрузки багажа',35],['board','Начало посадки',30],['close','Окончание посадки',10]];
+const preparationOffset=(f,key,offset)=>key==='fuel'&&aircraftFor(f.tail)?.short!=='A321'?offset*2:offset;
 const pages = [['home','Главная'],['center','Полетный центр'],['fleet','Флот'],['airports','Аэропорты'],['journal','Журнал'],['pilot','Профиль']];
 const storageKey = 'flightdesk.v1';
 const byId = id => document.getElementById(id);
@@ -101,8 +104,7 @@ const flight = () => data.flights.find(f => f.id === selected && f.tail === tail
 const dateUTC = () => new Date().toISOString().slice(0,10);
 const displayDate = date => /^(\d{4})-(\d{2})-(\d{2})$/.test(date||'') ? date.split('-').reverse().join('.') : '';
 const dateField = (name,value,required=false) => '<span class="date-editor"><input name="'+name+'" type="text" data-flight-date inputmode="numeric" maxlength="10" placeholder="'+tr('ДД.ММ.ГГГГ')+'" value="'+displayDate(value)+'" '+(required?'required':'')+'>'+
- '<button type="button" class="icon-button" data-action="pick-date" aria-label="'+tr('Выбрать дату')+'">'+toolbarIcon('calendar')+'</button>'+
- '<input type="date" class="date-editor-picker" tabindex="-1" aria-hidden="true"></span>';
+ '<button type="button" class="icon-button" data-action="pick-date" aria-label="'+tr('Выбрать дату')+'">'+toolbarIcon('calendar')+'</button></span>';
 function parseDisplayDate(value){
  if(!/^\d{2}\.\d{2}\.\d{4}$/.test(value))return '';
  const iso=value.split('.').reverse().join('-');
@@ -158,10 +160,11 @@ const formatTime = (time,date) => {
 function forecast(f) {
  if (!f.std || ['Вылетел','Выполнен','Отменен','Уход на запасной'].includes(f.status)) return '';
  const plan = clockOn(f.date,f.std);
- if (!Number.isFinite(plan) || !f.stages) return '';
- const started = Date.parse(f.stages.board), ended = Date.parse(f.stages.close);
- if (!Number.isFinite(started) && !Number.isFinite(ended)) return '';
- const estimate = Math.max(plan,Number.isFinite(ended)?ended+10*minute:started+30*minute);
+ if (!Number.isFinite(plan)) return '';
+ const latestBoard=Number.isFinite(Date.parse(f.stages?.close))?'close':'board';
+ const estimates=stages.filter(([key])=>key==='fuel'||key==='bags'||key===latestBoard)
+  .map(([key,,offset])=>Date.parse(f.stages?.[key])+preparationOffset(f,key,offset)*minute).filter(Number.isFinite);
+ const estimate=Math.max(plan,...estimates);
  const delay = Math.round((estimate-plan)/minute);
  return '<div class="forecast row '+(delay?'late':'good')+`"><span>${tr("Прогноз вылета")}</span><strong class="time">`+formatTime(estimate,f.date)+' UTC'+(delay?' · +'+delay+` ${tr("мин")}`:'')+'</strong></div>';
 }
@@ -260,7 +263,7 @@ function center() {
  if (!f) return '<div class="panel empty"><h2>'+esc(aircraft().type)+`</h2><p class="muted">${tr("Для этого борта пока нет рейсов.")}</p><p><button class="primary" data-action="new">${tr("Добавить рейс")}</button></p></div>`;
  const times = f.stages || {};
  const stageRows = stages.map(([key,label,offset]) => {
-  const planned = clockOn(f.date,f.std)-offset*minute, actual = Date.parse(times[key]);
+  const planned = clockOn(f.date,f.std)-preparationOffset(f,key,offset)*minute, actual = Date.parse(times[key]);
   const late = Number.isFinite(actual) && actual > planned;
   return '<tr><td>'+tr(label)+'</td><td class="clock">'+(Number.isFinite(planned)?formatTime(planned,f.date):'—')+'</td><td class="clock '+(late?'late':'')+'">'+
   (Number.isFinite(actual)?formatTime(actual,f.date):'—')+'</td><td><button data-stage="'+key+'">'+(times[key]?tr("Изменить"):tr("Отметить"))+'</button></td></tr>';
@@ -270,8 +273,8 @@ function center() {
  (f.note?'<p class="facts muted">'+esc(f.note)+'</p>':'')+
  `<div class="flight-status-bar facts"><label>${tr("Статус рейса")}<span class="flight-select status-select `+(statusColors[f.status]||'scheduled')+'"><select id="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></span></label>'+nextFlightButton(f)+'</div></div>'+continuationPanel(f)+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Подготовка рейса")}</h2>`+
- (aircraft().short==='A321'?`<table><thead><tr><th>${tr("Этап")}</th><th>${tr("План UTC")}</th><th>${tr("Факт UTC")}</th><th></th></tr></thead><tbody>`+stageRows+'</tbody></table>'+forecast(f):`<p class="facts muted">${tr("Для этого типа сроки подготовки пока не заданы.")}</p>`)+
- `</section><section class="panel"><h2>${tr("Рейс")}</h2><div class="strip row"><span>${tr("Тип рейса")}</span><strong>`+tr(flightType(f))+'</strong></div>'+(f.goArounds?`<div class="strip row"><span>${tr("Уходы на второй круг")}</span><strong>`+esc(f.goArounds)+'</strong></div>':'')+`<div class="strip row"><span>${tr("Пассажиры")}</span><strong>`+paxText(f)+`</strong></div><div class="strip row"><span>${tr("Время полета по журналу")}</span><strong>`+duration(flightStats([f]).minutes || f.actualMinutes)+'</strong></div>'+
+ (`<table><thead><tr><th>${tr("Этап")}</th><th>${tr("План UTC")}</th><th>${tr("Факт UTC")}</th><th></th></tr></thead><tbody>`+stageRows+'</tbody></table>'+forecast(f))+
+ `</section><section class="panel"><h2>${tr("Рейс")}</h2><div class="strip row"><span>${tr("Тип рейса")}</span><strong>`+tr(flightType(f))+'</strong></div>'+(f.goArounds?`<div class="strip row"><span>${tr("Уходы на второй круг")}</span><strong>`+esc(f.goArounds)+'</strong></div>':'')+`<div class="strip row"><span>${tr("Пассажиры")}</span><strong>`+paxText(f)+'</strong></div>'+[['baggageKg','Загрузка багажа'],['cargoKg','Коммерческий груз']].map(([key,label])=>f[key]==null?'':'<div class="strip row"><span>'+tr(label)+'</span><strong>'+Number(f[key])+' '+tr('кг')+'</strong></div>').join('')+`<div class="strip row"><span>${tr("Время полета по журналу")}</span><strong>`+duration(flightStats([f]).minutes || f.actualMinutes)+'</strong></div>'+
  (Number.isFinite(f.scheduledBlockMinutes)?`<div class="strip row"><span>${tr("Блок-время по плану")}</span><strong>`+duration(f.scheduledBlockMinutes)+'</strong></div>':'')+
  (f.sourceStatus?`<p class="muted">${tr("Статус в маршрутном листе:")} `+esc(f.sourceStatus)+'</p>':'')+
  `<label class="facts">${tr("Другой рейс борта")}<select id="flightPicker">`+list.map(x=>option(x.id,displayDate(x.date)+' · '+(x.number||tr("Без номера"))+' · '+x.dep+' → '+x.arr,f.id)).join('')+'</select></label>'+
@@ -352,6 +355,23 @@ function airportRows() {
 }
 const refreshAirports=()=>{airportListPage=0;byId('airportRows').innerHTML=airportRows();};
 const airportPhotos=JSON.parse(byId('airport-photos').textContent);
+const checkedAirportPhotos=new Set();
+async function fetchAirportPhoto(code){
+ const wiki=worldwideAirports[code]?.wiki;
+ if(!wiki||checkedAirportPhotos.has(code))return;
+ checkedAirportPhotos.add(code);
+ try {
+  const [language,title]=wiki;
+  const query=new URLSearchParams({action:'query',prop:'pageimages',piprop:'thumbnail|name',pithumbsize:'650',
+   pilicense:'free',redirects:'1',titles:decodeURIComponent(title),origin:'*',format:'json',formatversion:'2'});
+  const response=await fetch('https://'+language+'.wikipedia.org/w/api.php?'+query,{signal:AbortSignal.timeout(8000)});
+  const page=(await response.json())?.query?.pages?.[0];
+  if(!page?.pageimage||!page.thumbnail?.source?.startsWith('https://upload.wikimedia.org/'))return;
+  airportPhotos[code]={url:page.thumbnail.source,file:page.pageimage};
+  const target=byId('airportPhotoSlot');
+  if(target?.dataset.code===code)target.innerHTML=airportPhoto(airport(code));
+ } catch {checkedAirportPhotos.delete(code);}
+}
 function airportPhoto(a) {
  const photo=airportPhotos[a.icao];
  if(!photo) return `<p class="airport-photo-empty muted">${tr("Фотография аэропорта пока недоступна.")}</p>`;
@@ -382,7 +402,7 @@ function airportsPage() {
  (a?'<section class="panel"><div class="airport-codes">'+codeLabel(a.icao)+'</div><div class="airport-heading"><h2>'+esc(airportCity(a.icao))+'</h2>'+
  (info?'<p>'+esc(airportName(a.icao))+'</p>':'')+
  (appLanguage()==='ru'&&info?.nameEn?'<p class="muted" lang="en">'+esc(info.nameEn)+'</p>':'')+'</div>'+
- airportPhoto(a)+'<div class="airport-flags">'+[['scenery',tr("Сценарий аэропорта")],['gsx',tr("Профиль GSX")],['python',tr("Расширение Python")]].map(([k,l])=>
+ '<div id="airportPhotoSlot" data-code="'+esc(a.icao)+'">'+airportPhoto(a)+'</div><div class="airport-flags">'+[['scenery',tr("Сценарий аэропорта")],['gsx',tr("Профиль GSX")],['python',tr("Расширение Python")]].map(([k,l])=>
  '<label class="switch-row"><span><strong>' +tr(l)+'</strong><small data-flag-label="'+k+'">'+(a[k]?tr("Установлен"):tr("Не установлен"))+'</small></span>'+
  '<input type="checkbox" role="switch" data-flag="'+k+'" '+(a[k]?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label>').join('')+'</div>'+
  `<label class="facts">${tr("Код IATA")}<input id="airportIata" value="`+esc(a.iata)+'" maxlength="3" placeholder="SVO"></label>'+
@@ -423,7 +443,7 @@ function render() {
   return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'"><strong>'+aircraftModel(a)+'</strong><small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></button>';
  }).join('')+'</section><footer class="sidebar-footer">'+
  (demoWorkspace?'<button data-action="exit-demo">'+tr('Выйти из демо')+'</button>':'<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+
- '<button data-action="feedback">'+tr('Обратная связь')+'</button>'+appCredit+'</footer>';
+ appCredit+'</footer>';
  byId('main').dataset.page = page;
  byId('main').innerHTML=(page==='home'?'':'<header class="top"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1><div class="controls">'+
  (page==='center'||page==='journal'?`<button class="primary" data-action="new">${tr("Добавить рейс")}</button>`:'')+'</div></header>')+
@@ -434,11 +454,14 @@ function render() {
   byId('main').classList.add('page-enter');
   document.querySelector('.workspace').scrollTop=0;
  }
- if(page==='pilot') bindCloudProfile();
+ if(page==='pilot')bindCloudProfile();
+ if(page==='airports'&&airport(airportCode)&&!airportPhotos[airportCode])fetchAirportPhoto(airportCode);
  mapCleanup=mountYandexMap();
 }
 function openDialog(html, layout = '', anchor = null) {
  const d=byId('dialog');
+ closeCalendar();
+ d.classList.remove('settings-closing');
  d.innerHTML=html;
  d.dataset.layout=layout;
  const title={flight:'flightEditorTitle',settings:'settingsTitle',update:'updateTitle'}[layout];
@@ -448,7 +471,12 @@ function openDialog(html, layout = '', anchor = null) {
  d.classList.remove('dialog-enter');
  d.style.removeProperty('--dialog-x');
  d.style.removeProperty('--dialog-y');
- if(anchor){
+ if(layout==='settings'){
+  const box=(anchor||document.querySelector('[data-action="settings"]'))?.getBoundingClientRect();
+  const top=(box?.bottom??48)+10;
+  d.style.setProperty('--settings-top',top+'px');
+  d.style.setProperty('--settings-right',Math.max(12,innerWidth-(box?.right??innerWidth)+1)+'px');
+ } else if(anchor){
   const from=anchor.getBoundingClientRect(), to=d.getBoundingClientRect();
   d.style.setProperty('--dialog-x',from.x+from.width/2-to.x-to.width/2+'px');
   d.style.setProperty('--dialog-y',from.y+from.height/2-to.y-to.height/2+'px');
@@ -456,18 +484,25 @@ function openDialog(html, layout = '', anchor = null) {
  void d.offsetWidth;
  d.classList.add('dialog-enter');
 }
+byId('dialog').addEventListener('close',()=>closeCalendar());
 function editFlight(existing,divert=false) {
  const f=existing?{...existing,diversionAirport:alternate(existing),status:divert?'Уход на запасной':existing.status}:{type:flightTypes[0],tail,dep:'',arr:'',date:dateUTC(),std:'',sta:'',status:statuses[0],stages:{}};
  const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}${type==='date'?dateField(name,f[name],required):type==='time'?timeField(name,f[name],required):`<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}>`}</label>`;
  const select=(name,label,options)=>`<label>${tr(label)}<span class="flight-select"><select name="${name}">${options}</select></span></label>`;
- const airports=data.airports.map(a=>`<option value="${esc(a.icao)}">${esc(airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
- const icao='list="icaoChoices" maxlength="4" placeholder="ICAO" autocomplete="off" spellcheck="false"';
+ const airports=data.airports.map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
+ const icao='list="icaoChoices" maxlength="80" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
  const section=(title,content)=>`<section class="flight-editor-section"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
- const actualFields=['atd','ata','atdDate','ataDate','pax','actualMinutes','goArounds','note'];
+ const loadFields=field('pax','Пассажиры','number',false,'min="0" step="1"')+
+  field('baggageKg','Загрузка багажа, кг','number',false,'min="0" step="1"')+
+  field('cargoKg','Коммерческий груз, кг','number',false,'min="0" step="1"');
+ const actualFields=['atd','ata','atdDate','ataDate','pax','baggageKg','cargoKg','actualMinutes','goArounds','note'];
  openDialog(`<header class="flight-editor-header"><h2 id="flightEditorTitle">${tr(existing?'Изменить рейс':'Новый рейс')}</h2><button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
  <form id="editForm" class="editor flight-editor">
  <datalist id="icaoChoices">${airports}</datalist>
  <div class="flight-editor-body">
+ ${!existing?`<ol class="planner-steps"><li data-step-indicator>${tr('Маршрут и время')}</li><li data-step-indicator>${tr('Загрузка')}</li><li data-step-indicator>${tr('Итоги')}</li></ol>`:''}
+ <div data-flight-step class="planner-section">
+ ${!existing?`<div class="planner-clocks"><div><small>UTC</small><strong id="plannerUtc"></strong></div><div><small id="plannerDepLabel"></small><strong id="plannerDepNow"></strong><small id="plannerDepPlan"></small></div><div><small id="plannerArrLabel"></small><strong id="plannerArrNow"></strong><small id="plannerArrPlan"></small></div></div>`:''}
  ${section('Маршрут',
   `<div class="flight-editor-route full">${field('dep','Аэропорт вылета ICAO','text',true,icao)}${planeIcon}${field('arr','Аэропорт прилета ICAO','text',true,icao)}</div>`+
   (!airports?`<div class="flight-editor-empty full"><p class="muted">${tr('Сначала добавь аэропорты в каталог.')}</p><button type="button" data-action="add-airport">${tr('Добавить аэропорт')}</button></div>`:'')+
@@ -480,18 +515,28 @@ function editFlight(existing,divert=false) {
  ${section('Расписание',
   field('date','Дата вылета UTC','date',true)+field('std','Вылет по плану UTC','time',true)+field('sta','Прилет по плану UTC','time',true)+
   (!existing?`<div class="flight-editor-estimate full"><p id="durationEstimate" role="status"></p><button type="button" id="applyDurationEstimate">${tr('Рассчитать время прилета')}</button></div>`:''))}
+ </div>
+ ${!existing?`<div data-flight-step class="planner-section" hidden>
+ <section class="panel planner-load"><h3>${tr('Загрузка самолета')}</h3><strong id="plannerLoad"></strong>
+ <div class="planner-cabin" id="plannerCabin" aria-hidden="true"><span></span></div>
+ <div class="planner-load-values"><div><small>${tr('Загрузка багажа')}</small><strong id="plannerBaggage"></strong></div>
+ <div><small>${tr('Коммерческий груз')}</small><strong id="plannerCargo"></strong></div></div></section>
+ ${section('Пассажиры и груз',loadFields)}</div>
+ <div data-flight-step class="planner-section" hidden><section class="panel planner-review"><h3>${tr('Проверь данные рейса')}</h3><dl id="plannerSummary"></dl></section>`:''}
  <details class="flight-editor-section flight-editor-extra"${!existing||actualFields.some(key=>f[key])?' open':''}>
  <summary>${tr('Фактические данные и примечание')}</summary>
  <div class="flight-editor-fields">
  ${!f.atd||!f.ata?`<p class="muted full">${tr('Пока фактическое время не записано, в полях показано плановое.')}</p>`:''}
  ${field('atd','Вылет фактически UTC','time')+field('ata','Посадка фактически UTC','time')+
   field('atdDate','Дата фактического вылета UTC','date')+field('ataDate','Дата фактического прилета UTC','date')+
-  field('pax','Пассажиры','number',false,'min="0" step="1"')+
+  (existing?loadFields:'')+
   field('actualMinutes','Фактическое время полета, мин','number',false,'min="0" max="1440" step="1"')+
   field('goArounds','Уходы на второй круг','number',false,'min="0" max="99" step="1"')}
  <label class="full">${tr('Примечание')}<textarea name="note" rows="2">${esc(f.note)}</textarea></label>
- </div></details></div>
- <footer class="flight-editor-footer"><button type="button" data-action="close">${tr('Отмена')}</button><button type="submit" class="primary">${tr('Сохранить')}</button></footer>
+ </div></details>${!existing?'</div>':''}</div>
+ <footer class="flight-editor-footer"><button type="button" data-action="close">${tr('Отмена')}</button><div class="controls">
+ ${!existing?`<button type="button" id="plannerBack">${tr('Назад')}</button><button type="button" id="plannerNext" class="primary">${tr('Далее')}</button>`:''}
+ <button type="submit" id="plannerSave" class="primary">${tr('Сохранить')}</button></div></footer>
  </form>`,'flight');
  const form=byId('editForm');
  form.addEventListener('invalid',event=>{const section=event.target.closest('details');if(section) section.open=true;},true);
@@ -502,7 +547,7 @@ function editFlight(existing,divert=false) {
  form.elements.std.addEventListener('input',showPlannedTimes);
  form.elements.sta.addEventListener('input',showPlannedTimes);
  showPlannedTimes();
- if(!existing)bindDurationEstimate(form);
+ if(!existing){bindDurationEstimate(form);bindPlanningSteps(form);}
  const updateDiversion=()=>{
   const diverted=form.elements.status.value==='Уход на запасной';
   form.elements.diversionAirport.required=diverted;
@@ -514,15 +559,20 @@ function editFlight(existing,divert=false) {
   form.elements.status.setCustomValidity('');
   updateDiversion();
  });
- const updateCapacity=()=>form.elements.pax.max=capacity(fleet.find(a=>a.tail===form.elements.tail.value));
+ const updateCapacity=()=>{
+  const a=aircraftFor(form.elements.tail.value);
+  form.elements.pax.max=capacity(a);
+  form.elements.baggageKg.max=capacity(a)*20;
+  form.elements.cargoKg.max=commercialLimit(a);
+ };
  updateCapacity();
  form.elements.tail.addEventListener('change',updateCapacity);
  form.onsubmit=event=>{
   event.preventDefault();
   const values=flightFormValues(form);
   if(!values)return;
-  values.dep=values.dep.trim().toUpperCase();
-  values.arr=values.arr.trim().toUpperCase();
+  values.dep=resolveAirportInput(values.dep);
+  values.arr=resolveAirportInput(values.arr);
   values.diversionAirport=values.diversionAirport.trim().toUpperCase();
   if (!isDiversion(values)) values.diversionAirport='';
   if (isDiversion(values)&&values.diversionAirport===values.arr) {
@@ -540,7 +590,7 @@ function editFlight(existing,divert=false) {
    form.reportValidity(); return;
   }
   values.goArounds=Number(values.goArounds)||0;
-  for (const key of ['pax','actualMinutes']) values[key]=values[key]===''?null:Number(values[key]);
+  for (const key of ['pax','actualMinutes','baggageKg','cargoKg']) values[key]=values[key]===''?null:Number(values[key]);
   if(form.dataset.estimatedMinutes) values.estimatedMinutes=Number(form.dataset.estimatedMinutes);
   const result={...f,...values,status:f.status,id:f.id||'flight-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)};
   // Schedule defaults are a preview. Only explicit records or a flight milestone set actuals.
@@ -572,7 +622,7 @@ function editFlight(existing,divert=false) {
 }
 function editStage(key) {
  const f=flight(), [,label,offset]=stages.find(s=>s[0]===key);
- const planned=clockOn(f.date,f.std)-offset*minute;
+ const planned=clockOn(f.date,f.std)-preparationOffset(f,key,offset)*minute;
  const saved=f.stages?.[key];
  const initial=saved?.slice(0,16)||(Number.isFinite(planned)?new Date(planned).toISOString().slice(0,16):new Date().toISOString().slice(0,16));
  openDialog('<div class="row"><div><p class="muted">'+flightNumber(f)+' · '+esc(f.tail)+'</p><h2>'+tr(label)+`</h2></div><button type="button" class="icon-button" data-action="close" aria-label="${tr("Закрыть")}">×</button></div>`+
@@ -603,7 +653,8 @@ function backup() {
  `<div class="controls"><button id="exportBackup">${tr("Сохранить JSON")}</button><button data-action="close">${tr("Закрыть")}</button></div>`+
  `<label>${tr("Загрузить копию")}<input id="backupFile" type="file" accept=".json,application/json"></label><button id="importBackup" disabled>${tr("Заменить данные из копии")}</button></div>`);
  byId('exportBackup').onclick=()=>{
-  const content=JSON.stringify(data,null,2);
+  const {cloudCheckpoint,...exported}=data;
+ const content=JSON.stringify(exported,null,2);
   if(window.webkit?.messageHandlers?.exportBackup) {
    window.webkit.messageHandlers.exportBackup.postMessage(content); return;
   }
@@ -615,7 +666,7 @@ function backup() {
   try {
    const restored=JSON.parse(await byId('backupFile').files[0].text());
    if(!validBackup(restored)) throw Error('format');
-   data=migrateDiversion(restored); delete data.workspaceUnlocked; airportCode=data.airports[0]?.icao||''; pickTail(tail);
+   data=migrateDiversion(restored); delete data.workspaceUnlocked; delete data.cloudCheckpoint; airportCode=data.airports[0]?.icao||''; pickTail(tail);
    save(); byId('dialog').close(); render(); notice(tr("Копия загружена."));
   } catch {notice(tr("Не удалось прочитать резервную копию."));}
  };
@@ -655,16 +706,19 @@ document.addEventListener('click',e=>{
  }
  if(d.action==='pick-date'){
   const field=b.parentElement.querySelector('[data-flight-date]');
-  const picker=b.parentElement.querySelector('.date-editor-picker');
-  picker.value=parseDisplayDate(field.value.trim());
-  if(picker.showPicker){
-   try {picker.showPicker();} catch {field.focus();}
-  } else field.focus();
+  openCalendar(b,parseDisplayDate(field.value.trim()),date=>{
+   field.setCustomValidity('');
+   field.value=displayDate(date);
+   field.dispatchEvent(new Event('input',{bubbles:true}));
+   field.focus();
+  });
  }
+ if(d.action==='journal-calendar')openCalendar(b,journalDate,date=>{journalDate=date;render();byId('journalDate')?.focus();});
  if(d.action==='clear-journal-date'){journalDate='';render();byId('journalDate')?.focus();}
  if(d.action==='settings') editSettings(b);
  if(d.action==='exit-demo') exitDemoWorkspace();
  if(d.action==='reset-profile'&&!demoWorkspace) confirmProfileReset();
+ if(d.action==='remove-profile-photo')removeProfilePhoto();
  if(d.action==='profile-name'){editSettings();byId('settingsForm').elements.profileName.focus();}
  if(d.action==='add-airport') addAirport();
  if(d.action==='new') editFlight();
@@ -672,7 +726,10 @@ document.addEventListener('click',e=>{
  if(d.action==='delete-flight') confirmFlightDeletion(flight());
  if(d.action==='divert') editFlight(flight(),true);
  if(d.action==='continuation') editContinuation(flight());
- if(d.action==='close') byId('dialog').close();
+ if(d.action==='close'){
+  if(byId('dialog').dataset.layout==='settings')closeSettings();
+  else byId('dialog').close();
+ }
  if(d.action==='backup') backup();
 });
 document.addEventListener('keydown',e=>{
@@ -687,13 +744,6 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
  const t=e.target,d=t.dataset;
- if(t.classList.contains('date-editor-picker')){
-  const field=t.parentElement.querySelector('[data-flight-date]');
-  field.setCustomValidity('');
-  field.value=displayDate(t.value);
-  field.dispatchEvent(new Event('input',{bubbles:true}));
-  field.focus();
- }
  if(t.id==='mapAirport'){selectMapAirport(t.value);}
  if(t.id==='status'){
   const f=flight(), status=t.value;
@@ -708,7 +758,6 @@ document.addEventListener('change',e=>{
   airportCountryFilter=t.value;airportListPage=0;query='';regionFilter='all';
   render();byId('airportCountry')?.focus();
  }
- if(t.id==='journalDate'){journalDate=t.value;render();byId('journalDate')?.focus();}
  if(t.id==='typeFilter'){typeFilter=t.value;render();}
  if(t.id==='statusFilter'){statusFilter=t.value;render();}
  if(t.id==='journalFilter'){journalFilter=t.value;render();}
@@ -725,12 +774,14 @@ document.addEventListener('change',e=>{
  }
  if(d.parking){const a=airport(airportCode);a.stands??={};a.stands[d.parking]=t.value;save();}
  if(d.airportScenery){airport(airportCode)[d.airportScenery]=t.value.trim();save();}
+ if(t.id==='profilePhotoInput')setProfilePhoto(t.files[0]);
  if(t.id==='airportIata'){const value=t.value.trim().toUpperCase();if(value&&!/^[A-Z]{3}$/.test(value)){notice(tr("Код IATA должен состоять из трех латинских букв."));t.value=airport(airportCode).iata;return;}airport(airportCode).iata=value;save();render();}
 });
 if(pages.some(([key])=>key===preferences().startPage)) page=preferences().startPage;
 if(!flight()) pickTail(tail);
 render();
-resumeGoogleSignIn();
+resumeGoogleSignIn().then(restoreCloudSession);
+window.addEventListener('focus',()=>queueCloudSync(0));
 const splash = byId('splash');
 const shell = document.querySelector('.shell');
 shell.inert = true;

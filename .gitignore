@@ -8,3 +8,6 @@ releases/
 FlightDesk/FlightDesk.html
 FlightDeck-Windows/FlightDesk.html
 FlightDesk/seed.json
+
+FlightDesk/airport-worldwide.json
+FlightDesk/__pycache__/

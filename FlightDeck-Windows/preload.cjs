@@ -7,3 +7,6 @@ contextBridge.exposeInMainWorld('flightDeckUpdates', {
 contextBridge.exposeInMainWorld('flightDeckAuth', {
  googleSignIn: url => ipcRenderer.invoke('google-sign-in', url)
 });
+contextBridge.exposeInMainWorld('flightDeckSession', {
+ request: (operation, value) => ipcRenderer.invoke('session-store', operation, value)
+});

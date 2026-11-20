@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import Security
 import UniformTypeIdentifiers
 
 final class WindowDragHandle: NSView {
@@ -9,7 +10,7 @@ final class WindowDragHandle: NSView {
     }
 }
 
-final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var googleOAuth: GoogleOAuth?
@@ -47,7 +48,10 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         controller.add(self, name: "exportBackup")
         controller.add(self, name: "googleSignIn")
         controller.add(self, name: "completeOnboarding")
-        if !testing { controller.add(self, name: "updateApplication") }
+        if !testing {
+            controller.add(self, name: "updateApplication")
+            controller.addScriptMessageHandler(self, contentWorld: .page, name: "sessionStore")
+        }
         let completed = testing || UserDefaults.standard.bool(forKey: "flightdeck.onboarding.v1")
         controller.addUserScript(WKUserScript(source: "window.flightDeckTourCompleted = \(completed);",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -127,6 +131,48 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping (Any?, String?) -> Void) {
+        guard message.name == "sessionStore", message.frameInfo.isMainFrame,
+              message.frameInfo.request.url?.standardizedFileURL == Bundle.main.url(forResource: "FlightDesk", withExtension: "html")?.standardizedFileURL,
+              let request = message.body as? [String: String], let operation = request["operation"] else {
+            replyHandler(nil, "Invalid session storage request")
+            return
+        }
+        let key: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                  kSecAttrService as String: "local.flightdesk.app",
+                                  kSecAttrAccount as String: "supabase-session"]
+        var status: OSStatus
+        switch operation {
+        case "read":
+            var query = key
+            query[kSecReturnData as String] = true
+            var item: CFTypeRef?
+            status = SecItemCopyMatching(query as CFDictionary, &item)
+            if status == errSecItemNotFound { replyHandler(NSNull(), nil); return }
+            if status == errSecSuccess, let bytes = item as? Data, let value = String(data: bytes, encoding: .utf8) {
+                replyHandler(value, nil)
+                return
+            }
+        case "write":
+            guard let value = request["value"], value.utf8.count <= 65_536 else {
+                replyHandler(nil, "Invalid session data")
+                return
+            }
+            let fields = [kSecValueData as String: Data(value.utf8)]
+            status = SecItemUpdate(key as CFDictionary, fields as CFDictionary)
+            if status == errSecItemNotFound { status = SecItemAdd(key.merging(fields) { _, new in new } as CFDictionary, nil) }
+        case "clear":
+            status = SecItemDelete(key as CFDictionary)
+            if status == errSecItemNotFound { status = errSecSuccess }
+        default:
+            replyHandler(nil, "Invalid session storage operation")
+            return
+        }
+        if status == errSecSuccess && operation != "read" { replyHandler(NSNull(), nil) }
+        else { replyHandler(nil, "Keychain is unavailable") }
+    }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let text = message.body as? String else { return }

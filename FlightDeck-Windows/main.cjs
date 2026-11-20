@@ -1,11 +1,25 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell } = require('electron');
-const { readFile } = require('node:fs/promises');
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, safeStorage, session, shell } = require('electron');
+const { readFile, rename, rm, writeFile } = require('node:fs/promises');
 const { join } = require('node:path');
 
 const appURL = 'flightdeck://app/index.html';
 const htmlPath = join(__dirname, 'FlightDesk.html');
 require('./google-auth.cjs')({ ipcMain, shell, appURL });
 require('./updates.cjs')({ app, ipcMain, appURL, autoUpdater: require('electron-updater').autoUpdater });
+
+ipcMain.handle('session-store', async (event, operation, value) => {
+  if (event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== appURL) throw new Error('Invalid sender');
+  const path = join(app.getPath('userData'), 'session.bin');
+  if (operation === 'clear') return rm(path, { force: true });
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Session encryption is unavailable');
+  if (operation === 'read') {
+    try { return safeStorage.decryptString(await readFile(path)); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  }
+  if (operation !== 'write' || typeof value !== 'string' || Buffer.byteLength(value) > 65536) throw new Error('Invalid session data');
+  await writeFile(path + '.new', safeStorage.encryptString(value));
+  await rename(path + '.new', path);
+});
 
 protocol.registerSchemesAsPrivileged([
   {

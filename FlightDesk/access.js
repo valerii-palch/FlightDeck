@@ -22,7 +22,7 @@ function renderAccessGate() {
 function unlockWorkspace() {
  const firstEntry=!signedInThisLaunch;
  signedInThisLaunch=true;
- cloudBase=null;cloudRemoteBase=null;cloudConflict=null;cloudState='pending';
+ loadCloudCheckpoint();
  save(false);
  queueCloudSync(0);
  if(firstEntry&&!tourCompleted()) setTimeout(()=>{
@@ -98,7 +98,7 @@ function confirmProfileReset() {
   dialog.addEventListener('cancel',preventClose);
   try {
    await resetCloudProfile();
-   data.flights=[];data.preferences={...preferences(),profileName:''};
+   data.flights=[];data.preferences={...preferences(),profileName:''};storeProfilePhoto('');
    pickTail(tail);save(false);dialog.close();render();
    notice(tr('Рейсы и профиль очищены.'));
   } catch(error) {

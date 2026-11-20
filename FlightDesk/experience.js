@@ -27,7 +27,7 @@ const mapsKey=(()=>{
 function editSettings(anchor = null) {
  const p=preferences();
  openDialog(`<header class="settings-header"><div><h2 id="settingsTitle">${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
- '<form id="settingsForm" class="settings-layout">'+
+ '<form id="settingsForm" class="settings-layout settings-flyout">'+
  '<fieldset class="settings-section"><legend>'+tr('Язык')+'</legend><select aria-label="'+tr('Язык')+'" name="language">'+
  languageOptions.map(([key,label])=>option(key,tr(label),languagePreference)).join('')+'</select></fieldset>'+
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
@@ -35,15 +35,16 @@ function editSettings(anchor = null) {
  `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
  '<label>'+tr('Плотность журнала')+'<select name="density">'+option('normal',tr("Обычная"),p.density)+option('compact',tr("Компактная"),p.density)+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
- '<div class="settings-actions controls">'+(demoWorkspace?'':`<button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button>`)+`<button class="primary">${tr("Сохранить")}</button></div>`+
- '<div class="settings-credit">'+appCredit+'</div></form>','settings',anchor);
+ '<fieldset class="settings-section"><legend>'+tr('Приложение')+'</legend><div class="settings-links">'+
+ (demoWorkspace?[]:[['update','Обновить приложение'],['tour','Повторить обучение'],['backup','Резервная копия']]).concat([['feedback','Обратная связь']]).map(([action,label])=>`<button type="button" data-action="${action}"><span>${tr(label)}</span><span aria-hidden="true">›</span></button>`).join('')+
+ '</div></fieldset><div class="settings-actions"><button class="primary">'+tr('Сохранить')+'</button></div></form>','settings',anchor);
  const form=byId('settingsForm');
  form.onsubmit=e=>{
   e.preventDefault();
   const {language,...settings}=Object.fromEntries(new FormData(form));
   data.preferences={...p,...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()};
   if(!demoWorkspace)saveLanguage(language);
-  save();byId('dialog').close();render();
+  save();closeSettings(render);
  };
 }
 
@@ -56,7 +57,9 @@ function airportSceneryDetails(airport) {
 
 function addAirport() {
  const countries=[...countryContinents.keys()].sort((a,b)=>countryName(a).localeCompare(countryName(b),appLanguage()));
- openDialog(`<h2>${tr("Добавить аэропорт")}</h2><form id="airportForm" class="editor two">`+
+ openDialog(`<h2>${tr("Добавить аэропорт")}</h2>
+ <label class="airport-directory">${tr('Мировой справочник')}<input id="airportDirectoryQuery" type="search" autocomplete="off" placeholder="${tr('ICAO, IATA или город')}"></label>
+ <div class="airport-directory-results" id="airportDirectoryResults"></div><form id="airportForm" class="editor two">`+
  '<label>ICAO<input name="icao" required minlength="4" maxlength="4" pattern="[A-Za-z]{4}"></label>'+
  '<label>IATA<input name="iata" maxlength="3" pattern="[A-Za-z]{3}"></label>'+
  `<label>${tr("Город на русском")}<input name="cityRu" required maxlength="100"></label><label>${tr("Город на английском")}<input name="cityEn" maxlength="100"></label>`+
@@ -66,8 +69,43 @@ function addAirport() {
  `<label>${tr("Широта")}<input name="lat" type="number" step="any" min="-90" max="90"></label>`+
  `<label>${tr("Долгота")}<input name="lon" type="number" step="any" min="-180" max="180"></label>`+
  `<p class="full muted">${tr("Координаты можно оставить пустыми. Для отображения аэропорта на карте укажи обе.")}</p>`+
+ `<label class="full">${tr('Часовой пояс IANA')}<input name="timezone" maxlength="60" placeholder="Europe/Moscow"></label>`+
  airportSceneryDetails()+
  `<div class="full controls"><button class="primary">${tr("Добавить")}</button><button type="button" data-action="close">${tr("Отмена")}</button></div></form>`);
+ const lookup=byId('airportDirectoryQuery'), results=byId('airportDirectoryResults');
+ lookup.oninput=()=>{
+  const term=lookup.value.trim().toLocaleLowerCase();
+  if(term.length<2){results.replaceChildren();return;}
+  const matches=[];
+  for(const [code,info] of Object.entries(worldwideAirports)){
+   if(airport(code))continue;
+   const names=[info.cityEn,info.nameEn,airportReference[code]?.cityRu,airportReference[code]?.nameRu];
+   const codes=[code.toLowerCase(),info.iata.toLowerCase()];
+   const score=codes.includes(term)?0:codes.some(value=>value.startsWith(term))?1:
+    names.some(value=>value?.toLocaleLowerCase().includes(term))?2:3;
+   if(score<3)matches.push({code,info,score});
+  }
+  results.replaceChildren();
+  for(const {code,info} of matches.sort((a,b)=>a.score-b.score).slice(0,12)){
+   const button=document.createElement('button');
+   button.type='button';
+   button.textContent=[code,info.iata,airportCity(code),airportName(code)].filter(Boolean).join(' · ');
+   button.onclick=()=>{
+    const localized=airportReference[code]||{};
+    const values={icao:code,iata:info.iata,cityRu:localized.cityRu||info.cityEn,cityEn:info.cityEn,
+     nameRu:localized.nameRu||info.nameEn,nameEn:info.nameEn,countryCode:info.countryCode,
+     lat:info.lat,lon:info.lon,timezone:info.timezone||''};
+    for(const [key,value] of Object.entries(values)){
+     form.elements[key].value=value;
+     form.elements[key].setCustomValidity('');
+    }
+    lookup.value=button.textContent;
+    results.replaceChildren();
+   };
+   results.append(button);
+  }
+  if(!results.childElementCount)results.textContent=tr('Аэропорты не найдены.');
+ };
  const form=byId('airportForm');
  form.addEventListener('input',()=>Array.from(form.elements).forEach(f=>f.setCustomValidity?.('')));
  form.onsubmit=e=>{
@@ -78,16 +116,75 @@ function addAirport() {
    iata:iata&&data.airports.some(a=>a.iata===iata)?tr("Этот IATA уже есть в каталоге."):'',
    cityRu:values.cityRu?'':tr("Укажи город."),nameRu:values.nameRu?'':tr("Укажи название аэропорта."),
    lat:values.lat===''&&values.lon!==''?tr("Укажи широту."):'',
-   lon:values.lon===''&&values.lat!==''?tr("Укажи долготу."):''};
+   lon:values.lon===''&&values.lat!==''?tr("Укажи долготу."):'',
+   timezone:values.timezone&&!validAirportTimezone(values.timezone)?tr('Укажи действительный часовой пояс IANA.'):''};
   const invalid=Object.keys(errors).find(k=>errors[k]);
   if(invalid){form.elements[invalid].setCustomValidity(errors[invalid]);form.reportValidity();return;}
-  const {cityRu,cityEn,nameRu,nameEn,countryCode,continent,developer,version}=values;
+  const {cityRu,cityEn,nameRu,nameEn,countryCode,continent,developer,version,timezone}=values;
   data.airports.push({icao,iata,name:nameRu,country:displayCountries.ru.of(countryCode),countryCode,continent,
    cityRu,cityEn,nameRu,nameEn,lat:values.lat===''?null:Number(values.lat),lon:values.lon===''?null:Number(values.lon),
-   developer,version,custom:true,scenery:false,gsx:false,python:false,stands:{narrow:'',wide:''}});
+   developer,version,timezone:timezone||undefined,custom:true,scenery:false,gsx:false,python:false,stands:{narrow:'',wide:''}});
   airportCode=icao;airportCountryFilter=countryCode;query='';airportFilter='all';regionFilter='all';airportListPage=Math.ceil(filteredAirports().length/airportPageSize)-1;
   save();byId('dialog').close();render();
  };
+}
+
+const pilotLevels=[
+ [0,'Курсант'],[150*60,'Новичок'],[500*60,'Хороший пилот'],[2500*60,'Опытный пилот'],[6000*60+1,'Пенсионер неба']
+];
+function pilotLevel(minutes){
+ const index=pilotLevels.findLastIndex(([threshold])=>minutes>=threshold);
+ const current=pilotLevels[Math.max(0,index)];
+ const next=pilotLevels[index+1];
+ return {rank:current[1],next:next?.[1],progress:next?Math.max(0,(minutes-current[0])/(next[0]-current[0])):1,
+  remaining:next?next[0]-minutes:0};
+}
+const profilePhotoOwner=()=>demoWorkspace?'demo':cloudSession?.user.id;
+const validProfilePhoto=photo=>typeof photo==='string'&&photo.length<=240_000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo);
+function storeProfilePhoto(photo){
+ const p=preferences(), photos={...p.profilePhotos};
+ const owner=profilePhotoOwner();
+ if(!owner)return;
+ if(photo)photos[owner]=photo;
+ else delete photos[owner];
+ data.preferences={...p,profilePhotos:photos};
+}
+function profileAvatar(){
+ const photo=preferences().profilePhotos?.[profilePhotoOwner()];
+ const valid=validProfilePhoto(photo);
+ return '<div class="pilot-avatar">'+(valid?'<img src="'+esc(photo)+'" alt="">':planeIcon)+'</div>'+
+ '<label class="photo-upload">'+tr('Добавить фотографию')+'<input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label>'+
+ (valid?`<button type="button" data-action="remove-profile-photo">${tr('Удалить фотографию')}</button>`:'');
+}
+async function setProfilePhoto(file){
+ if(!file)return;
+ const owner=profilePhotoOwner();
+ try {
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>15_000_000)throw Error();
+  const url=URL.createObjectURL(file);
+  try {
+   const img=new Image();
+   img.src=url;
+   await img.decode();
+   if(owner!==profilePhotoOwner())return;
+   const size=Math.min(img.naturalWidth,img.naturalHeight);
+   const canvas=document.createElement('canvas');
+   canvas.width=canvas.height=320;
+   canvas.getContext('2d').drawImage(img,(img.naturalWidth-size)/2,(img.naturalHeight-size)/2,size,size,0,0,320,320);
+   storeProfilePhoto(canvas.toDataURL('image/jpeg',.85));
+   save();render();
+  } finally {URL.revokeObjectURL(url);}
+ }catch {notice(tr('Не удалось загрузить фотографию. Выбери JPEG, PNG или WebP до 15 МБ.'));}
+}
+function removeProfilePhoto(){
+ storeProfilePhoto('');
+ save();render();
+}
+function pilotRankPanel(minutes){
+ const {rank,next,progress,remaining}=pilotLevel(minutes);
+ return `<section class="panel pilot-rank"><div class="pilot-rank-heading"><span class="pilot-rank-icon">${planeIcon}</span><div><small>${tr('Уровень пилота')}</small><h2>${tr(rank)}</h2></div><strong>${duration(minutes)}</strong></div>
+ <div class="rank-track" role="progressbar" aria-label="${tr('Уровень пилота')}" aria-valuenow="${Math.round(progress*100)}"><span style="--rank-progress:${progress*100}%"></span></div>
+ <p class="muted">${next?tr('До следующего уровня')+' · '+tr(next)+' · '+duration(remaining):tr('Максимальный уровень достигнут')}</p></section>`;
 }
 
 function travelAchievements(rows) {
@@ -254,3 +351,101 @@ function mountYandexMap() {
  load(3);
  return ()=>{clearFrame();window.removeEventListener('message',message);};
 }
+
+let calendarPopup, calendarAnchor;
+function closeCalendar(restoreFocus=false){
+ calendarPopup?.remove();
+ calendarPopup=null;
+ if(restoreFocus)calendarAnchor?.focus();
+ calendarAnchor?.setAttribute('aria-expanded','false');
+ calendarAnchor=null;
+}
+function openCalendar(anchor,selected,onSelect){
+ if(calendarAnchor===anchor){closeCalendar(true);return;}
+ closeCalendar();
+ calendarAnchor=anchor;
+ const today=dateUTC(), initial=selected||today;
+ let month=new Date(initial.slice(0,7)+'-01T12:00:00Z');
+ const modal=anchor.closest('dialog[open]');
+ modal?.classList.remove('dialog-enter');
+ const popup=document.createElement('section');
+ calendarPopup=popup;
+ popup.className='calendar-popover';
+ popup.setAttribute('role','dialog');
+ popup.setAttribute('aria-label',tr('Календарь'));
+ anchor.setAttribute('aria-expanded','true');
+ (modal||document.body).append(popup);
+ const position=()=>{
+  if(!anchor.isConnected){closeCalendar();return;}
+  const box=anchor.getBoundingClientRect();
+  const top=box.bottom+8+popup.offsetHeight>innerHeight-12?box.top-popup.offsetHeight-8:box.bottom+8;
+  popup.style.left=Math.max(10,Math.min(box.left,innerWidth-popup.offsetWidth-10))+'px';
+  popup.style.top=Math.max(10,top)+'px';
+ };
+ function draw(focus){
+  popup.replaceChildren();
+  const header=document.createElement('header');
+  const title=document.createElement('strong');
+  title.textContent=new Intl.DateTimeFormat(appLanguage(),{month:'long',year:'numeric',timeZone:'UTC'}).format(month);
+  const button=(label,action,accessibleLabel=label)=>{
+   const b=document.createElement('button');
+   b.type='button';b.textContent=label;b.setAttribute('aria-label',accessibleLabel);b.onclick=action;
+   return b;
+  };
+  const move=delta=>()=>{month.setUTCMonth(month.getUTCMonth()+delta);draw(true);};
+  header.append(button('‹',move(-1),tr('Предыдущий месяц')),title,button('›',move(1),tr('Следующий месяц')));
+  const grid=document.createElement('div');
+  grid.className='calendar-days';
+  const weekdayFormatter=new Intl.DateTimeFormat(appLanguage(),{weekday:'short',timeZone:'UTC'});
+  for(let i=0;i<7;i++){
+   const label=document.createElement('small');
+   label.textContent=weekdayFormatter.format(Date.UTC(2024,0,i+1));
+   grid.append(label);
+  }
+  const mondayOffset=(month.getUTCDay()+6)%7;
+  for(let i=0;i<42;i++){
+   const date=new Date(month.getTime()+(i-mondayOffset)*day);
+   const iso=date.toISOString().slice(0,10);
+   const control=button(String(date.getUTCDate()),()=>{closeCalendar(true);onSelect(iso);},displayDate(iso));
+   control.classList.toggle('other-month',date.getUTCMonth()!==month.getUTCMonth());
+   control.classList.toggle('today',iso===today);
+   control.setAttribute('aria-pressed',String(iso===selected));
+   grid.append(control);
+  }
+  popup.append(header,grid,button(tr('Сегодня'),()=>{closeCalendar(true);onSelect(today);}));
+  position();
+  if(focus)(grid.querySelector('[aria-pressed=true]')||header.querySelector('button'))?.focus();
+ }
+ draw(true);
+}
+document.addEventListener('pointerdown',event=>{
+ if(calendarPopup&&!calendarPopup.contains(event.target)&&!calendarAnchor?.contains(event.target))closeCalendar();
+},true);
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&calendarPopup){event.preventDefault();event.stopPropagation();closeCalendar(true);}
+},true);
+window.addEventListener('resize',()=>closeCalendar());
+
+function closeSettings(after){
+ const dialog=byId('dialog');
+ if(dialog.dataset.layout!=='settings'||!dialog.open)return;
+ const finish=()=>{
+  if(dialog.dataset.layout!=='settings'||!dialog.open)return;
+  dialog.classList.remove('settings-closing');
+  dialog.close();
+  after?.();
+ };
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){finish();return;}
+ if(dialog.classList.contains('settings-closing'))return;
+ dialog.classList.add('settings-closing');
+ setTimeout(finish,180);
+}
+byId('dialog').addEventListener('click',event=>{
+ const dialog=event.currentTarget;
+ if(dialog.dataset.layout!=='settings'||event.target!==dialog)return;
+ const box=dialog.getBoundingClientRect();
+ if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)closeSettings();
+});
+byId('dialog').addEventListener('cancel',event=>{
+ if(event.currentTarget.dataset.layout==='settings'){event.preventDefault();closeSettings();}
+});

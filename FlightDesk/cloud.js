@@ -1,7 +1,15 @@
 const cloudURL='https://dntuchblnbpxgvdggapw.supabase.co';
 const cloudKey='sb_publishable_2G0lwSIutKWV7bS6ry72mg_x_B5EsYt';
 let cloudSession=null, cloudBase=null, cloudRemoteBase=null, cloudBusy=false, cloudStatus='', cloudConflict=null;
-let cloudTimer, cloudState='pending';
+let cloudTimer, cloudState='pending', cloudRefresh;
+const sessionBridge=window.webkit?.messageHandlers?.sessionStore;
+const sessionStore=(operation,value)=>sessionBridge
+ ?sessionBridge.postMessage({operation,...(value===undefined?{}:{value})})
+ :window.flightDeckSession?.request(operation,value);
+async function saveSession(operation,value){
+ try {await sessionStore(operation,value);}
+ catch {notice(tr('Не удалось сохранить сеанс на этом устройстве.'));}
+}
 
 function cloudIndicator(){
  if(!cloudSession) return ['signed-out',tr("Войти для синхронизации")];
@@ -26,7 +34,7 @@ function cloudEditing(){
  return byId('dialog')?.open||document.activeElement?.matches('input, textarea, select, [contenteditable="true"]');
 }
 
-function queueCloudSync(delay=900){
+function queueCloudSync(delay=350){
  if(demoWorkspace||!cloudSession||cloudConflict) return;
  if(delay&&cloudState==='ready'){
   cloudState='pending';
@@ -37,8 +45,8 @@ function queueCloudSync(delay=900){
 }
 
 async function autoSyncCloud(){
- if(!cloudSession||cloudConflict||cloudBusy||navigator.onLine===false) return;
- if(cloudEditing()){queueCloudSync(2000);return;}
+ if(!cloudSession||cloudConflict||navigator.onLine===false)return;
+ if(cloudBusy){queueCloudSync(1000);return;}
  cloudBusy=true;
  updateCloudIndicator();
  const profileButtons=['cloudSync','cloudLogout'].map(byId).filter(Boolean);
@@ -62,7 +70,7 @@ async function autoSyncCloud(){
  } finally {
   cloudBusy=false;
   if(page==='pilot') for(const id of ['cloudSync','cloudLogout']) byId(id)?.removeAttribute('disabled');
-  if(repaint) render();
+  if(repaint||!cloudSession) render();
   else {
    updateCloudIndicator();
    const status=byId('cloudStatus');
@@ -91,27 +99,72 @@ async function cloudRequest(path,{method='GET',body,token,representation=false}=
    if(result?.error_code==='email_not_confirmed') throw Error('Email еще не подтвержден. Проверь пользователя в Supabase.');
    if(response.status===400||response.status===401) throw Error('Проверь email и пароль.');
   }
-  throw Error('Supabase отклонил запрос (HTTP '+response.status+').');
+  throw Object.assign(Error('Supabase отклонил запрос (HTTP '+response.status+').'),{status:response.status});
  }
  return result;
 }
 
-function acceptCloudSession(result){
+async function acceptCloudSession(result){
  if(!result?.access_token||!result.refresh_token||!result.user?.id) throw Error('Сервер не вернул данные сеанса.');
- cloudSession={...result,expiresAt:Date.now()+Number(result.expires_in||0)*1000};
+ cloudSession={access_token:result.access_token,refresh_token:result.refresh_token,
+  user:{id:result.user.id,email:result.user.email},expiresAt:Date.now()+Number(result.expires_in||0)*1000};
+ await saveSession('write',JSON.stringify(cloudSession));
 }
-
-async function cloudToken(){
- if(cloudSession.expiresAt>Date.now()+60000) return cloudSession.access_token;
+async function restoreCloudSession(){
+ if(cloudSession||cloudBusy||demoWorkspace)return;
+ cloudBusy=true;
  try {
-  acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=refresh_token',{
-   method:'POST',body:{refresh_token:cloudSession.refresh_token}
-  }));
- } catch(error){throw Error(error.message+' При необходимости войди заново.');}
- return cloudSession.access_token;
+  const stored=JSON.parse(await sessionStore('read')||'null');
+  if(!stored?.access_token||!stored.refresh_token||!stored.user?.id||!Number.isFinite(stored.expiresAt))return;
+  cloudSession=stored;
+  loadCloudCheckpoint();
+  if(navigator.onLine!==false)await cloudToken(true);
+ } catch(error) {
+  if(cloudSession)cloudState='error';
+  cloudStatus=error.message;
+ } finally {
+  cloudBusy=false;
+  render();
+  queueCloudSync(0);
+ }
+}
+async function cloudToken(forceRefresh=false){
+ if(!forceRefresh&&cloudSession.expiresAt>Date.now()+60000) return cloudSession.access_token;
+ if(!cloudRefresh)cloudRefresh=(async()=>{
+  try {
+   await acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=refresh_token',{
+    method:'POST',body:{refresh_token:cloudSession.refresh_token}
+   }));
+   return cloudSession.access_token;
+  } catch(error) {
+   if([400,401,403].includes(error.status)){
+    await saveSession('clear');
+    cloudSession=null;
+    render();
+   }
+   throw error;
+  } finally {cloudRefresh=null;}
+ })();
+ return cloudRefresh;
+}
+function loadCloudCheckpoint(){
+ const checkpoint=data.cloudCheckpoint;
+ cloudBase=checkpoint?.owner===cloudSession.user.id?checkpoint.local:null;
+ cloudRemoteBase=cloudBase?(checkpoint.remote||cloudBase):null;
+ cloudConflict=null;
+ cloudState='pending';
+}
+function rememberCloudCheckpoint(){
+ const checkpoint={owner:cloudSession.user.id,local:cloudBase,remote:cloudSame(cloudBase,cloudRemoteBase)?null:cloudRemoteBase};
+ if(cloudSame(checkpoint,data.cloudCheckpoint))return;
+ data.cloudCheckpoint=checkpoint;
+ save(false);
 }
 
-const cloudSnapshot=()=>JSON.parse(JSON.stringify({flights:data.flights,airports:data.airports,profileName:preferences().profileName}));
+const cloudSnapshot=()=>{
+ const photo=preferences().profilePhotos?.[profilePhotoOwner()];
+ return JSON.parse(JSON.stringify({flights:data.flights,airports:data.airports,profileName:preferences().profileName,profilePhoto:validProfilePhoto(photo)?photo:''}));
+};
 function cloudCanonical(value){
  if(Array.isArray(value)) return value.map(cloudCanonical);
  if(value&&typeof value==='object') return Object.fromEntries(Object.keys(value).sort().map(key=>[key,cloudCanonical(value[key])]));
@@ -123,6 +176,7 @@ function applyCloudCopy(copy){
  if(!validBackup(copy)) throw Error('Формат облачного журнала не поддерживается.');
  data={...data,...JSON.parse(JSON.stringify({flights:copy.flights,airports:copy.airports}))};
  if(typeof copy.profileName==='string') data.preferences={...preferences(),profileName:copy.profileName.trim().slice(0,80)};
+ storeProfilePhoto(validProfilePhoto(copy.profilePhoto)?copy.profilePhoto:'');
  if(!airport(airportCode)) airportCode=data.airports[0]?.icao||'';
  if(!flight()) pickTail(tail);
  save(false);
@@ -133,30 +187,35 @@ async function synchronizeCloud(choice='',expected,automatic=false){
  const endpoint='/rest/v1/flightdeck_journals';
  const filter='?owner_id=eq.'+encodeURIComponent(cloudSession.user.id);
  const rows=await cloudRequest(endpoint+filter+'&select=version,journal',{token});
- if(automatic&&cloudEditing()) return {deferred:true};
  const remote=rows[0];
  const local=cloudSnapshot();
  if(remote&&!validBackup(remote.journal)) throw Error('Формат облачного журнала не поддерживается.');
  if(choice&&(!cloudSame(expected.local,local)||expected.version!==(remote?.version??null))){
   throw Error('Журнал изменился. Нажми «Синхронизировать» и проверь копии снова.');
  }
- const remoteJournal=remote?{...remote.journal,profileName:remote.journal.profileName??local.profileName}:null;
+ const remoteJournal=remote?{...remote.journal,profileName:remote.journal.profileName??local.profileName,
+  profilePhoto:validProfilePhoto(remote.journal.profilePhoto)?remote.journal.profilePhoto:''}:null;
+ if(cloudBase&&!Object.hasOwn(cloudBase,'profilePhoto'))cloudBase={...cloudBase,profilePhoto:''};
+ if(cloudRemoteBase&&!Object.hasOwn(cloudRemoteBase,'profilePhoto'))cloudRemoteBase={...cloudRemoteBase,profilePhoto:''};
  if(remote&&cloudSame(local,remoteJournal)&&typeof remote.journal.profileName==='string'){
   cloudBase=local;
   cloudRemoteBase=local;
+  rememberCloudCheckpoint();
   return {message:'Журналы совпадают.'};
  }
  if(remote&&cloudBase&&cloudSame(local,cloudBase)&&cloudSame(remoteJournal,cloudRemoteBase)&&!choice){
   return {message:'Журналы совпадают.'};
  }
- const freshJournal=!local.flights.length&&!local.airports.length&&!local.profileName&&!cloudBase;
+ const freshJournal=!local.flights.length&&!local.airports.length&&!local.profileName&&!local.profilePhoto&&!cloudBase;
  if(remote&&(choice==='download'||(!choice&&(freshJournal||(cloudBase&&cloudSame(local,cloudBase)))))){
+  if(automatic&&cloudEditing())return {deferred:true};
   applyCloudCopy(remoteJournal);
   cloudBase=cloudSnapshot();
   cloudRemoteBase=remoteJournal;
+  rememberCloudCheckpoint();
   return {message:'Облачный журнал загружен.',applied:true};
  }
- if(choice==='upload'||(remote&&cloudSame(local,remoteJournal))||(remote&&cloudBase&&cloudSame(remoteJournal,cloudRemoteBase))){
+ if(choice==='upload'||(!remote&&!cloudBase&&!choice)||(remote&&cloudSame(local,remoteJournal))||(remote&&cloudBase&&cloudSame(remoteJournal,cloudRemoteBase))){
   const body={journal:local,version:(remote?.version||0)+1};
   const updated=await cloudRequest(remote?endpoint+filter+'&version=eq.'+remote.version:endpoint,{
    token,method:remote?'PATCH':'POST',representation:true,
@@ -165,6 +224,7 @@ async function synchronizeCloud(choice='',expected,automatic=false){
   if(!updated?.length) throw Error('Облачный журнал изменился. Нажми «Синхронизировать» еще раз.');
   cloudBase=local;
   cloudRemoteBase=local;
+  rememberCloudCheckpoint();
   return {message:'Локальный журнал сохранен в облаке.'};
  }
  return {version:remote?.version??null,local,remote:remote?.journal};
@@ -189,7 +249,7 @@ async function resetCloudProfile() {
   const filter='?owner_id=eq.'+encodeURIComponent(owner);
   const [remote]=await cloudRequest(endpoint+filter+'&select=version,journal',{token});
   if(remote&&!validBackup(remote.journal)) throw Error('Формат облачного журнала не поддерживается.');
-  const local={...cloudSnapshot(),flights:[],profileName:''};
+  const local={...cloudSnapshot(),flights:[],profileName:'',profilePhoto:''};
   const journal={...local,airports:remote?.journal.airports??local.airports};
   const body={journal,version:(remote?.version??0)+1};
   const updated=await cloudRequest(remote?endpoint+filter+'&version=eq.'+remote.version:endpoint,{
@@ -198,6 +258,7 @@ async function resetCloudProfile() {
   });
   if(!updated?.length) throw Error('Журнал изменился. Подтверди сброс снова.');
   cloudBase=local;cloudRemoteBase=journal;
+  rememberCloudCheckpoint();
   cloudConflict=cloudSame(local,journal)?null:{version:body.version,local,remote:journal};
   cloudState='ready';
   cloudStatus='Рейсы и профиль очищены.';
@@ -244,7 +305,7 @@ function bindCloudProfile(){
    const email=form.elements.email.value.trim(),password=form.elements.password.value;
    form.elements.password.value='';
    perform(async()=>{
-    acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=password',{
+    await acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=password',{
      method:'POST',body:{email,password}
     }));
     return unlockWorkspace();
@@ -266,6 +327,7 @@ function bindCloudProfile(){
  byId('cloudLogout').onclick=()=>perform(async()=>{
   try {await cloudRequest('/auth/v1/logout?scope=local',{method:'POST',token:await cloudToken()});}
   finally {
+   await saveSession('clear');
    clearTimeout(cloudTimer);cloudSession=null;cloudBase=null;cloudRemoteBase=null;cloudConflict=null;
    explicitAircraft=false;page='home';
    if(byId('dialog').open)byId('dialog').close();

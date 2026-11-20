@@ -136,7 +136,8 @@ let journalQuery='', journalDate='', typeFilter='all';
 function journal() {
  return '<section class="panel board-panel '+(preferences().density==='compact'?'board-compact':'')+'"><div class="controls board-filters">'+
  `<input id="journalSearch" type="search" aria-label="${tr("Поиск рейсов")}" placeholder="${tr("Поиск рейса")}" value="`+esc(journalQuery)+'">'+
- '<div class="board-date"><label class="board-date-field"><span aria-hidden="true">'+(journalDate?displayDate(journalDate):tr("Все даты"))+`</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v5m8-5v5M4 10h16"/></svg><input id="journalDate" type="date" aria-label="${tr("Дата вылета UTC")}" value="`+esc(journalDate)+'"></label>'+
+ '<div class="board-date"><button id="journalDate" type="button" class="board-date-field" data-action="journal-calendar" aria-haspopup="dialog" aria-expanded="false"><span>'+
+ (journalDate?displayDate(journalDate):tr("Все даты"))+'</span>'+toolbarIcon('calendar')+'</button>'+
  (journalDate?`<button type="button" data-action="clear-journal-date" aria-label="${tr("Сбросить дату")}">×</button>`:'')+'</div>'+
  `<select id="typeFilter" aria-label="${tr("Тип рейса")}">`+option('all',tr("Все типы"),typeFilter)+[...flightTypes,'Не указан'].map(t=>option(t,tr(t),typeFilter)).join('')+'</select>'+
  `<select id="journalFilter" aria-label="${tr("Борт")}">`+option('all',tr("Все борта"),journalFilter)+fleet.map(a=>option(a.tail,aircraftModel(a)+' · '+a.tail,journalFilter)).join('')+'</select>'+

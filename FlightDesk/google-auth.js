@@ -27,7 +27,7 @@ async function startGoogleSignIn() {
  return new Promise(()=>{});
 }
 async function completeGoogleSignIn(result){
- acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=pkce',{
+ await acceptCloudSession(await cloudRequest('/auth/v1/token?grant_type=pkce',{
   method:'POST',body:{auth_code:result.code,code_verifier:result.verifier}
  }));
  return unlockWorkspace();

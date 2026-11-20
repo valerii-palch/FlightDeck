@@ -5,6 +5,7 @@ import json
 import os
 import plistlib
 import re
+from worldwide_airports import catalog
 
 root = Path(__file__).resolve().parent
 parser = ArgumentParser(description='Build the standalone FlightDeck web interface.')
@@ -31,6 +32,8 @@ html = html.replace('__CLOUD__', (root / 'cloud.js').read_text(encoding='utf-8')
 html = html.replace('__ACCESS__', (root / 'access.js').read_text(encoding='utf-8'))
 html = html.replace('__ROUTE_MAP__', (root / 'route-map.js').read_text(encoding='utf-8'))
 reference = (root / 'airport-reference.json').read_text(encoding='utf-8').replace('<', '\\u003c')
+html = html.replace('__AIRPORT_DATA_LICENSE__', (root / 'airport-data-license.txt').read_text(encoding='utf-8').replace('--', '—'))
+html = html.replace('__WORLDWIDE_AIRPORTS__', json.dumps(catalog(), ensure_ascii=False, separators=(',', ':')).replace('<', r'\u003c'))
 html = html.replace('__AIRPORT_REFERENCE__', reference)
 html = html.replace('__AIRPORT_PHOTOS__', (root / 'airport-photos.json').read_text(encoding='utf-8').replace('<', r'\u003c'))
 map_key = os.environ.get('FLIGHTDECK_YANDEX_MAPS_KEY', '').strip()
