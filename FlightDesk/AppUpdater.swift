@@ -110,7 +110,13 @@ enum UpdateVerification {
                     do { try process.run() } catch { process.terminationHandler = nil; continuation.resume(throwing: error) }
                 }
                 installer = nil
-                guard result == 0 else { throw UpdateFailure.install }
+                let installedApp = URL(fileURLWithPath: "/Applications/FlightDeck.app")
+                let installedPlist = installedApp.appendingPathComponent("Contents/Info.plist")
+                guard result == 0,
+                      let installed = NSDictionary(contentsOf: installedPlist),
+                      installed["CFBundleShortVersionString"] as? String == manifest.version,
+                      installed["CFBundleVersion"] as? String == String(manifest.build)
+                else { throw UpdateFailure.install }
                 // Restart only after installation succeeds; the helper waits until this process exits.
                 let restart = Process()
                 restart.executableURL = URL(fileURLWithPath: "/bin/sh")

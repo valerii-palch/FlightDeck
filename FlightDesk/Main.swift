@@ -92,6 +92,8 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         window.title = "FlightDeck"
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(srgbRed: 9.0 / 255, green: 13.0 / 255, blue: 22.0 / 255, alpha: 1)
         window.contentMinSize = NSSize(width: 1340, height: 700)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.titleVisibility = .hidden

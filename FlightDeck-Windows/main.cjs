@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session, shell } = require('electron');
 const { readFile } = require('node:fs/promises');
 const { join } = require('node:path');
 
@@ -26,6 +26,7 @@ function openExternalLink(url, window) {
 }
 
 async function createWindow() {
+  nativeTheme.themeSource = 'dark';
   const window = new BrowserWindow({
     title: 'FlightDeck',
     width: 1400,
@@ -33,7 +34,7 @@ async function createWindow() {
     minWidth: 1340,
     minHeight: 700,
     useContentSize: true,
-    backgroundColor: '#0b1421',
+    backgroundColor: '#090d16',
     icon: join(__dirname, 'icon.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   });

@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+# PackageKit sorts the marketing version first. Reject downgrades by build instead.
+target_plist="${3%/}/Applications/FlightDeck.app/Contents/Info.plist"
+if [ ! -f "$target_plist" ]; then
+    exit 0
+fi
+
+installed_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$target_plist" 2>/dev/null || true)
+package_build=$(cat "$(dirname "$0")/build")
+case "$installed_build" in
+    ''|*[!0-9]*) exit 0 ;;
+esac
+if [ "$installed_build" -gt "$package_build" ]; then
+    echo "FlightDeck build $installed_build is newer than this package (build $package_build)." >&2
+    exit 1
+fi

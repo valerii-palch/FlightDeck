@@ -6,7 +6,7 @@ const tourSteps=[
  {page:'home',target:'.dashboard-latest',title:'Актуальный рейс под рукой',body:'На главной появляется текущий или ближайший рейс. Открой его данные, чтобы отмечать этапы полета.'},
  {page:'journal',target:'.board-panel',title:'Весь журнал полетов',body:'Здесь можно найти рейс, проверить время прилета и открыть его для редактирования.'},
  {page:'pilot',target:'.cloud-profile',title:'Подключи облако',body:'Войди через Google или по почте. Один аккаунт открывает общий журнал на macOS и Windows.'},
- {page:'home',target:'[data-action="settings"]',title:'Настрой FlightDeck под себя',body:'Выбери язык и тему. В настройках можно повторить обучение и написать обратную связь.'}
+ {page:'home',target:'[data-action="settings"]',title:'Настрой FlightDeck под себя',body:'Выбери язык интерфейса. В настройках можно повторить обучение и написать обратную связь.'}
 ];
 function tourCompleted(){
  if(typeof window.flightDeckTourCompleted==='boolean')return window.flightDeckTourCompleted;

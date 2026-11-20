@@ -14,7 +14,7 @@ codesign --verify --deep --strict "$app"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/flightdeck-installer.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-mkdir "$work/root" "$work/resources"
+mkdir "$work/root" "$work/resources" "$work/scripts"
 ditto "$app" "$work/root/FlightDeck.app"
 pkgbuild --analyze --root "$work/root" "$work/components.plist"
 python3 - "$work/components.plist" <<'PLIST'
@@ -26,9 +26,13 @@ path = Path(sys.argv[1])
 components = plistlib.loads(path.read_bytes())
 for component in components:
     component["BundleIsRelocatable"] = False
+    component["BundleIsVersionChecked"] = False
 path.write_bytes(plistlib.dumps(components))
 PLIST
+cp installer/preinstall "$work/scripts/preinstall"
+printf '%s\n' "$build" > "$work/scripts/build"
 pkgbuild --root "$work/root" --component-plist "$work/components.plist" \
+  --scripts "$work/scripts" \
   --identifier local.flightdesk.installer --version "$build" \
   --install-location /Applications "$work/FlightDeck.pkg"
 

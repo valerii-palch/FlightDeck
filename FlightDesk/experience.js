@@ -13,21 +13,9 @@ const countryName=code=>displayCountries[appLanguage()].of(code);
 const knownCountries={ARMENIA:'AM',AZERBAIJAN:'AZ',BELARUS:'BY',CHINA:'CN',CUBA:'CU',EGIPT:'EG','HONG KONG':'HK',INDIA:'IN',INDONESIA:'ID',KAZAKHSTAN:'KZ',KYRGYZSTAN:'KG',MALDIVES:'MV',SEYCHELLES:'SC','SRI-LANKA':'LK',THAILAND:'TH',TURKEY:'TR',UAE:'AE',UZBEKISTAN:'UZ',VIETNAM:'VN','РОССИЯ':'RU',RUSSIA:'RU'};
 const airportCountry=a=>a?.countryCode||knownCountries[a?.country?.trim().toUpperCase()];
 const preferences=()=>{
- return {profileName:'',startPage:'home',density:'normal',theme:'system',includeDemo:false,...data.preferences};
+ return {profileName:'',startPage:'home',density:'normal',includeDemo:false,...data.preferences};
 };
 const summaryFlights=()=>preferences().includeDemo?data.flights:data.flights.filter(f=>!f.demo);
-const themes=[['light','Светлая'],['dark','Темная'],['system','Системная']];
-const systemLight=window.matchMedia?.('(prefers-color-scheme: light)');
-const applyTheme=()=>{
- const theme=preferences().theme;
- document.documentElement.dataset.theme=theme==='light'||theme==='dark'?theme:systemLight?.matches?'light':'dark';
-};
-function refreshMapTheme(){
- applyTheme();
- mapCleanup?.();
- mapCleanup=mountYandexMap();
-}
-systemLight?.addEventListener('change',()=>{if(preferences().theme==='system') refreshMapTheme();});
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
 const mapsKey=(()=>{
  let legacyKey;
@@ -38,12 +26,8 @@ const mapsKey=(()=>{
 
 function editSettings() {
  const p=preferences();
- const preview=variant=>'<span class="theme-mini theme-mini-'+variant+'" aria-hidden="true"><i></i><i></i><i></i></span>';
  openDialog(`<header class="settings-header"><div><h2>${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
  '<form id="settingsForm" class="settings-layout">'+
- `<fieldset class="settings-section theme-settings"><legend>${tr("Оформление")}</legend><div class="theme-options">`+themes.map(([key,label])=>
- '<label class="theme-option"><input type="radio" name="theme" value="'+key+'" '+(p.theme===key?'checked':'')+'><span class="theme-card"><span class="theme-preview">'+
- (key==='system'?preview('light')+preview('dark'):preview(key))+'</span><span class="theme-label">'+tr(label)+'</span></span></label>').join('')+'</div></fieldset>'+
  '<fieldset class="settings-section"><legend>'+tr('Язык')+'</legend><select aria-label="'+tr('Язык')+'" name="language">'+
  languageOptions.map(([key,label])=>option(key,tr(label),languagePreference)).join('')+'</select></fieldset>'+
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
@@ -54,11 +38,6 @@ function editSettings() {
  '<div class="settings-actions controls">'+(demoWorkspace?'':`<button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button>`)+`<button class="primary">${tr("Сохранить")}</button></div>`+
  '<div class="settings-credit">'+appCredit+'</div></form>');
  const form=byId('settingsForm');
- form.addEventListener('change',e=>{
-  if(e.target.name!=='theme') return;
-  data.preferences={...preferences(),theme:e.target.value};
-  refreshMapTheme();save();
- });
  form.onsubmit=e=>{
   e.preventDefault();
   const {language,...settings}=Object.fromEntries(new FormData(form));
@@ -167,15 +146,14 @@ function initializeYandexFrame(payload) {
   const bounds=[[Math.min(...longitudes),Math.max(...latitudes)],[Math.max(...longitudes),Math.min(...latitudes)]];
   const map=new YMap(document.getElementById('map'),{
    location:coordinates.length===1?{center:coordinates[0],zoom:8}:{bounds},
-   margin:[35,40,40,45],theme:payload.theme,mode:'vector'
+   margin:[35,40,40,45],theme:'dark',mode:'vector'
   });
-  const dark=payload.theme==='dark';
   const color=(tags,value)=>({tags:{all:[tags]},elements:'geometry.fill',stylers:[{color:value}]});
-  const scheme=[color('water',dark?'#101d2e':'#cbe2f6'),color('landscape',dark?'#23384d':'#e8f1f8'),
+  const scheme=[color('water','#101822'),color('landscape','#23344a'),
    {tags:{any:['poi','transit_location']},elements:'label',stylers:[{visibility:'off'}]}];
   map.addChild(new YMapDefaultSchemeLayer({customization:scheme})).addChild(new YMapDefaultFeaturesLayer());
   for(const coordinates of payload.curves) map.addChild(new YMapFeature({
-   geometry:{type:'LineString',coordinates},style:{stroke:[{color:dark?'#78c5f8':'#2466aa',width:2}]}
+   geometry:{type:'LineString',coordinates},style:{stroke:[{color:'#a4ddff',width:2}]}
   }));
   for(const [code,coordinates] of Object.entries(payload.points)){
    const marker=document.createElement('button');
@@ -190,6 +168,7 @@ function initializeYandexFrame(payload) {
  };
  const startV2=()=>{
   const map=new ymaps.Map('map',{center:[50,45],zoom:4,controls:[]});
+  map.panes.get('ground')?.getElement().style.setProperty('filter','invert(1) hue-rotate(180deg) saturate(.65)');
   map.behaviors.disable('scrollZoom');
   const normalDot=ymaps.templateLayoutFactory.createClass('<span class="airport-dot legacy"></span>');
   const hubDot=ymaps.templateLayoutFactory.createClass('<span class="airport-dot legacy hub"></span>');
@@ -255,9 +234,8 @@ function mountYandexMap() {
  }
  function load(attempt){
   version=attempt;
-  const theme=document.documentElement.dataset.theme==='light'?'light':'dark';
-  const payload=JSON.stringify({points,paths,curves,key:mapsKey,theme,version,locale:appLanguage()==='ru'?'ru_RU':'en_US'}).replace(/</g,'\\u003c');
-  const colors=theme==='dark'?'#15283d;color:#e3f1ff':'#eff6ff;color:#23435e';
+  const payload=JSON.stringify({points,paths,curves,key:mapsKey,version,locale:appLanguage()==='ru'?'ru_RU':'en_US'}).replace(/</g,'\\u003c');
+  const colors='#101822;color:#e3f1ff';
   frame=document.createElement('iframe');
   frame.title=tr("Яндекс Карты · карта перелетов");
   frame.setAttribute('sandbox','allow-scripts allow-popups');
