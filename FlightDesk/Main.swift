@@ -87,6 +87,11 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             guard let data = try? JSONEncoder().encode(state), let json = String(data: data, encoding: .utf8) else { return }
             self?.webView.evaluateJavaScript("window.flightDeckUpdateStatus?.(\(json))")
         }
+        appUpdater.available = { [weak self] version, notes in
+            guard let data = try? JSONEncoder().encode([version, notes]),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            self?.webView.evaluateJavaScript("window.flightDeckUpdateAvailable?.(...\(json))")
+        }
         webView.navigationDelegate = self
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 810),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -125,7 +130,11 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let text = message.body as? String else { return }
-        if message.name == "updateApplication" { appUpdater.start(); return }
+        if message.name == "updateApplication" {
+            if text == "check" { appUpdater.check() }
+            if text == "install" { appUpdater.install() }
+            return
+        }
         if message.name == "closeWindow" { window.close(); return }
         if message.name == "toggleFullscreen" { window.toggleFullScreen(nil); return }
         if message.name == "googleSignIn" {
@@ -219,11 +228,21 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           check(!byId('accessGate').hidden && document.querySelector('.shell').hidden, 'initial authorization gate');
           byId('openDemo').click();
           check(data.flights.length > 0 && data.airports.length > 0 && fleet.every(a=>a.tail.startsWith('DEMO')), 'fictional workspace');
+          check(document.querySelector('[data-next-flight]'), 'quick status button');
+          const current = workingFlight(summaryFlights());
+          const previousStatus = current.status;
+          document.querySelector('[data-next-flight]').click();
+          check(current.status === nextStatus[previousStatus], 'advance active flight once');
+          check(displayDate('2026-11-20') === '20.11.2026' && parseDisplayDate('29.02.2024') === '2024-02-29' &&
+                parseDisplayDate('29.02.2026') === '', 'fixed date format and leap year');
           data.flights.length=0;
           save();
           exitDemoWorkspace();
           check(data.flights.length === 0 && !byId('accessGate').hidden, 'demo remains separate');
           data.workspaceUnlocked=true;
+          render();
+          check(!byId('accessGate').hidden, 'saved unlock flag cannot bypass sign-in');
+          cloudSession={user:{id:'test-user',email:'test@example.com'},expiresAt:Date.now()+3600000};
           render();
           check(document.querySelector('h1').textContent === 'Главная', 'initial view');
           check(validBackup(data), 'empty backup');

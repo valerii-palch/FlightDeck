@@ -57,7 +57,7 @@ const demoBadge=f=>f.demo?`<span class="badge demo-badge">${tr("Демо")}</spa
 const flightNumber = f => esc(f.number || tr("Без номера"));
 function flightTable(rows) {
  return `<div class="table-wrap"><table class="journal-table flight-summary-table"><thead><tr><th>${tr("Дата UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Маршрут")}</th><th>${tr("Статус")}</th><th></th></tr></thead><tbody>`+
- rows.map(f=>'<tr class="'+(arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'')+'"><td>'+esc(f.date)+'</td><td>'+flightNumber(f)+' '+demoBadge(f)+'</td><td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="codes">'+codeLabel(f.dep)+' <span>→</span> '+codeLabel(f.arr)+'</div></td><td><div class="flight-badges">'+statusBadge(f)+delayBadge(f)+'</div></td><td><button data-flight="'+esc(f.id)+`">${tr("Открыть")}</button></td></tr>`).join('')+'</tbody></table></div>';
+ rows.map(f=>'<tr class="'+(arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'')+'"><td>'+displayDate(f.date)+'</td><td>'+flightNumber(f)+' '+demoBadge(f)+'</td><td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="codes">'+codeLabel(f.dep)+' <span>→</span> '+codeLabel(f.arr)+'</div></td><td><div class="flight-badges">'+statusBadge(f)+delayBadge(f)+'</div></td><td><button data-flight="'+esc(f.id)+`">${tr("Открыть")}</button></td></tr>`).join('')+'</tbody></table></div>';
 }
 const flown = f => isDiversion(f) ? !!continuationLeg(f)&&legFlown(continuationLeg(f)) : legFlown(f);
 function loggedMinutes(f) {
@@ -71,10 +71,26 @@ function flightStats(rows) {
  return {count:completed.length, minutes:rows.flatMap(physicalLegs).filter(legFlown).reduce((sum,f)=>sum+loggedMinutes(f),0)};
 }
 const newest = rows => [...rows].sort((a,b)=>(b.date+b.std).localeCompare(a.date+a.std));
+const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготовка','Идет посадка','Посадка завершена','Вылетел','Уход на запасной'].includes(f.status)))[0];
 function workingFlight(rows, now=Date.now()) {
- const active=newest(rows.filter(f=>!flown(f)&&['Подготовка','Идет посадка','Посадка завершена','Вылетел','Уход на запасной','Задержан'].includes(f.status)))[0];
- if(active) return active;
- return newest(rows.filter(f=>f.status==='Запланирован'&&!flown(f)&&clockOn(f.date,f.std)>=now)).at(-1);
+ return activeFlight(rows)||newest(rows.filter(f=>(f.status==='Запланирован'||f.status==='Задержан')&&!flown(f)&&clockOn(f.date,f.std)>=now)).at(-1);
+}
+const nextStatus = {
+ 'Запланирован':'Подготовка','Задержан':'Подготовка','Подготовка':'Идет посадка',
+ 'Идет посадка':'Посадка завершена','Посадка завершена':'Вылетел','Вылетел':'Выполнен'
+};
+function nextFlightButton(f) {
+ const next=nextStatus[f.status];
+ return next&&workingFlight(summaryFlights())?.id===f.id
+  ? '<button class="flight-next" data-next-flight="'+esc(f.id)+'">'+tr('Следующий статус')+' · '+tr(next)+'</button>' : '';
+}
+function advanceFlight(id) {
+ const f=workingFlight(summaryFlights());
+ const next=f&&nextStatus[f.status];
+ if(!next||id!==f.id)return;
+ f.status=next;
+ save();
+ render();
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
@@ -85,9 +101,9 @@ function home() {
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const city=code=>esc(airportCity(code));
  return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+`</div><button class="primary" data-action="new">＋ ${tr("Добавить рейс")}</button></header>`+
- '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(working.status==='Запланирован'?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
+ '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div>'+planeIcon+'<div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
- '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+esc(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`:`<p class="muted">${tr("Журнал пуст")}</p>`)+
+ '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest):`<p class="muted">${tr("Журнал пуст")}</p>`)+
  '</section>'+
  `<section class="panel dashboard-card"><h2>${tr("Активность")}</h2><p class="muted">${tr("Последние 30 дней UTC")}</p>`+dashboardActivity()+
  '<p>'+stats.count+` ${tr("выполнено ·")} `+duration(stats.minutes)+`</p><button data-page="journal">${tr("Журнал полетов")}</button></section>`+

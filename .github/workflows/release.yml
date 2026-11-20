@@ -1,12 +1,16 @@
 name: Release FlightDeck
 on:
   push:
-    branches: ['release/v*']
+    branches: ['release/v*', 'release/patch/v*']
   workflow_dispatch:
     inputs:
       tag:
         description: 'Public release tag matching the app version, for example v0.1.0'
         required: true
+      publish_patch:
+        description: 'Allow an explicitly requested public patch release'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -14,6 +18,7 @@ concurrency:
   cancel-in-progress: false
 env:
   RELEASE_REF: ${{ inputs.tag || github.ref_name }}
+  ALLOW_PATCH: ${{ inputs.publish_patch || startsWith(github.ref, 'refs/heads/release/patch/') }}
 jobs:
   mac:
     runs-on: macos-15-intel
@@ -21,11 +26,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate release version
         run: |
-          export RELEASE_TAG="${RELEASE_REF#release/}"
+          RELEASE_TAG="${RELEASE_REF#release/}"
+          export RELEASE_TAG="${RELEASE_TAG#patch/}"
           python3 - <<'PY'
           import os, plistlib, json, re
           with open('FlightDesk/Info.plist','rb') as f: version=plistlib.load(f)['CFBundleShortVersionString']
-          assert re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0', version), 'Public releases must end in .0'
+          assert re.fullmatch(r'(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2}', version), 'Invalid version'
+          assert version.endswith('.0') or os.environ['ALLOW_PATCH'] == 'true', 'Publishing a patch requires explicit opt-in'
           assert os.environ['RELEASE_TAG'] == 'v'+version, 'Tag must match Info.plist'
           assert json.load(open('FlightDeck-Windows/package.json'))['version'] == version
           PY
@@ -62,6 +69,7 @@ jobs:
           FLIGHTDECK_UPDATE_PRIVATE_KEY: ${{ secrets.FLIGHTDECK_UPDATE_PRIVATE_KEY }}
         run: |
           RELEASE_TAG="${RELEASE_REF#release/}"
+          RELEASE_TAG="${RELEASE_TAG#patch/}"
           version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' FlightDesk/Info.plist)
           swift tools/sign-update.swift sign "releases/FlightDeck-macOS-$version.pkg" "$RELEASE_TAG" releases/macos-update.json
       - name: Verify macOS manifest and package checksum
@@ -127,6 +135,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           RELEASE_TAG="${RELEASE_REF#release/}"
+          RELEASE_TAG="${RELEASE_TAG#patch/}"
           notes="$RUNNER_TEMP/flightdeck-release-notes.md"
           awk -v heading="## $RELEASE_TAG" '$0 == heading { found=1; next } found && /^## / { exit } found' CHANGELOG.md > "$notes"
           if ! grep -q '[^[:space:]]' "$notes"; then

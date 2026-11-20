@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('flightDeckUpdates', {
- start: () => ipcRenderer.invoke('update-application'),
+ request: action => ipcRenderer.invoke('update-application', action),
+ onAvailable: callback => ipcRenderer.on('update-available', (_event, version, notes) => callback(version, notes)),
  onStatus: callback => ipcRenderer.on('update-status', (_event, state) => callback(state))
 });
 contextBridge.exposeInMainWorld('flightDeckAuth', {

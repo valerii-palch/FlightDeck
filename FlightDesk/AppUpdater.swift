@@ -52,24 +52,20 @@ enum UpdateVerification {
     private var busy = false
     private var installer: Process?
     var status: ((String) -> Void)?
+    var available: ((String, String) -> Void)?
+    private var candidate: UpdateManifest?
     private let feed = URL(string: "https://github.com/valerii-palch/FlightDeck/releases/latest/download/macos-update.json")!
 
-    func start() {
+    func check() {
         guard !busy else { return }
         busy = true
+        candidate = nil
         status?("checking")
         Task {
-            var folder: URL?
-            defer {
-                busy = false
-                if let folder { try? FileManager.default.removeItem(at: folder) }
-            }
+            defer { busy = false }
+            let session = makeSession()
+            defer { session.invalidateAndCancel() }
             do {
-                let configuration = URLSessionConfiguration.ephemeral
-                configuration.timeoutIntervalForRequest = 30
-                configuration.timeoutIntervalForResource = 600
-                let session = URLSession(configuration: configuration)
-                defer { session.invalidateAndCancel() }
                 let (data, response) = try await session.data(from: feed)
                 if (response as? HTTPURLResponse)?.statusCode == 404 { status?("unpublished"); return }
                 guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateFailure.download }
@@ -82,7 +78,48 @@ enum UpdateVerification {
                 guard manifest.minimumSystemVersion.range(of: #"^\d+(\.\d+){0,2}$"#, options: .regularExpression) != nil,
                       manifest.minimumSystemVersion.compare(currentOS, options: .numeric) != .orderedDescending
                 else { throw UpdateFailure.unsupported }
-                status?("downloading")
+                candidate = manifest
+                let notes = await releaseNotes(for: manifest.version, session: session)
+                available?(manifest.version, notes)
+            } catch UpdateFailure.invalid { status?("invalid") }
+              catch UpdateFailure.unsupported { status?("unsupported") }
+              catch { status?("failed") }
+        }
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 600
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }
+
+    private func releaseNotes(for version: String, session: URLSession) async -> String {
+        let url = URL(string: "https://api.github.com/repos/valerii-palch/FlightDeck/releases/tags/v\(version)")!
+        var request = URLRequest(url: url, timeoutInterval: 5)
+        request.setValue("FlightDeck", forHTTPHeaderField: "User-Agent")
+        struct Release: Decodable { let body: String? }
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let release = try? JSONDecoder().decode(Release.self, from: data)
+        else { return "" }
+        return String((release.body ?? "").prefix(16000))
+    }
+
+    func install() {
+        guard !busy, let manifest = candidate else { return }
+        busy = true
+        status?("downloading")
+        Task {
+            var folder: URL?
+            defer {
+                busy = false
+                if let folder { try? FileManager.default.removeItem(at: folder) }
+            }
+            let session = makeSession()
+            defer { session.invalidateAndCancel() }
+            do {
                 let (download, downloadResponse) = try await session.download(from: URL(string: manifest.url)!)
                 defer { try? FileManager.default.removeItem(at: download) }
                 guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200,

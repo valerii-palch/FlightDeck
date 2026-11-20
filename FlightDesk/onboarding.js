@@ -25,6 +25,7 @@ function finishTour(){
  document.removeEventListener('keydown',tourKeydown,true);
  page=tourReturnPage;render();
  document.querySelector('[data-action="settings"]')?.focus();
+ maybeOfferUpdate();
 }
 function tourKeydown(event){
  if(event.key==='Escape'){event.preventDefault();finishTour();return;}

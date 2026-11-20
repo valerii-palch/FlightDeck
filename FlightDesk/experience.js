@@ -24,9 +24,9 @@ const mapsKey=(()=>{
  return [bundledKey,window.flightDeckMapsKey,legacyKey].find(key=>typeof key==='string'&&mapKeyPattern.test(key));
 })();
 
-function editSettings() {
+function editSettings(anchor = null) {
  const p=preferences();
- openDialog(`<header class="settings-header"><div><h2>${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
+ openDialog(`<header class="settings-header"><div><h2 id="settingsTitle">${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
  '<form id="settingsForm" class="settings-layout">'+
  '<fieldset class="settings-section"><legend>'+tr('Язык')+'</legend><select aria-label="'+tr('Язык')+'" name="language">'+
  languageOptions.map(([key,label])=>option(key,tr(label),languagePreference)).join('')+'</select></fieldset>'+
@@ -36,7 +36,7 @@ function editSettings() {
  '<label>'+tr('Плотность журнала')+'<select name="density">'+option('normal',tr("Обычная"),p.density)+option('compact',tr("Компактная"),p.density)+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
  '<div class="settings-actions controls">'+(demoWorkspace?'':`<button type="button" data-action="update">${tr("Обновить приложение")}</button><button type="button" data-action="tour">${tr("Повторить обучение")}</button><button type="button" data-action="feedback">${tr("Обратная связь")}</button><button type="button" data-action="backup">${tr("Резервная копия")}</button>`)+`<button class="primary">${tr("Сохранить")}</button></div>`+
- '<div class="settings-credit">'+appCredit+'</div></form>');
+ '<div class="settings-credit">'+appCredit+'</div></form>','settings',anchor);
  const form=byId('settingsForm');
  form.onsubmit=e=>{
   e.preventDefault();
@@ -109,7 +109,7 @@ function travelAchievements(rows) {
 
 function achievementPanel() {
  const {countries,continents}=travelAchievements(summaryFlights());
- const tile=(title,mark,date)=>'<article class="achievement'+(date?' earned':'')+'"><span class="achievement-mark" aria-hidden="true">'+esc(mark)+'</span><div><strong>'+esc(title)+'</strong><small>'+esc(date||tr("Еще не посещен"))+'</small></div></article>';
+ const tile=(title,mark,date)=>'<article class="achievement'+(date?' earned':'')+'"><span class="achievement-mark" aria-hidden="true">'+esc(mark)+'</span><div><strong>'+esc(title)+'</strong><small>'+(date?displayDate(date):tr("Еще не посещен"))+'</small></div></article>';
  const flag=code=>[...code].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join('');
  return `<section class="panel facts"><h2>${tr("Достижения")}</h2><h3>${tr("Континенты ·")} `+continents.size+' / '+Object.keys(countryGroups).length+'</h3>'+
  '<div class="achievement-grid">'+Object.keys(countryGroups).map(r=>tile(tr(r),'✦',continents.get(r))).join('')+'</div>'+
@@ -123,7 +123,7 @@ function dashboardActivity() {
  for(const f of summaryFlights().filter(flown)) if(counts.has(f.date)) counts.set(f.date,counts.get(f.date)+1);
  const max=Math.max(1,...counts.values());
  return `<div class="activity-bars" role="img" aria-label="${tr("Выполнено рейсов за 30 дней:")} `+[...counts.values()].reduce((a,b)=>a+b,0)+'">'+
- [...counts].map(([date,n])=>'<span title="'+date+' · '+n+'" style="--level:'+Math.max(4,n/max*100)+'%"></span>').join('')+'</div>';
+ [...counts].map(([date,n])=>'<span title="'+displayDate(date)+' · '+n+'" style="--level:'+Math.max(4,n/max*100)+'%"></span>').join('')+'</div>';
 }
 
 // Runs only inside the isolated map iframe. The parent supplies coordinates and style.

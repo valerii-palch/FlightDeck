@@ -75,9 +75,12 @@ let storageAvailable = true;
 try {
  const saved = nativeStorage ? null : localStorage.getItem(storageKey);
  const stored = window.flightDeskState ?? (saved ? JSON.parse(saved) : null);
- if (Array.isArray(stored?.airports)&&Array.isArray(stored?.flights)) data = stored;
+ if (Array.isArray(stored?.airports)&&Array.isArray(stored?.flights)) {
+  data=stored;
+  delete data.workspaceUnlocked;
+ }
 } catch { storageAvailable = false; }
-let page = 'home', tail = fleet[0].tail, selected, airportCode = '';
+let page = 'home', tail = fleet[0].tail, selected, explicitAircraft=false, airportCode = '';
 let query = '', airportFilter = 'all', journalFilter = 'all', regionFilter = 'all', statusFilter = 'all', detailTail = '', noticeTimer;
 function notice(message) {
  byId('notice').textContent = message;
@@ -96,12 +99,39 @@ const capacity = a => a.seats.reduce((sum,n) => sum+n,0);
 const airport = code => data.airports.find(a => a.icao === code);
 const flight = () => data.flights.find(f => f.id === selected && f.tail === tail);
 const dateUTC = () => new Date().toISOString().slice(0,10);
+const displayDate = date => /^(\d{4})-(\d{2})-(\d{2})$/.test(date||'') ? date.split('-').reverse().join('.') : '';
+const dateField = (name,value,required=false) => '<span class="date-editor"><input name="'+name+'" type="text" data-flight-date inputmode="numeric" maxlength="10" placeholder="'+tr('ДД.ММ.ГГГГ')+'" value="'+displayDate(value)+'" '+(required?'required':'')+'>'+
+ '<button type="button" class="icon-button" data-action="pick-date" aria-label="'+tr('Выбрать дату')+'">'+toolbarIcon('calendar')+'</button>'+
+ '<input type="date" class="date-editor-picker" tabindex="-1" aria-hidden="true"></span>';
+function parseDisplayDate(value){
+ if(!/^\d{2}\.\d{2}\.\d{4}$/.test(value))return '';
+ const iso=value.split('.').reverse().join('-');
+ const day=new Date(iso+'T00:00:00Z');
+ return Number.isFinite(day.getTime())&&day.toISOString().slice(0,10)===iso?iso:'';
+}
+function flightFormValues(form) {
+ const values=Object.fromEntries(new FormData(form));
+ for(const field of form.querySelectorAll('[data-flight-date]')){
+  const value=field.value.trim();
+  if(!value&&!field.required){values[field.name]='';continue;}
+  const iso=parseDisplayDate(value);
+  if(!iso){
+   field.setCustomValidity(tr('Введи дату в формате ДД.ММ.ГГГГ.'));
+   field.addEventListener('input',()=>field.setCustomValidity(''),{once:true});
+   field.reportValidity();
+   return null;
+  }
+  values[field.name]=iso;
+ }
+ return values;
+}
 const utcLabel=(now=new Date())=>{
  const [date,time]=now.toISOString().split('T');
- return date.split('-').reverse().join('.')+' · '+time.slice(0,8)+' UTC';
+ return displayDate(date)+' · '+time.slice(0,8)+' UTC';
 };
 const toolbarIcon=kind=>{
  const icons={
+  calendar:'<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v5m8-5v5M4 10h16"/>',
   close:'<path d="m6 6 12 12M18 6 6 18"/>',
   fullscreen:'<path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="m10 3-.5 2.4-2 .9L5.2 5l-2.1 2.1 1.3 2.3-.9 2L1 12l2.5.6.9 2-1.3 2.3L5.2 19l2.3-1.3 2 .9L10 21h4l.5-2.4 2-.9 2.3 1.3 2.1-2.1-1.3-2.3.9-2L23 12l-2.5-.6-.9-2 1.3-2.3L18.8 5l-2.3 1.3-2-.9L14 3z"/>'
@@ -214,6 +244,11 @@ function routeOverview(f) {
  routeEndpoint(f.arr)+'</div>';
 }
 function center() {
+ if(!explicitAircraft){
+  const current=workingFlight(summaryFlights());
+  if(current){tail=current.tail;selected=current.id;}
+  else return '<div class="panel empty"><h2>'+tr('Нет актуального рейса')+'</h2><p class="muted">'+tr('Выбери борт в боковом меню или добавь рейс.')+'</p><p><button class="primary" data-action="new">'+tr('Добавить рейс')+'</button></p></div>';
+ }
  const f = flight();
  const list = newest(data.flights.filter(f=>f.tail===tail));
  if (!f) return '<div class="panel empty"><h2>'+esc(aircraft().type)+`</h2><p class="muted">${tr("Для этого борта пока нет рейсов.")}</p><p><button class="primary" data-action="new">${tr("Добавить рейс")}</button></p></div>`;
@@ -224,22 +259,22 @@ function center() {
   return '<tr><td>'+tr(label)+'</td><td class="clock">'+(Number.isFinite(planned)?formatTime(planned,f.date):'—')+'</td><td class="clock '+(late?'late':'')+'">'+
   (Number.isFinite(actual)?formatTime(actual,f.date):'—')+'</td><td><button data-stage="'+key+'">'+(times[key]?tr("Изменить"):tr("Отметить"))+'</button></td></tr>';
  }).join('');
- return '<div class="panel flight-hero"><div class="row flight-hero-header"><div class="controls"><strong>'+esc(f.number || tr("Без номера"))+'</strong>'+demoBadge(f)+'<span class="muted">'+esc(f.date)+'</span><span class="badge">'+esc(f.tail)+'</span></div>'+
+ return '<div class="panel flight-hero"><div class="row flight-hero-header"><div class="controls"><strong>'+esc(f.number || tr("Без номера"))+'</strong>'+demoBadge(f)+'<span class="muted">'+displayDate(f.date)+'</span><span class="badge">'+esc(f.tail)+'</span></div>'+
  '<div class="controls">'+(!isDiversion(f)?`<button data-action="divert">${tr("Уход на запасной")}</button>`:'')+`<button class="primary" data-action="edit">${tr("Редактировать рейс")}</button></div></div>`+routeOverview(f)+'<div class="flight-details">'+routeSide(f,'dep',tr("Стоянка вылета"),f.atd)+routeSide(f,'arr',tr("Стоянка прилета"),isDiversion(f)?'':f.ata)+'</div>'+
  (f.note?'<p class="facts muted">'+esc(f.note)+'</p>':'')+
- `<div class="flight-status-bar facts"><label>${tr("Статус рейса")}<span class="flight-select status-select `+(statusColors[f.status]||'scheduled')+'"><select id="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></span></label></div></div>'+continuationPanel(f)+
+ `<div class="flight-status-bar facts"><label>${tr("Статус рейса")}<span class="flight-select status-select `+(statusColors[f.status]||'scheduled')+'"><select id="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></span></label>'+nextFlightButton(f)+'</div></div>'+continuationPanel(f)+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Подготовка рейса")}</h2>`+
  (aircraft().short==='A321'?`<table><thead><tr><th>${tr("Этап")}</th><th>${tr("План UTC")}</th><th>${tr("Факт UTC")}</th><th></th></tr></thead><tbody>`+stageRows+'</tbody></table>'+forecast(f):`<p class="facts muted">${tr("Для этого типа сроки подготовки пока не заданы.")}</p>`)+
  `</section><section class="panel"><h2>${tr("Рейс")}</h2><div class="strip row"><span>${tr("Тип рейса")}</span><strong>`+tr(flightType(f))+'</strong></div>'+(f.goArounds?`<div class="strip row"><span>${tr("Уходы на второй круг")}</span><strong>`+esc(f.goArounds)+'</strong></div>':'')+`<div class="strip row"><span>${tr("Пассажиры")}</span><strong>`+paxText(f)+`</strong></div><div class="strip row"><span>${tr("Время полета по журналу")}</span><strong>`+duration(flightStats([f]).minutes || f.actualMinutes)+'</strong></div>'+
  (Number.isFinite(f.scheduledBlockMinutes)?`<div class="strip row"><span>${tr("Блок-время по плану")}</span><strong>`+duration(f.scheduledBlockMinutes)+'</strong></div>':'')+
  (f.sourceStatus?`<p class="muted">${tr("Статус в маршрутном листе:")} `+esc(f.sourceStatus)+'</p>':'')+
- `<label class="facts">${tr("Другой рейс борта")}<select id="flightPicker">`+list.map(x=>option(x.id,x.date+' · '+(x.number||tr("Без номера"))+' · '+x.dep+' → '+x.arr,f.id)).join('')+'</select></label>'+
+ `<label class="facts">${tr("Другой рейс борта")}<select id="flightPicker">`+list.map(x=>option(x.id,displayDate(x.date)+' · '+(x.number||tr("Без номера"))+' · '+x.dep+' → '+x.arr,f.id)).join('')+'</select></label>'+
  `<div class="flight-danger facts"><button class="danger" data-action="delete-flight">${tr("Удалить рейс")}</button></div></section></div>`;
 }
 
 function confirmFlightDeletion(f) {
  if(!f) return;
- openDialog(`<h2>${tr("Удалить рейс?")}</h2><p>`+flightNumber(f)+' · '+esc(f.dep)+' → '+esc(f.arr)+' · '+esc(f.date)+'</p>'+
+ openDialog(`<h2>${tr("Удалить рейс?")}</h2><p>`+flightNumber(f)+' · '+esc(f.dep)+' → '+esc(f.arr)+' · '+displayDate(f.date)+'</p>'+
   (f.continuation?`<p class="muted facts">${tr("Продолжение после посадки на запасном также будет удалено.")}</p>`:'')+
   `<div class="controls facts"><button data-action="close" autofocus>${tr("Отмена")}</button><button class="danger" id="confirmFlightDeletion">${tr("Удалить рейс")}</button></div>`);
  byId('confirmFlightDeletion').onclick=()=>{
@@ -356,7 +391,7 @@ window.addEventListener('languagechange',()=>{
 let mapCleanup, renderedPage;
 function render() {
  mapCleanup?.();
- const gated=!demoWorkspace&&!data.workspaceUnlocked;
+ const gated=!demoWorkspace&&!cloudSession;
  document.querySelector('.shell').hidden=gated;
  byId('accessGate').hidden=!gated;
  if(gated){renderAccessGate();return;}
@@ -369,10 +404,20 @@ function render() {
  '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
- byId('nav').innerHTML=`<button class="primary sidebar-new" data-action="new">＋ ${tr("Добавить рейс")}</button>`+pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id||page==='aircraft'&&id==='fleet'?'active':'')+'">'+tr(label)+'</button>').join('')+
- '<div class="grow"></div>'+fleet.map(a=>'<button class="tail '+(tail===a.tail?'active':'')+'" data-tail="'+a.tail+'">'+aircraftModel(a)+'<small>'+tr(a.name)+'</small><small class="tail-registration">'+a.tail+'</small></button>').join('')+
+ const operating=activeFlight(summaryFlights());
+ const navIcons={home:'⌂',center:'⌖',fleet:'✈',airports:'⚑',journal:'≡',pilot:'◉'};
+ byId('nav').innerHTML=`<button class="primary sidebar-new" data-action="new">＋ ${tr("Добавить рейс")}</button>`+
+ '<nav class="sidebar-pages" aria-label="'+tr('Навигация')+'">'+pages.map(([id,label])=>{
+  const current=page===id||page==='aircraft'&&id==='fleet';
+  return '<button data-page="'+id+'"'+(current?' class="active" aria-current="page"':'')+'><span aria-hidden="true">'+navIcons[id]+'</span>'+tr(label)+'</button>';
+ }).join('')+'</nav>'+
+ '<section class="sidebar-fleet" aria-label="'+tr('Флот')+'"><h2>'+tr('Флот')+'</h2>'+fleet.map(a=>{
+  const selected=page==='center'&&explicitAircraft&&tail===a.tail;
+  const active=operating?.tail===a.tail;
+  return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'"><strong>'+aircraftModel(a)+'</strong><small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></button>';
+ }).join('')+'</section><footer class="sidebar-footer">'+
  (demoWorkspace?'<button data-action="exit-demo">'+tr('Выйти из демо')+'</button>':'<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+
- '<button data-action="feedback">'+tr('Обратная связь')+'</button><div class="sidebar-credit">'+appCredit+'</div>';
+ '<button data-action="feedback">'+tr('Обратная связь')+'</button>'+appCredit+'</footer>';
  byId('main').dataset.page = page;
  byId('main').innerHTML=(page==='home'?'':'<header class="top"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1><div class="controls">'+
  (page==='center'||page==='journal'?`<button class="primary" data-action="new">${tr("Добавить рейс")}</button>`:'')+'</div></header>')+
@@ -386,20 +431,28 @@ function render() {
  if(page==='pilot') bindCloudProfile();
  mapCleanup=mountYandexMap();
 }
-function openDialog(html, layout = '') {
+function openDialog(html, layout = '', anchor = null) {
  const d=byId('dialog');
  d.innerHTML=html;
  d.dataset.layout=layout;
- if(layout==='flight') d.setAttribute('aria-labelledby','flightEditorTitle');
+ const title={flight:'flightEditorTitle',settings:'settingsTitle',update:'updateTitle'}[layout];
+ if(title)d.setAttribute('aria-labelledby',title);
  else d.removeAttribute('aria-labelledby');
  if(!d.open) d.showModal();
  d.classList.remove('dialog-enter');
+ d.style.removeProperty('--dialog-x');
+ d.style.removeProperty('--dialog-y');
+ if(anchor){
+  const from=anchor.getBoundingClientRect(), to=d.getBoundingClientRect();
+  d.style.setProperty('--dialog-x',from.x+from.width/2-to.x-to.width/2+'px');
+  d.style.setProperty('--dialog-y',from.y+from.height/2-to.y-to.height/2+'px');
+ }
  void d.offsetWidth;
  d.classList.add('dialog-enter');
 }
 function editFlight(existing,divert=false) {
  const f=existing?{...existing,diversionAirport:alternate(existing),status:divert?'Уход на запасной':existing.status}:{type:flightTypes[0],tail,dep:'',arr:'',date:dateUTC(),std:'',sta:'',status:statuses[0],stages:{}};
- const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}></label>`;
+ const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}${type==='date'?dateField(name,f[name],required):`<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}>`}</label>`;
  const select=(name,label,options)=>`<label>${tr(label)}<span class="flight-select"><select name="${name}">${options}</select></span></label>`;
  const airports=data.airports.map(a=>`<option value="${esc(a.icao)}">${esc(airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
  const icao='list="icaoChoices" maxlength="4" placeholder="ICAO" autocomplete="off" spellcheck="false"';
@@ -452,7 +505,8 @@ function editFlight(existing,divert=false) {
  form.elements.tail.addEventListener('change',updateCapacity);
  form.onsubmit=event=>{
   event.preventDefault();
-  const values=Object.fromEntries(new FormData(form));
+  const values=flightFormValues(form);
+  if(!values)return;
   values.dep=values.dep.trim().toUpperCase();
   values.arr=values.arr.trim().toUpperCase();
   values.diversionAirport=values.diversionAirport.trim().toUpperCase();
@@ -489,7 +543,7 @@ function editFlight(existing,divert=false) {
   }
   if (f.date!==result.date) result.stages={};
   if (existing) Object.assign(existing,result); else data.flights.push(result);
-  tail=result.tail; selected=result.id; page='center'; save(); byId('dialog').close(); render();
+  explicitAircraft=true;tail=result.tail; selected=result.id; page='center'; save(); byId('dialog').close(); render();
  };
  form.addEventListener('input',()=>Array.from(form.elements).forEach(field=>field.setCustomValidity?.('')));
 }
@@ -500,16 +554,16 @@ function editStage(key) {
  const initial=saved?.slice(0,16)||(Number.isFinite(planned)?new Date(planned).toISOString().slice(0,16):new Date().toISOString().slice(0,16));
  openDialog('<div class="row"><div><p class="muted">'+flightNumber(f)+' · '+esc(f.tail)+'</p><h2>'+tr(label)+`</h2></div><button type="button" class="icon-button" data-action="close" aria-label="${tr("Закрыть")}">×</button></div>`+
  `<div class="stage-plan"><span>${tr("По плану")}</span><strong>`+stampLabel(planned,f.date)+'</strong></div>'+
- `<form id="stageForm" class="editor two facts"><label>${tr("Дата UTC")}<input name="date" type="date" required value="`+initial.slice(0,10)+'"></label>'+
+ `<form id="stageForm" class="editor two facts"><label>${tr("Дата UTC")}${dateField('date',initial.slice(0,10),true)}</label>`+
  `<label>${tr("Фактическое время UTC")}<input name="time" type="time" required value="`+initial.slice(11,16)+'"></label>'+
  `<div class="full controls"><button class="primary">${tr("Сохранить")}</button><button type="button" id="stageNow">${tr("Подставить текущее время")}</button>`+
  (saved?`<button type="button" id="clearStage">${tr("Снять отметку")}</button>`:'')+'</div></form>');
  const form=byId('stageForm');
  const commit=value=>{f.stages??={};if(value)f.stages[key]=value;else delete f.stages[key];save();byId('dialog').close();render();};
- form.onsubmit=e=>{e.preventDefault();commit(form.elements.date.value+'T'+form.elements.time.value+':00Z');};
+ form.onsubmit=e=>{e.preventDefault();const values=flightFormValues(form);if(values)commit(values.date+'T'+values.time+':00Z');};
  byId('stageNow').onclick=()=>{
   const now=new Date().toISOString();
-  form.elements.date.value=now.slice(0,10);form.elements.time.value=now.slice(11,16);
+  form.elements.date.setCustomValidity('');form.elements.date.value=displayDate(now.slice(0,10));form.elements.time.value=now.slice(11,16);
  };
  if(saved) byId('clearStage').onclick=()=>commit('');
 }
@@ -538,7 +592,7 @@ function backup() {
   try {
    const restored=JSON.parse(await byId('backupFile').files[0].text());
    if(!validBackup(restored)) throw Error('format');
-   data={...migrateDiversion(restored),workspaceUnlocked:data.workspaceUnlocked}; airportCode=data.airports[0]?.icao||''; pickTail(tail);
+   data=migrateDiversion(restored); delete data.workspaceUnlocked; airportCode=data.airports[0]?.icao||''; pickTail(tail);
    save(); byId('dialog').close(); render(); notice(tr("Копия загружена."));
   } catch {notice(tr("Не удалось прочитать резервную копию."));}
  };
@@ -560,12 +614,13 @@ document.addEventListener('click',e=>{
   const selector=d.slideFocus==='tab'?'[data-slide-focus="tab"][aria-pressed="true"]':'[data-slide-focus="'+d.slideFocus+'"]';
   document.querySelector(selector)?.focus();
  }
- if(d.page){page=d.page;render();}
+ if(d.page){explicitAircraft=false;page=d.page;render();}
  if(d.aircraft){detailTail=d.aircraft;page='aircraft';render();}
- if(d.tail){pickTail(d.tail);page='center';render();}
+ if(d.tail){explicitAircraft=true;pickTail(d.tail);page='center';render();}
  if(d.airportPage){airportListPage+=Number(d.airportPage);byId('airportRows').innerHTML=airportRows();document.querySelector('[data-airport-page="'+d.airportPage+'"]:not(:disabled)')?.focus();return;}
  if(d.airport){airportCode=d.airport;render();}
- if(d.flight){const f=data.flights.find(f=>f.id===d.flight);tail=f.tail;selected=f.id;page='center';render();}
+ if(d.flight){const f=data.flights.find(f=>f.id===d.flight);if(f){explicitAircraft=true;tail=f.tail;selected=f.id;page='center';render();}}
+ if(d.nextFlight)advanceFlight(d.nextFlight);
  if(d.stage) editStage(d.stage);
  if(d.action==='window-close') window.webkit?.messageHandlers?.closeWindow?.postMessage('');
  if(d.action==='fullscreen'){
@@ -575,8 +630,16 @@ document.addEventListener('click',e=>{
   else if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>notice(tr("Браузер не разрешил полноэкранный режим.")));
   else notice(tr("Полноэкранный режим доступен через меню браузера."));
  }
+ if(d.action==='pick-date'){
+  const field=b.parentElement.querySelector('[data-flight-date]');
+  const picker=b.parentElement.querySelector('.date-editor-picker');
+  picker.value=parseDisplayDate(field.value.trim());
+  if(picker.showPicker){
+   try {picker.showPicker();} catch {field.focus();}
+  } else field.focus();
+ }
  if(d.action==='clear-journal-date'){journalDate='';render();byId('journalDate')?.focus();}
- if(d.action==='settings') editSettings();
+ if(d.action==='settings') editSettings(b);
  if(d.action==='exit-demo') exitDemoWorkspace();
  if(d.action==='reset-profile'&&!demoWorkspace) confirmProfileReset();
  if(d.action==='profile-name'){editSettings();byId('settingsForm').elements.profileName.focus();}
@@ -601,6 +664,13 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
  const t=e.target,d=t.dataset;
+ if(t.classList.contains('date-editor-picker')){
+  const field=t.parentElement.querySelector('[data-flight-date]');
+  field.setCustomValidity('');
+  field.value=displayDate(t.value);
+  field.dispatchEvent(new Event('input',{bubbles:true}));
+  field.focus();
+ }
  if(t.id==='mapAirport'){selectMapAirport(t.value);}
  if(t.id==='status'){
   const f=flight(), status=t.value;
@@ -646,7 +716,8 @@ setTimeout(() => {
  splash.classList.add('ready');
  splash.setAttribute('aria-hidden','true');
  shell.inert = false;
- if(data.workspaceUnlocked&&!demoWorkspace&&!tourCompleted()&&!byId('dialog').open)startTour();
+ if(cloudSession&&!demoWorkspace&&!tourCompleted()&&!byId('dialog').open)startTour();
+ if(updateBridge||window.flightDeckUpdates)checkApplicationUpdate(true);
 }, 2000);
 if(!storageAvailable) notice(tr("Хранилище недоступно. Выгрузи резервную копию после работы."));
 setInterval(()=>queueCloudSync(0),45000);

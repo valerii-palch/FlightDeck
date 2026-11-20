@@ -32,7 +32,7 @@ function continuationPanel(f) {
  return `<section class="panel facts"><h2>${tr("Уход на запасной")}</h2>`+
  '<p>'+codeLabel(f.dep)+' → '+(destination?codeLabel(destination):tr("Запасной не указан"))+` <span class="muted">· ${tr("Посадка")} `+landing+'</span></p>'+
  (next?'<div class="strip"><p>'+codeLabel(next.dep)+' → '+codeLabel(next.arr)+' · '+flightNumber(next)+'</p>'+
- '<p class="muted">'+esc(next.date)+' · '+esc(next.std)+' → '+esc(next.sta)+' UTC · '+esc(tr(journalStatus(next)))+'</p>'+
+ '<p class="muted">'+displayDate(next.date)+' · '+esc(next.std)+' → '+esc(next.sta)+' UTC · '+esc(tr(journalStatus(next)))+'</p>'+
  (next.atd||next.ata?`<p>${tr("Факт:")} `+stampLabel(flightTimes(next).actualDeparture,next.date)+' → '+stampLabel(flightTimes(next).actualArrival,next.date)+' '+delayBadge(f)+'</p>':'')+'</div>':'')+
  '<button class="facts" data-action="'+(destination?'continuation':'divert')+'">'+(next?tr("Изменить продолжение"):destination?tr("Добавить продолжение"):tr("Указать запасной"))+'</button></section>';
 }
@@ -42,7 +42,7 @@ function editContinuation(f) {
  const next=continuationLeg(f);
  const date=Number.isFinite(inbound)?new Date(inbound).toISOString().slice(0,10):f.date;
  const leg=next||{date,status:'Запланирован'};
- const field=(key,label,type,required=false)=>'<label>'+label+'<input name="'+key+'" type="'+type+'" value="'+esc(leg[key])+'" '+(required?'required':'')+'></label>';
+ const field=(key,label,type,required=false)=>'<label>'+label+(type==='date'?dateField(key,leg[key],required):'<input name="'+key+'" type="'+type+'" value="'+esc(leg[key])+'" '+(required?'required':'')+'>')+'</label>';
  const allowed=['Запланирован','Задержан','Вылетел','Выполнен','Отменен'];
  openDialog(`<h2>${tr("Продолжение ·")} `+flightNumber(f)+'</h2><p>'+codeLabel(alternate(f))+' → '+codeLabel(f.arr)+'</p>'+
  '<form id="continuationForm" class="editor two facts">'+field('date',tr("Дата вылета по плану UTC"),'date',true)+
@@ -68,7 +68,8 @@ function editContinuation(f) {
  form.addEventListener('input',e=>e.target.setCustomValidity?.(''));
  form.onsubmit=e=>{
   e.preventDefault();
-  const values=Object.fromEntries(new FormData(form));
+  const values=flightFormValues(form);
+  if(!values)return;
   values.actualMinutes=values.actualMinutes===''?null:Number(values.actualMinutes);
   const times=flightTimes(values);
   let error='';
@@ -126,7 +127,7 @@ function boardRows() {
   groups.get(row.date).push(row);
  }
  return [...groups].map(([date,items])=>'<div class="table-wrap"><table class="journal-table flight-board">'+
- '<caption>'+new Intl.DateTimeFormat(appLanguage(),{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T00:00:00Z'))+'</caption><colgroup><col><col><col><col><col><col><col><col></colgroup>'+
+ '<caption>'+displayDate(date)+'</caption><colgroup><col><col><col><col><col><col><col><col></colgroup>'+
  `<thead><tr><th>${tr("Вылет UTC")}</th><th>${tr("Отправление")}</th><th>${tr("Назначение")}</th><th>${tr("Прилет UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Статус")}</th><th></th></tr></thead><tbody>`+
  items.map(boardRow).join('')+'</tbody></table></div>').join('');
 }
@@ -135,7 +136,7 @@ let journalQuery='', journalDate='', typeFilter='all';
 function journal() {
  return '<section class="panel board-panel '+(preferences().density==='compact'?'board-compact':'')+'"><div class="controls board-filters">'+
  `<input id="journalSearch" type="search" aria-label="${tr("Поиск рейсов")}" placeholder="${tr("Поиск рейса")}" value="`+esc(journalQuery)+'">'+
- '<div class="board-date"><label class="board-date-field"><span aria-hidden="true">'+(journalDate?esc(journalDate.split('-').reverse().join('.')):tr("Все даты"))+`</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v5m8-5v5M4 10h16"/></svg><input id="journalDate" type="date" aria-label="${tr("Дата вылета UTC")}" value="`+esc(journalDate)+'"></label>'+
+ '<div class="board-date"><label class="board-date-field"><span aria-hidden="true">'+(journalDate?displayDate(journalDate):tr("Все даты"))+`</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 3v5m8-5v5M4 10h16"/></svg><input id="journalDate" type="date" aria-label="${tr("Дата вылета UTC")}" value="`+esc(journalDate)+'"></label>'+
  (journalDate?`<button type="button" data-action="clear-journal-date" aria-label="${tr("Сбросить дату")}">×</button>`:'')+'</div>'+
  `<select id="typeFilter" aria-label="${tr("Тип рейса")}">`+option('all',tr("Все типы"),typeFilter)+[...flightTypes,'Не указан'].map(t=>option(t,tr(t),typeFilter)).join('')+'</select>'+
  `<select id="journalFilter" aria-label="${tr("Борт")}">`+option('all',tr("Все борта"),journalFilter)+fleet.map(a=>option(a.tail,aircraftModel(a)+' · '+a.tail,journalFilter)).join('')+'</select>'+

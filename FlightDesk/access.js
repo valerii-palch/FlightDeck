@@ -1,4 +1,4 @@
-let demoWorkspace=null;
+let demoWorkspace=null, signedInThisLaunch=false;
 
 function signInFields(disabled) {
  return `<form id="cloudLoginForm" class="cloud-login"><label>${tr('Электронная почта')}<input name="email" type="email" autocomplete="username" required></label>
@@ -20,13 +20,13 @@ function renderAccessGate() {
 }
 
 function unlockWorkspace() {
- const firstEntry=!data.workspaceUnlocked;
- data.workspaceUnlocked=true;
+ const firstEntry=!signedInThisLaunch;
+ signedInThisLaunch=true;
  cloudBase=null;cloudRemoteBase=null;cloudConflict=null;cloudState='pending';
  save(false);
  queueCloudSync(0);
  if(firstEntry&&!tourCompleted()) setTimeout(()=>{
-  if(data.workspaceUnlocked&&!demoWorkspace&&!byId('dialog').open)startTour();
+  if(cloudSession&&!demoWorkspace&&!byId('dialog').open)startTour();
  },250);
  return 'Вход выполнен. Проверяем облачную копию.';
 }
@@ -66,7 +66,8 @@ function demoJournal() {
 
 function enterDemoWorkspace() {
  if(cloudBusy||demoWorkspace) return;
- demoWorkspace={data,page,tail,selected,airportCode};
+ demoWorkspace={data,page,tail,selected,explicitAircraft,airportCode};
+ explicitAircraft=false;
  fleet=personalFleet.map((aircraft,i)=>({...aircraft,tail:['DEMO-A1','DEMO-A2','DEMO-B1'][i],
   name:['Northstar','Daybreak','Blue Horizon'][i]}));
  data=demoJournal();
@@ -76,7 +77,7 @@ function enterDemoWorkspace() {
 
 function exitDemoWorkspace() {
  if(!demoWorkspace) return;
- ({data,page,tail,selected,airportCode}=demoWorkspace);
+ ({data,page,tail,selected,explicitAircraft,airportCode}=demoWorkspace);
  demoWorkspace=null;fleet=personalFleet;fleetSlide=0;
  if(byId('dialog').open)byId('dialog').close();
  render();
