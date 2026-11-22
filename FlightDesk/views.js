@@ -37,10 +37,19 @@ function setFlightStatus(f,status,now=Date.now()) {
  f.status=status;
  return true;
 }
-function changeFlightStatus(f,status){
- if(!setFlightStatus(f,status)){
+function changeFlightStatus(f,status,markPreparation=false){
+ const now=Date.now();
+ if(!setFlightStatus(f,status,now)){
   notice(tr("Прилет должен быть после вылета."));
   return;
+ }
+ if(markPreparation){
+  const keys={'Подготовка':['fuel','bags'],'Идет посадка':['board'],'Посадка завершена':['close']}[status]||[];
+  if(keys.length){
+   f.stages??={};
+   const stamp=new Date(now).toISOString();
+   for(const key of keys)if(!f.stages[key])f.stages[key]=stamp;
+  }
  }
  save();
  render();
@@ -111,7 +120,7 @@ function advanceFlight(id) {
  const f=workingFlight(summaryFlights());
  const next=f&&nextStatus[f.status];
  if(!next||id!==f.id)return;
- changeFlightStatus(f,next);
+ changeFlightStatus(f,next,true);
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
@@ -170,17 +179,18 @@ function pilot() {
  const completed = rows.filter(flown);
  const cutoff = days => new Date(Date.now()-days*day).toISOString().slice(0,10);
  const recent = days => flightStats(rows.filter(f=>f.date>=cutoff(days)&&f.date<=dateUTC()));
- const landings = rows.flatMap(physicalLegs).filter(f=>legFlown(f)&&f.ata).length;
+ const landings = rows.reduce((total,f)=>total+
+  (isDiversion(f)?Number(alternateLanded(f))+Number(flown(f)):Number(legFlown(f))),0);
  const routes = completed.filter(f=>airport(f.dep)&&airport(f.arr));
  const domestic = routes.filter(f=>isDomestic(airport(f.dep))&&isDomestic(airport(f.arr))).length;
  const international = routes.filter(f=>airport(f.dep).country!==airport(f.arr).country).length;
  const name=preferences().profileName;
- return `<section class="panel welcome"><div class="pilot-avatar-row">${profileAvatar()}</div><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><div class="row"><h2>${esc(name||tr('Летная книжка'))}</h2><div class="controls"><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button>${demoWorkspace?'':`<button data-action="reset-profile">${tr('Сбросить рейсы и профиль')}</button>`}</div></div><p class="muted">${tr("Налет и перелеты по записям журнала")}</p></section>`+pilotRankPanel(stats.minutes)+cloudProfilePanel()+
+ return `<section class="panel pilot-identity">${profileAvatar()}<div class="pilot-name"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><h2>${esc(name||tr('Летная книжка'))}</h2></div><div class="pilot-profile-actions"><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button>${demoWorkspace?'':`<button data-action="reset-profile">${tr('Сбросить рейсы и профиль')}</button>`}</div></section>`+pilotRankPanel(stats.minutes)+
  '<div class="profile-metrics facts">'+metric(tr("Общее время"),duration(stats.minutes))+metric(tr("Выполнено перелетов"),stats.count)+metric(tr("Посадки"),landings)+metric(tr("Страны"),travelAchievements(rows).countries.size)+'</div>'+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Налет по типам")}</h2>`+
  fleet.map(a=>{const part=flightStats(rows.filter(f=>f.tail===a.tail));return '<div class="strip row"><span>'+a.type+'</span><strong>'+duration(part.minutes)+' · '+part.count+` ${tr("перел.")}</strong></div>`;}).join('')+'</section>'+
  `<section class="panel"><h2>${tr("Активность")}</h2>`+[30,90].map(days=>{const part=recent(days);return `<div class="strip row"><span>${tr("За")} `+days+` ${tr("дней UTC")}</span><strong>`+duration(part.minutes)+' · '+part.count+` ${tr("перел.")}</strong></div>`;}).join('')+
  `<div class="strip row"><span>${tr("Внутренние перелеты")}</span><strong>`+domestic+'</strong></div>'+
  `<div class="strip row"><span>${tr("Международные перелеты")}</span><strong>`+international+'</strong></div>'+
- `<p class="facts muted">${tr("При отсутствии записанного времени используется интервал между фактическим вылетом и прилетом.")}</p></section></div>`+routeMap()+achievementPanel();
+ `<p class="facts muted">${tr("При отсутствии записанного времени используется интервал между фактическим вылетом и прилетом.")}</p></section></div>`+routeMap()+achievementPanel()+cloudProfilePanel();
 }

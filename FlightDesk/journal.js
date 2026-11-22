@@ -3,8 +3,12 @@ const flightType = f => flightTypes.includes(f.type) ? f.type : 'Не указа
 const alternate = f => f.diversionAirport || f.note?.match(/Запасной аэропорт\s+([A-Z]{4})/i)?.[1]?.toUpperCase() || '';
 const isDiversion = f => f.status==='Уход на запасной';
 const continuationLeg = f => isDiversion(f)&&f.continuation
- ? {...f.continuation,dep:alternate(f),arr:f.arr,number:f.number,tail:f.tail,type:f.type} : null;
+ ? {...f.continuation,dep:alternate(f),arr:f.arr,number:f.number,tail:f.tail,type:f.type,id:f.id,demo:f.demo} : null;
 const legFlown = leg => leg.status!=='Отменен' && (!!leg.ata || leg.status==='Выполнен' || (isDiversion(leg)&&Number.isFinite(leg.actualMinutes)));
+function alternateLanded(f) {
+ const next=continuationLeg(f);
+ return isDiversion(f)&&!!alternate(f)&&(legFlown(f)||!!next&&(!!next.atd||next.status==='Вылетел'||legFlown(next)));
+}
 function physicalLegs(f) {
  const next=continuationLeg(f);
  const first=isDiversion(f)?{...f,arr:alternate(f)}:f;
@@ -29,7 +33,7 @@ function continuationPanel(f) {
  const next=continuationLeg(f);
  const destination=alternate(f);
  const landing=stampLabel(flightTimes(f).actualArrival,f.date);
- return `<section class="panel facts"><h2>${tr("Уход на запасной")}</h2>`+
+ return `<section id="continuationPanel" class="panel facts" tabindex="-1"><h2>${tr("Уход на запасной")}</h2>`+
  '<p>'+codeLabel(f.dep)+' → '+(destination?codeLabel(destination):tr("Запасной не указан"))+` <span class="muted">· ${tr("Посадка")} `+landing+'</span></p>'+
  (next?'<div class="strip"><p>'+codeLabel(next.dep)+' → '+codeLabel(next.arr)+' · '+flightNumber(next)+'</p>'+
  '<p class="muted">'+displayDate(next.date)+' · '+esc(next.std)+' → '+esc(next.sta)+' UTC · '+esc(tr(journalStatus(next)))+'</p>'+
@@ -37,14 +41,29 @@ function continuationPanel(f) {
  '<button class="facts" data-action="'+(destination?'continuation':'divert')+'">'+(next?tr("Изменить продолжение"):destination?tr("Добавить продолжение"):tr("Указать запасной"))+'</button></section>';
 }
 
+function continuationDefaults(f,inbound) {
+ const times=flightTimes(f);
+ const takeoff=(Number.isFinite(inbound)?inbound:times.scheduledArrival)+60*minute;
+ const from=airportInfo(alternate(f)), to=airportInfo(f.arr);
+ const distance=hasCoordinates(from)&&hasCoordinates(to)?Math.acos(Math.max(-1,Math.min(1,
+  Math.sin(rad(from.lat))*Math.sin(rad(to.lat))+Math.cos(rad(from.lat))*Math.cos(rad(to.lat))*Math.cos(rad(to.lon-from.lon))
+ )))*6371:NaN;
+ const speed=aircraftFor(f.tail)?.short==='A321'?820:880;
+ const routeMinutes=routeDurationEstimate(alternate(f),f.arr,f.tail,f.id)?.minutes||
+  (Number.isFinite(distance)?Math.max(15,Math.ceil((15+distance/speed*60)/5)*5):
+   Math.max(15,Math.round((times.scheduledArrival-times.scheduledDeparture)/minute)||60));
+ const departure=new Date(Number.isFinite(takeoff)?takeoff:Date.now()+60*minute).toISOString();
+ const arrival=new Date(Date.parse(departure)+routeMinutes*minute).toISOString();
+ return {date:departure.slice(0,10),std:departure.slice(11,16),sta:arrival.slice(11,16),status:'Запланирован'};
+}
 function editContinuation(f) {
  const inbound=flightTimes(f).actualArrival;
  const next=continuationLeg(f);
- const date=Number.isFinite(inbound)?new Date(inbound).toISOString().slice(0,10):f.date;
- const leg=next||{date,status:'Запланирован'};
+ const leg=next||continuationDefaults(f,inbound);
  const field=(key,label,type,required=false)=>'<label>'+label+(type==='date'?dateField(key,leg[key],required):type==='time'?timeField(key,leg[key],required):'<input name="'+key+'" type="'+type+'" value="'+esc(leg[key])+'" '+(required?'required':'')+'>')+'</label>';
  const allowed=['Запланирован','Задержан','Вылетел','Выполнен','Отменен'];
  openDialog(`<h2>${tr("Продолжение ·")} `+flightNumber(f)+'</h2><p>'+codeLabel(alternate(f))+' → '+codeLabel(f.arr)+'</p>'+
+ (!next?`<p class="muted">${tr(Number.isFinite(inbound)?'Вылет предложен через 60 минут после посадки на запасном. Время можно изменить.':'Посадка на запасном ещё не отмечена. Времена предложены по исходному расписанию, их можно изменить.')}</p>`:'')+
  '<form id="continuationForm" class="editor two facts">'+field('date',tr("Дата вылета по плану UTC"),'date',true)+
  `<label>${tr("Статус")}<select name="status">`+allowed.map(s=>option(s,tr(s),leg.status)).join('')+'</select></label>'+
  field('std',tr("Вылет по плану UTC"),'time',true)+field('sta',tr("Прилет по плану UTC"),'time',true)+
@@ -76,9 +95,9 @@ function editContinuation(f) {
   let key='ata';
   if (values.status==='Выполнен'&&!values.ata) error=tr("Укажи фактическое время прилета.");
   if (times.actualArrival<times.actualDeparture) error=tr("Прилет должен быть после вылета.");
-  if (Number.isFinite(inbound)&&times.actualDeparture<inbound) {
+  if (Number.isFinite(inbound)&&((times.actualDeparture||times.scheduledDeparture)<inbound)) {
    error=tr("Продолжение вылетает после посадки на запасном. Проверь дату и время UTC.");
-   key='atd';
+   key=values.atd?'atd':'std';
   }
   if (Number.isFinite(inbound)&&times.actualArrival<inbound) error=tr("Прибытие должно быть после посадки на запасном.");
   if (error) {form.elements[key].setCustomValidity(error);form.reportValidity();return;}
@@ -87,25 +106,27 @@ function editContinuation(f) {
  };
 }
 
-function boardRow(f) {
+function boardRow(f, kind='') {
  const t=flightTimes(f);
  const city=code=>esc(airportCity(code));
- const next=continuationLeg(f);
- const place=(code,label)=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span><strong class="board-city">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
- const via=isDiversion(f)&&alternate(f)?`<small>${tr("Через")} `+city(alternate(f))+' · '+codeLabel(alternate(f))+'</small>':'';
+ const stop=kind==='diverted';
+ const place=(code,label,original='')=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span>'+
+  (original?'<del class="board-original">'+city(original)+'</del>':'')+'<strong class="board-city">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
  const changed=Number.isFinite(t.actualDeparture)&&t.actualDeparture!==t.scheduledDeparture;
  const time='<span class="board-time">'+(changed?'<del>'+esc(f.std)+'</del><strong>'+formatTime(t.actualDeparture,f.date)+'</strong>':'<strong>'+esc(f.std)+'</strong>')+'</span>';
- const actualArrival=destinationArrival(f,t);
+ const actualArrival=stop?t.actualArrival:destinationArrival(f,t);
  const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,f.date):'—';
  const arrival=`<td class="board-arrival"><span class="board-mobile-label">${tr("Прилет UTC")}</span>`+
-  `<span>${tr("План")} <time>`+clock(t.scheduledArrival)+'</time></span>'+
-  '<span'+(actualArrival>t.scheduledArrival?' class="late"':'')+`>${tr("Факт")} <time>`+clock(actualArrival)+'</time></span></td>';
- const status=statusBadge(f)+via+(isDiversion(f)&&next?`<small>${tr("Уход на запасной ·")} `+esc(tr(journalStatus(next)))+'</small>':'')+delayBadge(f);
- return '<tr class="'+(arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'')+'">'+
- '<td>'+time+'</td>'+place(f.dep,tr("Отправление"))+place(f.arr,tr("Назначение"))+arrival+
- '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(flightType(f))+'</small></td>'+
+  (stop?'':`<span>${tr("План")} <time>`+clock(t.scheduledArrival)+'</time></span>')+
+  '<span'+(!stop&&actualArrival>t.scheduledArrival?' class="late"':'')+`>${tr(stop?"Посадка":"Факт")} <time>`+clock(actualArrival)+'</time></span></td>';
+ const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
+ const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
+ return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
+ '<td>'+time+(kind==='continuation'?'<small>'+displayDate(f.date)+'</small>':'')+'</td>'+
+ place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
+ '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
  '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+
- '<td><button data-flight="'+esc(f.id)+'" aria-label="'+tr('Открыть рейс')+' '+flightNumber(f)+'">→</button></td></tr>';
+ '<td><button data-flight="'+esc(f.id)+'"'+(kind==='continuation'?' data-show-continuation':'')+' aria-label="'+tr('Открыть рейс')+' '+flightNumber(f)+'">→</button></td></tr>';
 }
 
 function boardRows() {
@@ -116,8 +137,9 @@ function boardRows() {
   return terms.join(' ').toLocaleLowerCase('ru').replace(/\s+/g,'').includes(needle) &&
    (journalFilter==='all'||f.tail===journalFilter) &&
    (typeFilter==='all'||typeFilter===flightType(f)) &&
-   (!journalDate||f.date===journalDate) &&
+   (!journalDate||f.date===journalDate||continuationLeg(f)?.date===journalDate) &&
    (statusFilter==='all'||statusFilter===journalStatus(f)||
+    statusFilter===continuationLeg(f)?.status||
     statusFilter==='Уход на запасной'&&isDiversion(f)||statusFilter==='arrival'&&arrivalDelay(f)>0);
  }));
  if (!rows.length) return `<p class="empty muted">${tr("Рейсы не найдены.")}</p>`;
@@ -126,15 +148,18 @@ function boardRows() {
   if (!groups.has(row.date)) groups.set(row.date,[]);
   groups.get(row.date).push(row);
  }
- return [...groups].map(([date,items])=>'<div class="table-wrap"><table class="journal-table flight-board">'+
+ return [...groups].map(([date,items])=>'<div class="board-group"><table class="journal-table flight-board">'+
  '<caption>'+displayDate(date)+'</caption><colgroup><col><col><col><col><col><col><col><col></colgroup>'+
  `<thead><tr><th>${tr("Вылет UTC")}</th><th>${tr("Отправление")}</th><th>${tr("Назначение")}</th><th>${tr("Прилет UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Статус")}</th><th></th></tr></thead><tbody>`+
- items.map(boardRow).join('')+'</tbody></table></div>').join('');
+ items.map(f=>{
+  const next=continuationLeg(f);
+  return boardRow(f,isDiversion(f)&&alternate(f)?'diverted':'')+(next?boardRow(next,'continuation'):'');
+ }).join('')+'</tbody></table></div>').join('');
 }
 
 let journalQuery='', journalDate='', typeFilter='all';
 function journal() {
- return '<section class="panel board-panel '+(preferences().density==='compact'?'board-compact':'')+'"><div class="controls board-filters">'+
+ return '<section class="panel board-panel"><div class="controls board-filters">'+
  `<input id="journalSearch" type="search" aria-label="${tr("Поиск рейсов")}" placeholder="${tr("Поиск рейса")}" value="`+esc(journalQuery)+'">'+
  '<div class="board-date"><button id="journalDate" type="button" class="board-date-field" data-action="journal-calendar" aria-haspopup="dialog" aria-expanded="false"><span>'+
  (journalDate?displayDate(journalDate):tr("Все даты"))+'</span>'+toolbarIcon('calendar')+'</button>'+

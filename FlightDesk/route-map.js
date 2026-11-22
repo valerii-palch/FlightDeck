@@ -18,7 +18,7 @@ let selectedMapAirport = '';
 function completedRoutes(flights) {
  const routes = new Map();
  let unmapped = 0;
- for (const f of flights.flatMap(physicalLegs).filter(legFlown)) {
+ for (const f of flights.filter(f=>isDiversion(f)?alternateLanded(f):legFlown(f))) {
   const destination=f.arr;
   if (!hasCoordinates(airportInfo(f.dep)) || !hasCoordinates(airportInfo(destination))) {
    unmapped++;

@@ -111,7 +111,20 @@ function parseDisplayDate(value){
  const day=new Date(iso+'T00:00:00Z');
  return Number.isFinite(day.getTime())&&day.toISOString().slice(0,10)===iso?iso:'';
 }
-const timeField=(name,value,required=false)=>'<input name="'+name+'" type="text" data-flight-time maxlength="5" autocomplete="off" spellcheck="false" placeholder="HH:MM" value="'+esc(value)+'" '+(required?'required':'')+'>';
+const timeField=(name,value,required=false)=>'<input name="'+name+'" type="text" data-flight-time inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="HH:MM" value="'+esc(value)+'" '+(required?'required':'')+'>';
+document.addEventListener('input',event=>{
+ const field=event.target;
+ if(!field.matches('[data-flight-time]')||event.isComposing)return;
+ const raw=field.value, caret=field.selectionStart;
+ const digits=raw.replace(/\D/g,'').slice(0,4);
+ const separator=/^\d:/.test(raw)&&digits.length<=3?1:2;
+ const formatted=digits.length>separator?digits.slice(0,separator)+':'+digits.slice(separator):digits;
+ if(raw===formatted)return;
+ const count=raw.slice(0,caret).replace(/\D/g,'').length;
+ field.value=formatted;
+ const position=Math.min(formatted.length,count+Number(count>separator));
+ field.setSelectionRange(position,position);
+},true);
 function parseFlightTime(value){
  const match=/^([0-9]{1,2}):([0-9]{2})$/.exec(value.trim());
  return match&&Number(match[1])<24&&Number(match[2])<60?match[1].padStart(2,'0')+':'+match[2]:'';
@@ -223,17 +236,21 @@ function routeSide(f,key,title,actual) {
  return '<div class="route-detail"><p class="muted">'+(appLanguage()==='en' ? tr(arriving?'Запланированный прилет':'Запланированный вылет') : (arriving?'Прилет':'Вылет')+' по плану')+'</p><strong class="time">'+stampLabel(plannedStamp,f.date)+'</strong>'+
  (actual?`<p class="facts">${tr("Факт")} <strong class="time">`+stampLabel(actualStamp,f.date)+'</strong> '+(arriving?delayBadge(f):'')+'</p>':'')+'<div class="controls facts">'+flags+'</div>'+standSelect(f,key+'Stand',code,title)+'</div>';
 }
-function routeProgress(f,now=Date.now()) {
- if(f.status==='Отменен') return 0;
- if(isDiversion(f)&&!continuationLeg(f)) return 0;
- if(journalStatus(f)==='Выполнен') return 100;
- const leg=continuationLeg(f)||f;
- if(leg.status!=='Вылетел'&&!leg.atd) return 0;
+function segmentProgress(leg,now) {
+ if(leg.status==='Отменен'||leg.status!=='Вылетел'&&!leg.atd) return 0;
  const times=flightTimes(leg);
  const start=times.actualDeparture||times.scheduledDeparture;
  const duration=times.scheduledArrival-times.scheduledDeparture;
  if(!Number.isFinite(start)||!(duration>0)) return 0;
  return Math.max(0,Math.min(95,Math.round((now-start)/duration*100)));
+}
+function routeProgress(f,now=Date.now()) {
+ if(f.status==='Отменен')return 0;
+ if(flown(f))return 100;
+ if(!isDiversion(f)||!alternate(f))return segmentProgress(f,now);
+ if(!alternateLanded(f))return segmentProgress(f,now)/2;
+ const next=continuationLeg(f);
+ return 50+(next?segmentProgress(next,now)/2:0);
 }
 function routeEndpoint(code) {
  const info=airportInfo(code);
@@ -242,14 +259,21 @@ function routeEndpoint(code) {
 function routeProgressLabel(f,progress) {
  if(f.status==='Отменен') return tr("Рейс отменен");
  if(progress===100) return tr("Прибыл");
- if(isDiversion(f)&&!continuationLeg(f)) return 'Уход на запасной';
+ if(isDiversion(f)&&alternate(f)){
+  if(progress<50)return tr('Уход на запасной');
+  if(progress===50)return tr('Посадка на запасном');
+ }
  if(progress===0) return tr("До вылета");
  return tr("В пути · расчетный прогресс");
 }
 function routeOverview(f) {
  const progress=routeProgress(f);
+ const stop=isDiversion(f)&&alternate(f);
+ const stopName=stop?esc(airportCity(stop)||stop):'';
  return '<div class="flight-route">'+routeEndpoint(f.dep)+
- '<div class="flight-path"><div class="flight-track" id="flightTrack" style="--progress:'+progress+'%"><div class="flight-track-fill"></div><span class="flight-marker">'+planeIcon+'</span></div><small id="flightProgressLabel">'+tr(routeProgressLabel(f,progress))+'</small></div>'+
+ '<div class="flight-path"><div class="flight-track" id="flightTrack" style="--progress:'+progress+'%"><div class="flight-track-fill"></div>'+
+ (stop?'<span class="flight-stop"><span>'+stopName+' · '+esc(stop)+'</span></span>':'')+
+ '<span class="flight-marker">'+planeIcon+'</span></div><small id="flightProgressLabel">'+routeProgressLabel(f,progress)+'</small></div>'+
  routeEndpoint(f.arr)+'</div>';
 }
 function center() {
@@ -455,6 +479,7 @@ function render() {
   document.querySelector('.workspace').scrollTop=0;
  }
  if(page==='pilot')bindCloudProfile();
+ if(page==='home')bindActivityChart();
  if(page==='airports'&&airport(airportCode)&&!airportPhotos[airportCode])fetchAirportPhoto(airportCode);
  mapCleanup=mountYandexMap();
 }
@@ -693,7 +718,7 @@ document.addEventListener('click',e=>{
  if(d.tail){explicitAircraft=true;pickTail(d.tail);page='center';render();}
  if(d.airportPage){airportListPage+=Number(d.airportPage);byId('airportRows').innerHTML=airportRows();document.querySelector('[data-airport-page="'+d.airportPage+'"]:not(:disabled)')?.focus();return;}
  if(d.airport){airportCode=d.airport;render();}
- if(d.flight){const f=data.flights.find(f=>f.id===d.flight);if(f){explicitAircraft=true;tail=f.tail;selected=f.id;page='center';render();}}
+ if(d.flight){const f=data.flights.find(f=>f.id===d.flight);if(f){explicitAircraft=true;tail=f.tail;selected=f.id;page='center';render();if(Object.hasOwn(d,'showContinuation'))byId('continuationPanel')?.focus();}}
  if(d.nextFlight)advanceFlight(d.nextFlight);
  if(d.stage) editStage(d.stage);
  if(d.action==='window-close') window.webkit?.messageHandlers?.closeWindow?.postMessage('');
@@ -718,6 +743,7 @@ document.addEventListener('click',e=>{
  if(d.action==='settings') editSettings(b);
  if(d.action==='exit-demo') exitDemoWorkspace();
  if(d.action==='reset-profile'&&!demoWorkspace) confirmProfileReset();
+ if(d.action==='pick-profile-photo')byId('profilePhotoInput')?.click();
  if(d.action==='remove-profile-photo')removeProfilePhoto();
  if(d.action==='profile-name'){editSettings();byId('settingsForm').elements.profileName.focus();}
  if(d.action==='add-airport') addAirport();
@@ -804,7 +830,7 @@ setInterval(()=>{
  if(track&&flight()){
   const progress=routeProgress(flight());
   track.style.setProperty('--progress',progress+'%');
-  byId('flightProgressLabel').textContent=tr(routeProgressLabel(flight(),progress));
+  byId('flightProgressLabel').textContent=routeProgressLabel(flight(),progress);
  }
 },1000);
 </script></body></html>

@@ -13,7 +13,7 @@ const countryName=code=>displayCountries[appLanguage()].of(code);
 const knownCountries={ARMENIA:'AM',AZERBAIJAN:'AZ',BELARUS:'BY',CHINA:'CN',CUBA:'CU',EGIPT:'EG','HONG KONG':'HK',INDIA:'IN',INDONESIA:'ID',KAZAKHSTAN:'KZ',KYRGYZSTAN:'KG',MALDIVES:'MV',SEYCHELLES:'SC','SRI-LANKA':'LK',THAILAND:'TH',TURKEY:'TR',UAE:'AE',UZBEKISTAN:'UZ',VIETNAM:'VN','РОССИЯ':'RU',RUSSIA:'RU'};
 const airportCountry=a=>a?.countryCode||knownCountries[a?.country?.trim().toUpperCase()];
 const preferences=()=>{
- return {profileName:'',startPage:'home',density:'normal',includeDemo:false,...data.preferences};
+ return {profileName:'',startPage:'home',includeDemo:false,...data.preferences};
 };
 const summaryFlights=()=>preferences().includeDemo?data.flights:data.flights.filter(f=>!f.demo);
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
@@ -33,7 +33,6 @@ function editSettings(anchor = null) {
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
  `<label>${tr("Имя в профиле")}<input name="profileName" autocomplete="nickname" maxlength="80" value="`+esc(p.profileName)+'"></label>'+
  `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
- '<label>'+tr('Плотность журнала')+'<select name="density">'+option('normal',tr("Обычная"),p.density)+option('compact',tr("Компактная"),p.density)+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
  '<fieldset class="settings-section"><legend>'+tr('Приложение')+'</legend><div class="settings-links">'+
  (demoWorkspace?[]:[['update','Обновить приложение'],['tour','Повторить обучение'],['backup','Резервная копия']]).concat([['feedback','Обратная связь']]).map(([action,label])=>`<button type="button" data-action="${action}"><span>${tr(label)}</span><span aria-hidden="true">›</span></button>`).join('')+
@@ -152,15 +151,19 @@ function storeProfilePhoto(photo){
 function profileAvatar(){
  const photo=preferences().profilePhotos?.[profilePhotoOwner()];
  const valid=validProfilePhoto(photo);
- return '<div class="pilot-avatar">'+(valid?'<img src="'+esc(photo)+'" alt="">':planeIcon)+'</div>'+
- '<label class="photo-upload">'+tr('Добавить фотографию')+'<input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label>'+
- (valid?`<button type="button" data-action="remove-profile-photo">${tr('Удалить фотографию')}</button>`:'');
+ const label=tr(valid?'Изменить фотографию':'Добавить фотографию');
+ return '<button type="button" class="pilot-avatar" data-action="pick-profile-photo" aria-label="'+label+'">'+
+ (valid?'<img src="'+esc(photo)+'" alt="">':planeIcon)+'</button>'+
+ '<div class="pilot-photo-actions"><button type="button" data-action="pick-profile-photo">'+label+'</button>'+
+ (valid?`<button type="button" data-action="remove-profile-photo">${tr('Удалить фотографию')}</button>`:'')+
+ '<input id="profilePhotoInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden></div>';
 }
 async function setProfilePhoto(file){
  if(!file)return;
  const owner=profilePhotoOwner();
  try {
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>15_000_000)throw Error();
+  const imageType=['image/jpeg','image/png','image/webp'].includes(file.type)||(!file.type&&/\.(jpe?g|png|webp)$/i.test(file.name));
+  if(!imageType||file.size>15_000_000)throw Error();
   const url=URL.createObjectURL(file);
   try {
    const img=new Image();
@@ -219,10 +222,38 @@ function dashboardActivity() {
  const counts=new Map(dates.map(date=>[date,0]));
  for(const f of summaryFlights().filter(flown)) if(counts.has(f.date)) counts.set(f.date,counts.get(f.date)+1);
  const max=Math.max(1,...counts.values());
- return `<div class="activity-bars" role="img" aria-label="${tr("Выполнено рейсов за 30 дней:")} `+[...counts.values()].reduce((a,b)=>a+b,0)+'">'+
- [...counts].map(([date,n])=>'<span title="'+displayDate(date)+' · '+n+'" style="--level:'+Math.max(4,n/max*100)+'%"></span>').join('')+'</div>';
+ return `<div class="activity-chart"><div class="activity-tooltip" aria-hidden="true"></div><div class="activity-bars" role="group" aria-label="${tr("Выполнено рейсов за 30 дней:")} `+[...counts.values()].reduce((a,b)=>a+b,0)+'">'+
+ [...counts].map(([date,n],index)=>{
+  const label=displayDate(date)+' · '+tr('Рейсов:')+' '+n;
+  return '<button type="button"'+(index===dates.length-1?'':' tabindex="-1"')+' aria-label="'+label+'" style="--level:'+Math.max(4,n/max*100)+'%"><span></span></button>';
+ }).join('')+'</div></div>';
 }
 
+function bindActivityChart(){
+ const chart=document.querySelector('.activity-chart');
+ if(!chart)return;
+ const tip=chart.querySelector('.activity-tooltip'), bars=[...chart.querySelectorAll('button')];
+ const highlight=bar=>{
+  for(const item of bars)item.classList.toggle('active',item===bar);
+  if(!bar){tip.classList.remove('visible');return;}
+  tip.textContent=bar.getAttribute('aria-label');
+  tip.classList.add('visible');
+  const box=bar.getBoundingClientRect(), bounds=chart.getBoundingClientRect(), half=tip.offsetWidth/2;
+  tip.style.left=Math.max(half,Math.min(bounds.width-half,box.left-bounds.left+box.width/2))+'px';
+ };
+ chart.addEventListener('pointerover',event=>{const bar=event.target.closest('button');if(bar)highlight(bar);});
+ chart.addEventListener('pointerleave',()=>highlight(bars.includes(document.activeElement)?document.activeElement:null));
+ chart.addEventListener('focusin',event=>highlight(event.target));
+ chart.addEventListener('focusout',event=>{if(!chart.contains(event.relatedTarget))highlight(null);});
+ chart.addEventListener('keydown',event=>{
+  const offset={ArrowLeft:-1,ArrowRight:1}[event.key];
+  if(!offset)return;
+  const index=bars.indexOf(event.target), next=bars[index+offset];
+  if(!next)return;
+  event.preventDefault();
+  event.target.tabIndex=-1;next.tabIndex=0;next.focus();
+ });
+}
 // Runs only inside the isolated map iframe. The parent supplies coordinates and style.
 function initializeYandexFrame(payload) {
  const send=(message)=>parent.postMessage(message,'*');
@@ -354,6 +385,7 @@ function mountYandexMap() {
 
 let calendarPopup, calendarAnchor;
 function closeCalendar(restoreFocus=false){
+ if(calendarPopup?.open)calendarPopup.close();
  calendarPopup?.remove();
  calendarPopup=null;
  if(restoreFocus)calendarAnchor?.focus();
@@ -366,21 +398,20 @@ function openCalendar(anchor,selected,onSelect){
  calendarAnchor=anchor;
  const today=dateUTC(), initial=selected||today;
  let month=new Date(initial.slice(0,7)+'-01T12:00:00Z');
- const modal=anchor.closest('dialog[open]');
- modal?.classList.remove('dialog-enter');
- const popup=document.createElement('section');
+ const popup=document.createElement('dialog');
  calendarPopup=popup;
  popup.className='calendar-popover';
- popup.setAttribute('role','dialog');
  popup.setAttribute('aria-label',tr('Календарь'));
  anchor.setAttribute('aria-expanded','true');
- (modal||document.body).append(popup);
+ document.body.append(popup);
+ popup.showModal();
+ popup.addEventListener('cancel',event=>{event.preventDefault();closeCalendar(true);});
  const position=()=>{
   if(!anchor.isConnected){closeCalendar();return;}
   const box=anchor.getBoundingClientRect();
   const top=box.bottom+8+popup.offsetHeight>innerHeight-12?box.top-popup.offsetHeight-8:box.bottom+8;
   popup.style.left=Math.max(10,Math.min(box.left,innerWidth-popup.offsetWidth-10))+'px';
-  popup.style.top=Math.max(10,top)+'px';
+  popup.style.top=Math.max(10,Math.min(top,innerHeight-popup.offsetHeight-10))+'px';
  };
  function draw(focus){
   popup.replaceChildren();
@@ -419,7 +450,13 @@ function openCalendar(anchor,selected,onSelect){
  draw(true);
 }
 document.addEventListener('pointerdown',event=>{
- if(calendarPopup&&!calendarPopup.contains(event.target)&&!calendarAnchor?.contains(event.target))closeCalendar();
+ if(!calendarPopup)return;
+ const box=calendarPopup.getBoundingClientRect();
+ if(!calendarPopup.contains(event.target)||(event.target===calendarPopup&&
+  (event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))){
+  event.preventDefault();
+  closeCalendar(true);
+ }
 },true);
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&calendarPopup){event.preventDefault();event.stopPropagation();closeCalendar(true);}

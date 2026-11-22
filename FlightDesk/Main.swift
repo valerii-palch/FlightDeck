@@ -10,7 +10,7 @@ final class WindowDragHandle: NSView {
     }
 }
 
-final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
+final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var googleOAuth: GoogleOAuth?
@@ -97,13 +97,14 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             self?.webView.evaluateJavaScript("window.flightDeckUpdateAvailable?.(...\(json))")
         }
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 810),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         window.title = "FlightDeck"
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 9.0 / 255, green: 13.0 / 255, blue: 22.0 / 255, alpha: 1)
-        window.contentMinSize = NSSize(width: 1340, height: 700)
+        window.contentMinSize = NSSize(width: 1100, height: 640)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -232,6 +233,23 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         }
     }
 
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        guard frame.isMainFrame, let bundled = Bundle.main.url(forResource: "FlightDesk", withExtension: "html"),
+              frame.request.url?.standardizedFileURL == bundled.standardizedFileURL else {
+            completionHandler(nil)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.allowedContentTypes = [.jpeg, .png, .webP, .json]
+        panel.beginSheetModal(for: window) { response in
+            completionHandler(response == .OK ? panel.urls : nil)
+        }
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if action.navigationType == .linkActivated, action.sourceFrame.isMainFrame,
@@ -279,6 +297,9 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           const previousStatus = current.status;
           document.querySelector('[data-next-flight]').click();
           check(current.status === nextStatus[previousStatus], 'advance active flight once');
+          if (current.status === 'Посадка завершена') {
+            check(Number.isFinite(Date.parse(current.stages.close)), 'quick status records boarding completion');
+          }
           check(displayDate('2026-11-20') === '20.11.2026' && parseDisplayDate('29.02.2024') === '2024-02-29' &&
                 parseDisplayDate('29.02.2026') === '', 'fixed date format and leap year');
           data.flights.length=0;
@@ -296,7 +317,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           document.querySelector('[data-page=pilot]').click();
           document.querySelector('[data-action=profile-name]').click();
           const settings = document.querySelector('#settingsForm');
-          check(!settings.elements.mapsKey && !settings.elements.mapProvider, 'map settings hidden');
+          check(!settings.elements.mapsKey && !settings.elements.mapProvider && !settings.elements.density, 'obsolete settings hidden');
           settings.elements.profileName.value = 'Тестовый пилот';
           settings.requestSubmit();
           check(preferences().profileName === 'Тестовый пилот', 'editable profile');
@@ -316,9 +337,47 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           check(cloudSnapshot().airports[0].version === '1.3', 'airport scenery edit persisted');
           document.querySelector('[data-action=new]').click();
           check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
+          const editor = byId('editForm');
+          editor.elements.std.value = '2335';
+          editor.elements.std.dispatchEvent(new Event('input', {bubbles:true}));
+          check(editor.elements.std.value === '23:35', 'numeric time entry adds separator');
+          editor.querySelectorAll('[data-action=pick-date]').item(1).click();
+          const calendar = document.querySelector('dialog.calendar-popover');
+          const bounds = calendar.getBoundingClientRect();
+          check(calendar.open && bounds.width > 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight, 'calendar fits viewport above form');
+          calendar.querySelector('.calendar-days button.today').click();
+          check(!calendar.isConnected && byId('dialog').open, 'date selection leaves editor open');
           document.querySelector('#dialog').close();
+          const diversion = {id:'diversion-test',number:'TEST',tail:fleet[0].tail,dep:'UUEE',arr:'USPP',diversionAirport:'USSS',
+            status:'Уход на запасной',date:'2026-11-20',std:'21:00',sta:'23:55',atd:'21:15',ata:'23:40'};
+          data.flights.push(diversion);
+          check(routeProgress(diversion) === 50 && routeOverview(diversion).includes('USSS'), 'alternate landing track');
+          editContinuation(diversion);
+          const onward = byId('continuationForm');
+          check(onward.elements.date.value === '21.11.2026' && onward.elements.std.value === '00:40' && parseFlightTime(onward.elements.sta.value), 'onward flight defaults across midnight');
+          onward.elements.std.value = '00:55';
+          onward.requestSubmit();
+          check(diversion.continuation?.std === '00:55', 'onward departure remains editable');
+          diversion.continuation.status='Выполнен';
+          diversion.continuation.ata='01:45';
+          check(routeProgress(diversion) === 100, 'alternate route completed after onward landing');
+          check(completedRoutes([diversion]).routes[0].codes.join('/') === 'USPP/UUEE', 'map retains scheduled endpoints');
+          document.querySelector('[data-page=journal]').click();
+          check(document.querySelectorAll('.flight-board tbody tr').length===2 &&
+                document.querySelector('.board-original')?.textContent === 'Пермь', 'adjacent diversion and onward journal rows');
+          const board=document.querySelector('.board-panel');
+          check(board.scrollWidth<=board.clientWidth+1, 'logbook fits viewport');
+          document.querySelector('[data-page=pilot]').click();
+          check([...document.querySelectorAll('.profile-metrics .metric')].some(e=>e.querySelector('small').textContent==='Посадки' &&
+                e.querySelector('strong').textContent==='2'), 'alternate and onward both count as landings');
+          check(byId('profilePhotoInput') && document.querySelector('[data-action=pick-profile-photo]'), 'profile photo picker available');
+          document.querySelector('[data-page=home]').click();
+          const bar = document.querySelector('.activity-bars button');
+          bar.dispatchEvent(new MouseEvent('pointerover', {bubbles:true}));
+          check(bar.classList.contains('active') && document.querySelector('.activity-tooltip.visible')?.textContent.includes('Рейсов:'), 'activity tooltip highlights day');
+          data.flights.pop();
           const fixture = \(fixture);
-          if (!fixture) return 'PASS: empty installation, profile, airport details and flight editor';
+          if (!fixture) return 'PASS: calendar, numeric time, linked diversion, landing count, direct map, profile and activity';
           check(validBackup(fixture), 'legacy backup format');
           data = migrateDiversion(fixture);
           airportCode = '';
