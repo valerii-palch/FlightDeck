@@ -106,23 +106,24 @@ function editContinuation(f) {
  };
 }
 
-function boardRow(f, kind='') {
+function boardRow(f, kind, date, groupDate) {
  const t=flightTimes(f);
  const city=code=>esc(airportCity(code));
  const stop=kind==='diverted';
  const place=(code,label,original='')=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span>'+
-  (original?'<del class="board-original">'+city(original)+'</del>':'')+'<strong class="board-city">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
+  (original?'<del class="board-original" title="'+city(original)+'">'+city(original)+'</del>':'')+
+  '<strong class="board-city" title="'+city(code)+'">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
  const changed=Number.isFinite(t.actualDeparture)&&t.actualDeparture!==t.scheduledDeparture;
- const time='<span class="board-time">'+(changed?'<del>'+esc(f.std)+'</del><strong>'+formatTime(t.actualDeparture,f.date)+'</strong>':'<strong>'+esc(f.std)+'</strong>')+'</span>';
+ const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,date):'—';
+ const time='<span class="board-time">'+(changed?'<del>'+clock(t.scheduledDeparture)+'</del><strong>'+clock(t.actualDeparture)+'</strong>':'<strong>'+clock(t.scheduledDeparture)+'</strong>')+'</span>';
  const actualArrival=stop?t.actualArrival:destinationArrival(f,t);
- const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,f.date):'—';
  const arrival=`<td class="board-arrival"><span class="board-mobile-label">${tr("Прилет UTC")}</span>`+
   (stop?'':`<span>${tr("План")} <time>`+clock(t.scheduledArrival)+'</time></span>')+
   '<span'+(!stop&&actualArrival>t.scheduledArrival?' class="late"':'')+`>${tr(stop?"Посадка":"Факт")} <time>`+clock(actualArrival)+'</time></span></td>';
  const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
  const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
  return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
- '<td>'+time+(kind==='continuation'?'<small>'+displayDate(f.date)+'</small>':'')+'</td>'+
+ '<td>'+time+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
  place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
  '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
  '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+
@@ -131,30 +132,41 @@ function boardRow(f, kind='') {
 
 function boardRows() {
  const needle=journalQuery.trim().toLocaleLowerCase('ru').replace(/\s+/g,'');
- const rows=newest(data.flights.filter(f=>{
+ const matching=data.flights.filter(f=>{
   const codes=[f.dep,alternate(f),f.arr];
   const terms=[f.number,f.tail,...codes.flatMap(c=>[c,airport(c)?.iata,airportInfo(c)?.cityRu,airportInfo(c)?.cityEn])];
   return terms.join(' ').toLocaleLowerCase('ru').replace(/\s+/g,'').includes(needle) &&
    (journalFilter==='all'||f.tail===journalFilter) &&
    (typeFilter==='all'||typeFilter===flightType(f)) &&
-   (!journalDate||f.date===journalDate||continuationLeg(f)?.date===journalDate) &&
    (statusFilter==='all'||statusFilter===journalStatus(f)||
     statusFilter===continuationLeg(f)?.status||
     statusFilter==='Уход на запасной'&&isDiversion(f)||statusFilter==='arrival'&&arrivalDelay(f)>0);
- }));
- if (!rows.length) return `<p class="empty muted">${tr("Рейсы не найдены.")}</p>`;
+ });
+ const blocks=matching.map(f=>{
+  const next=continuationLeg(f);
+  const legs=[[f,isDiversion(f)&&alternate(f)?'diverted':'']];
+  if(next)legs.push([next,'continuation']);
+  const rows=legs.map(([flight,kind])=>{
+   const {actualDeparture,scheduledDeparture}=flightTimes(flight);
+   const departure=Number.isFinite(actualDeparture)?actualDeparture:scheduledDeparture;
+   const date=Number.isFinite(departure)?new Date(departure).toISOString().slice(0,10):flight.date;
+   return {flight,kind,date,departure};
+  }).reverse();
+  const latest=rows.find(row=>!journalDate||row.date===journalDate);
+  return latest&&{rows,date:latest.date,departure:latest.departure};
+ }).filter(Boolean)
+  .sort((a,b)=>b.date.localeCompare(a.date)||(b.departure||0)-(a.departure||0));
+ if (!blocks.length) return `<p class="empty muted">${tr("Рейсы не найдены.")}</p>`;
  const groups=new Map();
- for (const row of rows) {
-  if (!groups.has(row.date)) groups.set(row.date,[]);
-  groups.get(row.date).push(row);
+ for (const block of blocks) {
+  if (!groups.has(block.date)) groups.set(block.date,[]);
+  groups.get(block.date).push(block);
  }
  return [...groups].map(([date,items])=>'<div class="board-group"><table class="journal-table flight-board">'+
  '<caption>'+displayDate(date)+'</caption><colgroup><col><col><col><col><col><col><col><col></colgroup>'+
- `<thead><tr><th>${tr("Вылет UTC")}</th><th>${tr("Отправление")}</th><th>${tr("Назначение")}</th><th>${tr("Прилет UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Статус")}</th><th></th></tr></thead><tbody>`+
- items.map(f=>{
-  const next=continuationLeg(f);
-  return boardRow(f,isDiversion(f)&&alternate(f)?'diverted':'')+(next?boardRow(next,'continuation'):'');
- }).join('')+'</tbody></table></div>').join('');
+ `<thead><tr><th>${tr("Вылет UTC")}</th><th>${tr("Отправление")}</th><th>${tr("Назначение")}</th><th>${tr("Прилет UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Статус")}</th><th></th></tr></thead>`+
+ items.map(({rows})=>(rows.length>1?`<tbody class="board-linked" aria-label="${tr('Два участка одного рейса')}">`:'<tbody>')+
+ rows.map(row=>boardRow(row.flight,row.kind,row.date,date)).join('')+'</tbody>').join('')+'</table></div>').join('');
 }
 
 let journalQuery='', journalDate='', typeFilter='all';

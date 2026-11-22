@@ -152,10 +152,13 @@ function profileAvatar(){
  const photo=preferences().profilePhotos?.[profilePhotoOwner()];
  const valid=validProfilePhoto(photo);
  const label=tr(valid?'Изменить фотографию':'Добавить фотографию');
- return '<button type="button" class="pilot-avatar" data-action="pick-profile-photo" aria-label="'+label+'">'+
- (valid?'<img src="'+esc(photo)+'" alt="">':planeIcon)+'</button>'+
- '<div class="pilot-photo-actions"><button type="button" data-action="pick-profile-photo">'+label+'</button>'+
- (valid?`<button type="button" data-action="remove-profile-photo">${tr('Удалить фотографию')}</button>`:'')+
+ const editIcon='<path d="m15 5 4 4M4 20l4-.8L20 7a2.8 2.8 0 0 0-4-4L4.8 15z"/>';
+ const deleteIcon='<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>';
+ const icon=path=>'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+path+'</svg>';
+ return '<div class="pilot-avatar">'+(valid?'<img src="'+esc(photo)+'" alt="">':planeIcon)+
+ '<div class="avatar-tools'+(valid?'':' avatar-tools-empty')+'">'+
+ '<button type="button" data-action="pick-profile-photo" aria-label="'+label+'" title="'+label+'">'+icon(editIcon)+'</button>'+
+ (valid?`<button type="button" data-action="remove-profile-photo" aria-label="${tr('Удалить фотографию')}" title="${tr('Удалить фотографию')}">${icon(deleteIcon)}</button>`:'')+'</div>'+
  '<input id="profilePhotoInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden></div>';
 }
 async function setProfilePhoto(file){
@@ -169,15 +172,62 @@ async function setProfilePhoto(file){
    const img=new Image();
    img.src=url;
    await img.decode();
-   if(owner!==profilePhotoOwner())return;
-   const size=Math.min(img.naturalWidth,img.naturalHeight);
-   const canvas=document.createElement('canvas');
-   canvas.width=canvas.height=320;
-   canvas.getContext('2d').drawImage(img,(img.naturalWidth-size)/2,(img.naturalHeight-size)/2,size,size,0,0,320,320);
-   storeProfilePhoto(canvas.toDataURL('image/jpeg',.85));
-   save();render();
+   if(owner===profilePhotoOwner())editProfileCrop(img,owner);
   } finally {URL.revokeObjectURL(url);}
  }catch {notice(tr('Не удалось загрузить фотографию. Выбери JPEG, PNG или WebP до 15 МБ.'));}
+}
+function editProfileCrop(image,owner){
+ const {naturalWidth:width,naturalHeight:height}=image;
+ openDialog(`<header class="row"><h2 id="photoCropTitle">${tr('Кадрирование фотографии')}</h2>
+ <button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
+ <form id="photoCropForm" class="photo-crop">
+  <p class="muted" id="photoCropHint">${tr('Перемещай фото мышью или стрелками. Масштаб меняется ползунком.')}</p>
+  <canvas width="320" height="320" tabindex="0" aria-label="${tr('Квадратная область кадрирования')}" aria-describedby="photoCropHint"></canvas>
+  <label>${tr('Масштаб')}<input name="zoom" type="range" min="1" max="3" step="0.01" value="1"></label>
+  <div class="controls"><button class="primary">${tr('Сохранить фотографию')}</button><button type="button" data-action="close">${tr('Отмена')}</button></div>
+ </form>`,'photo-crop');
+ const form=byId('photoCropForm'), canvas=form.querySelector('canvas'), ctx=canvas.getContext('2d');
+ const zoom=form.elements.zoom, output=canvas.width;
+ let x=width/2,y=height/2,drag;
+ const edge=()=>Math.min(width,height)/Number(zoom.value);
+ function draw(){
+  const size=edge(), half=size/2;
+  x=Math.min(width-half,Math.max(half,x));
+  y=Math.min(height-half,Math.max(half,y));
+  ctx.fillStyle='#101722';
+  ctx.fillRect(0,0,output,output);
+  ctx.drawImage(image,x-half,y-half,size,size,0,0,output,output);
+ }
+ draw();
+ zoom.oninput=draw;
+ canvas.onpointerdown=e=>{
+  if(e.button!==0||drag)return;
+  drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,x,y};
+  canvas.focus();canvas.setPointerCapture(e.pointerId);
+ };
+ canvas.onpointermove=e=>{
+  if(drag?.id!==e.pointerId)return;
+  const scale=edge()/canvas.getBoundingClientRect().width;
+  x=drag.x-(e.clientX-drag.startX)*scale;
+  y=drag.y-(e.clientY-drag.startY)*scale;
+  draw();
+ };
+ canvas.onlostpointercapture=()=>{drag=null;};
+ canvas.onkeydown=e=>{
+  const step={ArrowLeft:[1,0],ArrowRight:[-1,0],ArrowUp:[0,1],ArrowDown:[0,-1]}[e.key];
+  if(!step)return;
+  e.preventDefault();
+  const distance=edge()*(e.shiftKey ? .1 : .025);
+  x+=step[0]*distance;y+=step[1]*distance;draw();
+ };
+ form.onsubmit=e=>{
+  e.preventDefault();
+  if(owner!==profilePhotoOwner()){byId('dialog').close();return;}
+  const photo=canvas.toDataURL('image/jpeg',.85);
+  if(!validProfilePhoto(photo)){notice(tr('Не удалось сохранить фотографию.'));return;}
+  storeProfilePhoto(photo);
+  save();byId('dialog').close();render();
+ };
 }
 function removeProfilePhoto(){
  storeProfilePhoto('');

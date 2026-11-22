@@ -489,7 +489,7 @@ function openDialog(html, layout = '', anchor = null) {
  d.classList.remove('settings-closing');
  d.innerHTML=html;
  d.dataset.layout=layout;
- const title={flight:'flightEditorTitle',settings:'settingsTitle',update:'updateTitle'}[layout];
+ const title={flight:'flightEditorTitle',settings:'settingsTitle',update:'updateTitle','photo-crop':'photoCropTitle'}[layout];
  if(title)d.setAttribute('aria-labelledby',title);
  else d.removeAttribute('aria-labelledby');
  if(!d.open) d.showModal();
@@ -514,7 +514,8 @@ function editFlight(existing,divert=false) {
  const f=existing?{...existing,diversionAirport:alternate(existing),status:divert?'Уход на запасной':existing.status}:{type:flightTypes[0],tail,dep:'',arr:'',date:dateUTC(),std:'',sta:'',status:statuses[0],stages:{}};
  const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}${type==='date'?dateField(name,f[name],required):type==='time'?timeField(name,f[name],required):`<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}>`}</label>`;
  const select=(name,label,options)=>`<label>${tr(label)}<span class="flight-select"><select name="${name}">${options}</select></span></label>`;
- const airports=data.airports.map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
+ const airports=[...data.airports].sort((a,b)=>Number(b.icao==='UUEE')-Number(a.icao==='UUEE')||a.icao.localeCompare(b.icao,'en'))
+  .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
  const icao='list="icaoChoices" maxlength="80" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
  const section=(title,content)=>`<section class="flight-editor-section"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
  const loadFields=field('pax','Пассажиры','number',false,'min="0" step="1"')+
@@ -800,7 +801,7 @@ document.addEventListener('change',e=>{
  }
  if(d.parking){const a=airport(airportCode);a.stands??={};a.stands[d.parking]=t.value;save();}
  if(d.airportScenery){airport(airportCode)[d.airportScenery]=t.value.trim();save();}
- if(t.id==='profilePhotoInput')setProfilePhoto(t.files[0]);
+ if(t.id==='profilePhotoInput'){const file=t.files[0];t.value='';setProfilePhoto(file);}
  if(t.id==='airportIata'){const value=t.value.trim().toUpperCase();if(value&&!/^[A-Z]{3}$/.test(value)){notice(tr("Код IATA должен состоять из трех латинских букв."));t.value=airport(airportCode).iata;return;}airport(airportCode).iata=value;save();render();}
 });
 if(pages.some(([key])=>key===preferences().startPage)) page=preferences().startPage;
