@@ -130,16 +130,16 @@ function home() {
  const recent=newest(rows).slice(0,6), working=workingFlight(rows), latest=working||recent[0];
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const city=code=>esc(airportCity(code));
- return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+`</div><button class="primary" data-action="new">＋ ${tr("Добавить рейс")}</button></header>`+
+ return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div>'+planeIcon+'<div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest):`<p class="muted">${tr("Журнал пуст")}</p>`)+
  '</section>'+
- `<section class="panel dashboard-card"><h2>${tr("Активность")}</h2><p class="muted">${tr("Последние 30 дней UTC")}</p>`+dashboardActivity()+
+ `<section class="panel dashboard-card"><h2>${tr("Активность")}</h2><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity()+
  '<p>'+stats.count+` ${tr("выполнено ·")} `+duration(stats.minutes)+`</p><button data-page="journal">${tr("Журнал полетов")}</button></section>`+
  `<section class="panel dashboard-card"><h2>${tr("Флот")}</h2>`+fleet.map(a=>{
   const count=flightStats(rows.filter(f=>f.tail===a.tail)).count;
-  return '<div class="dashboard-aircraft"><span>'+aircraftModel(a)+' <small>'+a.tail+'</small></span><strong>'+count+'</strong></div>';
+  return '<div class="dashboard-aircraft"><div><span>'+aircraftModel(a)+'</span><small>'+a.tail+'</small></div><strong>'+count+'</strong></div>';
  }).join('')+`<button data-page="fleet">${tr("Открыть флот")}</button></section>`+
  `<section class="panel dashboard-card"><h2>${tr("Аэропорты")}</h2><p class="dashboard-number">`+data.airports.filter(a=>a.scenery).length+' <small>/ '+data.airports.length+'</small></p>'+
  `<p class="muted">${tr("Установлено сценариев")}</p><button data-page="airports">${tr("Каталог аэропортов")}</button></section></div>`+
@@ -156,7 +156,8 @@ function fleetPage() {
  '<div class="fleet-groups">'+[[tr("Ближнемагистральные"),[0]],[tr("Дальнемагистральные"),[1,2]]].map(([title,items])=>
  '<div class="fleet-group"><small>'+title+'</small><div class="fleet-tabs">'+items.map(i=>'<button data-slide="'+i+'" data-slide-focus="tab" aria-pressed="'+(i===fleetSlide)+'" class="'+(i===fleetSlide?'active':'')+'">'+aircraftModel(fleet[i])+'</button>').join('')+'</div></div>').join('')+'</div>'+
  '<article class="panel fleet-slide" aria-label="'+a.type+' · '+(fleetSlide+1)+` ${tr("из")} `+fleet.length+'">'+aircraftImage(a)+
- '<div class="fleet-slide-body"><div><h2>'+a.type+'</h2><p class="muted">'+tr(a.name)+' · '+a.tail+'</p></div>'+
+ '<div class="fleet-slide-body"><div><h2>'+a.type+'</h2><p class="muted">'+tr(a.name)+' · '+a.tail+'</p>'+
+ (aircraftDisplayName(a)?'<p class="airframe-name">'+tr('Название самолёта')+' · '+esc(aircraftDisplayName(a))+'</p>':'')+'</div>'+
  '<div class="fleet-metrics">'+metric(tr("Мест на борту"),capacity(a))+metric(tr("Налет"),duration(stats.minutes))+'</div>'+
  '<div class="fleet-slide-actions"><button class="primary" data-aircraft="'+a.tail+`">${tr("Открыть борт")}</button>`+
  '<div class="fleet-controls"><button data-slide="'+previous+`" data-slide-focus="previous" aria-label="${tr("Предыдущий борт")}">←</button>`+
@@ -167,7 +168,8 @@ function aircraftPage() {
  const rows = newest(data.flights.filter(f=>f.tail===a.tail));
  const stats = flightStats(rows);
  return `<div class="controls page-actions"><button data-page="fleet">← ${tr("К флоту")}</button><button data-tail="`+a.tail+`">${tr("Полетный центр борта")}</button></div>`+
- '<div class="grid two"><section class="panel"><h2>'+a.type+'</h2><p class="muted">'+tr(a.name)+' · '+a.tail+'</p>'+aircraftImage(a)+`<div class="strip row"><span>${tr("Выполнено перелетов")}</span><strong>`+stats.count+`</strong></div><div class="strip row"><span>${tr("Налет по журналу")}</span><strong>`+duration(stats.minutes)+'</strong></div></section>'+
+ '<div class="grid two"><section class="panel"><h2>'+a.type+'</h2><p class="muted">'+tr(a.name)+' · '+a.tail+'</p>'+
+ (aircraftDisplayName(a)?'<p class="airframe-name">'+tr('Название самолёта')+' · '+esc(aircraftDisplayName(a))+'</p>':'')+aircraftImage(a)+`<div class="strip row"><span>${tr("Выполнено перелетов")}</span><strong>`+stats.count+`</strong></div><div class="strip row"><span>${tr("Налет по журналу")}</span><strong>`+duration(stats.minutes)+'</strong></div></section>'+
  `<section class="panel"><h2>${tr("Пассажирский салон")}</h2><div class="strip row"><span>${tr("Всего мест")}</span><strong>`+capacity(a)+'</strong></div>'+
  a.seats.map((n,i)=>'<div class="strip row"><span>'+[tr("Эконом"),tr("Комфорт"),tr("Бизнес")][i]+'</span><strong>'+(n||'—')+'</strong></div>').join('')+
  (a.short==='B777'?`<p class="facts muted">${tr("Стоянки по списку Airbus A350")}</p>`:'')+'</section></div>'+

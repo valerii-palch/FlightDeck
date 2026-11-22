@@ -68,7 +68,7 @@ function enterDemoWorkspace() {
  if(cloudBusy||demoWorkspace) return;
  demoWorkspace={data,page,tail,selected,explicitAircraft,airportCode};
  explicitAircraft=false;
- fleet=personalFleet.map((aircraft,i)=>({...aircraft,tail:['DEMO-A1','DEMO-A2','DEMO-B1'][i],
+ fleet=personalFleet.map((aircraft,i)=>({...aircraft,airframeName:null,tail:['DEMO-A1','DEMO-A2','DEMO-B1'][i],
   name:['Northstar','Daybreak','Blue Horizon'][i]}));
  data=demoJournal();
  page='home';airportCode=data.airports[0].icao;fleetSlide=0;pickTail(fleet[0].tail);

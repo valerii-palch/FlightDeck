@@ -35,7 +35,7 @@ function cloudEditing(){
 }
 
 function queueCloudSync(delay=350){
- if(demoWorkspace||!cloudSession||cloudConflict) return;
+ if(demoWorkspace||!cloudSession) return;
  if(delay&&cloudState==='ready'){
   cloudState='pending';
   updateCloudIndicator();
@@ -45,7 +45,7 @@ function queueCloudSync(delay=350){
 }
 
 async function autoSyncCloud(){
- if(!cloudSession||cloudConflict||navigator.onLine===false)return;
+ if(!cloudSession||navigator.onLine===false)return;
  if(cloudBusy){queueCloudSync(1000);return;}
  cloudBusy=true;
  updateCloudIndicator();
@@ -56,13 +56,14 @@ async function autoSyncCloud(){
   const result=await synchronizeCloud('',undefined,true);
   if(result.deferred){queueCloudSync(2000);return;}
   if(result.message){
+   cloudConflict=null;
    cloudStatus=result.message;
    cloudState=cloudSame(cloudSnapshot(),cloudBase)?'ready':'pending';
    repaint=result.applied;
    if(cloudState==='pending') queueCloudSync();
   } else {
    cloudConflict=result;
-   repaint=page==='pilot';
+   repaint=result.applied||page==='pilot';
   }
  } catch(error){
   cloudStatus=error.message;
@@ -193,41 +194,47 @@ async function synchronizeCloud(choice='',expected,automatic=false){
  if(choice&&(!cloudSame(expected.local,local)||expected.version!==(remote?.version??null))){
   throw Error('Журнал изменился. Нажми «Синхронизировать» и проверь копии снова.');
  }
- const remoteJournal=remote?{...remote.journal,profileName:remote.journal.profileName??local.profileName,
-  profilePhoto:validProfilePhoto(remote.journal.profilePhoto)?remote.journal.profilePhoto:''}:null;
- if(cloudBase&&!Object.hasOwn(cloudBase,'profilePhoto'))cloudBase={...cloudBase,profilePhoto:''};
- if(cloudRemoteBase&&!Object.hasOwn(cloudRemoteBase,'profilePhoto'))cloudRemoteBase={...cloudRemoteBase,profilePhoto:''};
- if(remote&&cloudSame(local,remoteJournal)&&typeof remote.journal.profileName==='string'){
-  cloudBase=local;
-  cloudRemoteBase=local;
-  rememberCloudCheckpoint();
-  return {message:'Журналы совпадают.'};
- }
- if(remote&&cloudBase&&cloudSame(local,cloudBase)&&cloudSame(remoteJournal,cloudRemoteBase)&&!choice){
-  return {message:'Журналы совпадают.'};
- }
- const freshJournal=!local.flights.length&&!local.airports.length&&!local.profileName&&!local.profilePhoto&&!cloudBase;
- if(remote&&(choice==='download'||(!choice&&(freshJournal||(cloudBase&&cloudSame(local,cloudBase)))))){
-  if(automatic&&cloudEditing())return {deferred:true};
-  applyCloudCopy(remoteJournal);
-  cloudBase=cloudSnapshot();
-  cloudRemoteBase=remoteJournal;
-  rememberCloudCheckpoint();
-  return {message:'Облачный журнал загружен.',applied:true};
- }
- if(choice==='upload'||(!remote&&!cloudBase&&!choice)||(remote&&cloudSame(local,remoteJournal))||(remote&&cloudBase&&cloudSame(remoteJournal,cloudRemoteBase))){
-  const body={journal:local,version:(remote?.version||0)+1};
+ if(!remote&&cloudBase&&choice!=='upload')return {version:null,local,remote:null};
+ const remoteJournal=remote?{...remote.journal,
+  profileName:typeof remote.journal.profileName==='string'?remote.journal.profileName:local.profileName,
+  profilePhoto:typeof remote.journal.profilePhoto==='string'?(validProfilePhoto(remote.journal.profilePhoto)?remote.journal.profilePhoto:''):local.profilePhoto}:null;
+ // The logbook remains one unit. Each profile field can sync independently of a logbook conflict.
+ const split=copy=>copy&&[{flights:copy.flights,airports:copy.airports},copy.profileName??'',copy.profilePhoto??''];
+ const join=([journal,profileName,profilePhoto])=>({...journal,profileName,profilePhoto});
+ const empty=[{flights:[],airports:[]},'',''];
+ const here=split(local), there=split(remoteJournal), prior=split(cloudBase), previousRemote=split(cloudRemoteBase);
+ const merged=here.map((value,index)=>{
+  if(choice==='upload'||!there||cloudSame(value,there[index]))return value;
+  if(choice==='download')return there[index];
+  const localUnchanged=cloudSame(value,prior?.[index]??empty[index]);
+  const remoteUnchanged=cloudSame(there[index],previousRemote?.[index]??empty[index]);
+  if(localUnchanged===remoteUnchanged)return undefined;
+  return localUnchanged?there[index]:value;
+ });
+ const conflicted=merged.some(value=>value===undefined);
+ const localTarget=merged.map((value,index)=>value??here[index]);
+ const remoteTarget=join(merged.map((value,index)=>value??there[index]));
+ if(automatic&&!cloudSame(localTarget,here)&&cloudEditing())return {deferred:true};
+ const write=!remote||!cloudSame(remoteTarget,{...join(there),profileName:remote.journal.profileName,profilePhoto:remote.journal.profilePhoto});
+ let version=remote?.version??0;
+ if(write){
+  const body={journal:remoteTarget,version:version+1};
   const updated=await cloudRequest(remote?endpoint+filter+'&version=eq.'+remote.version:endpoint,{
    token,method:remote?'PATCH':'POST',representation:true,
    body:remote?body:{...body,owner_id:cloudSession.user.id}
   });
   if(!updated?.length) throw Error('Облачный журнал изменился. Нажми «Синхронизировать» еще раз.');
-  cloudBase=local;
-  cloudRemoteBase=local;
-  rememberCloudCheckpoint();
-  return {message:'Локальный журнал сохранен в облаке.'};
+  version=body.version;
  }
- return {version:remote?.version??null,local,remote:remote?.journal};
+ const current=split(cloudSnapshot());
+ const safeCopy=join(localTarget.map((value,index)=>cloudSame(current[index],here[index])?value:current[index]));
+ const applied=!cloudSame(join(current),safeCopy);
+ if(applied)applyCloudCopy(safeCopy);
+ cloudBase=join(merged.map((value,index)=>value??prior?.[index]??empty[index]));
+ cloudRemoteBase=join(merged.map((value,index)=>value??previousRemote?.[index]??empty[index]));
+ rememberCloudCheckpoint();
+ if(conflicted)return {version,local:cloudSnapshot(),remote:remoteTarget,applied};
+ return {message:write?'Локальный журнал сохранен в облаке.':applied?'Облачный журнал загружен.':'Журналы совпадают.',applied};
 }
 
 function cloudMessage(message) {
@@ -276,7 +283,7 @@ function cloudProfilePanel(){
  `<p>${tr("Копии различаются. Локально:")} `+conflict.local.flights.length+' '+tr('рейсов ·')+' '+esc(conflict.local.profileName)+'. '+tr('В облаке:')+' '+conflict.remote.flights.length+' '+tr('рейсов')+(conflict.remote.profileName?' · '+esc(conflict.remote.profileName):'')+'.</p>'+
  '<div class="controls facts"><button id="cloudDownload"'+disabled+`>${tr("Использовать облачную копию")}</button><button id="cloudUpload"`+disabled+`>${tr("Использовать локальную копию")}</button><button data-action="backup">${tr("Резервная копия")}</button></div>`:
  `<p>${tr("Облачной копии пока нет.")}</p><button id="cloudUpload" class="facts"`+disabled+`>${tr("Загрузить в облако")}</button>`)+'</div>':'')+
- `<p class="muted facts">${tr("Синхронизируются имя профиля, рейсы и аэропорты.")}</p>`+
+ `<p class="muted facts">${tr("Синхронизируются имя, фотография профиля, рейсы и аэропорты.")}</p>`+
  '<p id="cloudStatus" class="muted" role="status">'+esc(cloudBusy?tr("Подождите…"):cloudMessage(cloudStatus))+'</p></section>';
 }
 

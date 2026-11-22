@@ -52,17 +52,19 @@ __EXTRA_CSS__
 'use strict';
 __LOCALIZATION__
 applyLanguage();
-// Public Aeroflot fleet registrations. Existing logbooks use these identifiers as keys.
+// Public aircraft registrations and commemorative names painted on the airframes.
+// These are aircraft labels. Pilot profile and account data are stored separately.
 // https://www.flightradar24.com/data/aircraft/RA-73709
 // https://www.flightradar24.com/data/aircraft/RA-73155
 // https://www.flightradar24.com/data/aircraft/RA-73132
 const personalFleet = [
- {tail:'RA-73709', short:'A321', type:'Airbus A321-211', name:'Узкофюзеляжный', seats:[167,0,16], stands:'narrow'},
- {tail:'RA-73155', short:'A350', type:'Airbus A350-900', name:'Широкофюзеляжный', seats:[264,24,28], stands:'wide'},
- {tail:'RA-73132', short:'B777', type:'Boeing 777-300ER', name:'Широкофюзеляжный', seats:[324,48,30], stands:'wide'}
+ {tail:'RA-73709', short:'A321', type:'Airbus A321-211', name:'Узкофюзеляжный', airframeName:{ru:'А. Шнитке',en:'A. Schnittke'}, seats:[167,0,16], stands:'narrow'},
+ {tail:'RA-73155', short:'A350', type:'Airbus A350-900', name:'Широкофюзеляжный', airframeName:{ru:'А. Дементьев',en:'A. Dementyev'}, seats:[264,24,28], stands:'wide'},
+ {tail:'RA-73132', short:'B777', type:'Boeing 777-300ER', name:'Широкофюзеляжный', airframeName:{ru:'М. Лермонтов',en:'M. Lermontov'}, seats:[324,48,30], stands:'wide'}
 ];
 let fleet=personalFleet;
 const aircraftModel = a => a.type;
+const aircraftDisplayName = a => a.airframeName?.[appLanguage()] || '';
 const aircraftFor = tail => fleet.find(a=>a.tail===tail);
 const appCredit = '<small class="version">v__VERSION__</small>';
 const statuses = ['Запланирован','Подготовка','Идет посадка','Посадка завершена','Вылетел','Выполнен','Уход на запасной','Отменен','Задержан'];
@@ -280,11 +282,11 @@ function center() {
  if(!explicitAircraft){
   const current=workingFlight(summaryFlights());
   if(current){tail=current.tail;selected=current.id;}
-  else return '<div class="panel empty"><h2>'+tr('Нет актуального рейса')+'</h2><p class="muted">'+tr('Выбери борт в боковом меню или добавь рейс.')+'</p><p><button class="primary" data-action="new">'+tr('Добавить рейс')+'</button></p></div>';
+  else return '<div class="panel empty"><h2>'+tr('Нет актуального рейса')+'</h2><p class="muted">'+tr('Выбери борт в боковом меню или добавь рейс.')+'</p></div>';
  }
  const f = flight();
  const list = newest(data.flights.filter(f=>f.tail===tail));
- if (!f) return '<div class="panel empty"><h2>'+esc(aircraft().type)+`</h2><p class="muted">${tr("Для этого борта пока нет рейсов.")}</p><p><button class="primary" data-action="new">${tr("Добавить рейс")}</button></p></div>`;
+ if (!f) return '<div class="panel empty"><h2>'+esc(aircraft().type)+`</h2><p class="muted">${tr("Для этого борта пока нет рейсов.")}</p></div>`;
  const times = f.stages || {};
  const stageRows = stages.map(([key,label,offset]) => {
   const planned = clockOn(f.date,f.std)-preparationOffset(f,key,offset)*minute, actual = Date.parse(times[key]);
@@ -464,13 +466,15 @@ function render() {
  '<section class="sidebar-fleet" aria-label="'+tr('Флот')+'"><h2>'+tr('Флот')+'</h2>'+fleet.map(a=>{
   const selected=page==='center'&&explicitAircraft&&tail===a.tail;
   const active=operating?.tail===a.tail;
-  return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'"><strong>'+aircraftModel(a)+'</strong><small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></button>';
+  const name=aircraftDisplayName(a);
+  return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'"><strong>'+aircraftModel(a)+'</strong>'+
+   (name?'<small class="tail-airframe" title="'+tr('Название самолёта')+'">'+esc(name)+'</small>':'')+
+   '<small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></button>';
  }).join('')+'</section><footer class="sidebar-footer">'+
  (demoWorkspace?'<button data-action="exit-demo">'+tr('Выйти из демо')+'</button>':'<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+
  appCredit+'</footer>';
  byId('main').dataset.page = page;
- byId('main').innerHTML=(page==='home'?'':'<header class="top"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1><div class="controls">'+
- (page==='center'||page==='journal'?`<button class="primary" data-action="new">${tr("Добавить рейс")}</button>`:'')+'</div></header>')+
+ byId('main').innerHTML=(page==='home'?'':'<header class="top"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1></header>')+
  ({home,center,fleet:fleetPage,aircraft:aircraftPage,airports:airportsPage,journal,pilot}[page])();
  if(pageChanged){
   byId('main').classList.remove('page-enter');
