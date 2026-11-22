@@ -946,8 +946,6 @@ button,input,select,textarea,.board-filters>*,.flight-select select,.settings-se
  min-width:0;
  margin:0;
 }
-.sidebar-pages button { display:grid; grid-template-columns:17px minmax(0,1fr); align-items:center; gap:8px; }
-.sidebar-pages button span { text-align:center; color:var(--blue); }
 .sidebar .tail {
  line-height:1.3;
  min-height:46px;
@@ -1156,12 +1154,67 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 .shell[data-tone] .sidebar {
  background:linear-gradient(155deg,#222f555c,#0d1730ac 56%,#0a1226ca);
 }
-.shell[data-tone] .sidebar-pages button.active {
- background:linear-gradient(116deg,rgba(var(--section-rgb),.32),rgba(var(--section-glow),.16));
- border-color:rgba(var(--section-rgb),.43);
- box-shadow:inset 0 1px 0 #f1f5ff30,0 3px 14px rgba(var(--section-rgb),.13);
+.sidebar-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:5px; }
+.sidebar .sidebar-toolbar .sidebar-new { display:flex; align-items:center; gap:5px; padding-inline:7px; white-space:nowrap; }
+.sidebar .sidebar-toggle { display:grid; place-items:center; width:31px; padding:0; }
+.sidebar-toggle span { display:block; font-size:21px; line-height:1; }
+.sidebar-pages { gap:5px; }
+.sidebar .sidebar-pages button[data-page] {
+ position:relative; isolation:isolate; display:grid; grid-template-columns:28px minmax(0,1fr); align-items:center;
+ min-height:43px; gap:9px; padding:6px 10px; border:1px solid transparent; background:none; box-shadow:none;
+ color:#eff4ff; font-size:13px; line-height:1.2; white-space:nowrap;
 }
-.shell[data-tone] .sidebar-pages button.active span { color:#ebf9ff; text-shadow:0 0 13px rgb(var(--section-rgb)); }
+.sidebar .sidebar-pages button[data-page]::before {
+ content:""; position:absolute; inset:0; z-index:-1; border-radius:inherit; opacity:0; transform:scale(.97,.88);
+ background:linear-gradient(106deg,rgba(var(--section-rgb),.22),rgba(var(--section-glow),.07) 78%);
+ border:1px solid rgba(var(--section-rgb),.26);
+ box-shadow:inset 0 1px 0 #c7e4ff2b;
+}
+.sidebar .sidebar-pages button[data-page]:is(:hover,:focus-visible)::before { opacity:.72; transform:none; }
+.sidebar .sidebar-pages button[aria-current="page"]::before {
+ opacity:1; transform:none;
+ background:
+  radial-gradient(ellipse at 6% 50%,rgba(var(--section-rgb),.35),transparent 64%),
+  linear-gradient(106deg,rgba(var(--section-rgb),.20),rgba(var(--section-glow),.11) 84%);
+ box-shadow:inset 0 1px 0 #c7e4ff48,0 3px 16px rgba(var(--section-glow),.14);
+}
+.sidebar .sidebar-pages button[data-page]:focus-visible { outline:2px solid #a4ddff; outline-offset:1px; }
+.nav-glyph {
+ display:grid; place-items:center; width:25px; height:25px; border-radius:8px; color:#edf5ff;
+ background:linear-gradient(152deg,#c8d7f15c,#899cb534 50%,#34496670 90%);
+ box-shadow:inset 0 1px 1px #e7f4ff51,inset 0 -1px 2px #030d23a1,0 2px 5px #02071366;
+}
+.nav-glyph svg { width:17px; height:17px; }
+.sidebar-pages button:is([aria-current="page"],:hover,:focus-visible) .nav-glyph {
+ color:#f4faff;
+ background:linear-gradient(152deg,rgba(var(--section-rgb),.88),rgba(var(--section-glow),.41) 70%,#203b74);
+ box-shadow:inset 0 1px 1px #e7f4ff75,inset 0 -1px 2px #030d2390,0 0 12px rgba(var(--section-rgb),.47);
+}
+.nav-label { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-hint {
+ position:fixed; z-index:5; pointer-events:none; opacity:0; transform:translate(-5px,-50%);
+ padding:6px 9px; border:1px solid #a8cfff59; border-radius:8px; background:#15213be8;
+ color:#f2f8ff; box-shadow:0 4px 12px #02081377; font-size:12px;
+}
+.sidebar-hint.visible { opacity:1; transform:translate(0,-50%); }
+.sidebar .tail-compact { display:none; }
+.sidebar-demo > span:first-child { display:none; }
+@media(min-width:721px) {
+ .shell.sidebar-compact { grid-template-columns:85px minmax(0,1fr); }
+ .sidebar-compact .sidebar { padding-inline:8px; }
+ .sidebar-compact .sidebar-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+ .sidebar-compact .sidebar-toolbar :is(.sidebar-new,.sidebar-toggle) { justify-content:center; width:100%; padding-inline:0; }
+ .sidebar-compact .sidebar-toggle span { transform:rotate(180deg); }
+ .sidebar-compact .nav-label { opacity:0; transform:translateX(-7px); }
+ .sidebar-compact :is(.sidebar-new-label,.tail-detail,.sidebar-fleet h2,.sidebar-footer .version,.sidebar-demo-label) { display:none; }
+ .sidebar-compact .sidebar .tail { min-height:32px; text-align:center; padding-inline:2px; }
+ .sidebar-compact .sidebar .tail-compact { display:block; font-size:10px; }
+ .sidebar-compact .sidebar-footer .sidebar-sync { position:relative; justify-content:center; }
+ .sidebar-compact .sidebar-sync [role="status"] { position:absolute; clip-path:inset(50%); width:1px; height:1px; overflow:hidden; }
+ .sidebar-compact .sidebar-demo { text-align:center; padding-inline:2px; }
+ .sidebar-compact .sidebar-demo > span:first-child { display:inline; }
+}
+@media(max-width:720px) { .sidebar .sidebar-toggle { display:none; } }
 .shell[data-tone] :is(.flight-hero,.dashboard-latest,.fleet-slide,.pilot-identity) {
  background:radial-gradient(ellipse at 84% 0,rgba(var(--section-rgb),.23),transparent 68%),var(--glass-fill);
  border-color:rgba(var(--section-rgb),.36);
@@ -1199,6 +1252,13 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 .stage-next-row { background:linear-gradient(90deg,#4fbcff26,transparent 88%); }
 .stage-next-row td:first-child { box-shadow:inset 2px 0 #78ccff; padding-left:10px; }
 @media(prefers-reduced-motion:no-preference) {
+ .shell { transition:grid-template-columns .37s cubic-bezier(.2,.76,.24,1); }
+ .sidebar-toggle span { transition:transform .32s cubic-bezier(.2,.76,.24,1); }
+ .sidebar .sidebar-pages button[data-page]::before { transition:opacity .22s ease,transform .30s cubic-bezier(.18,.78,.26,1); }
+ .nav-glyph { transition:background .22s ease,box-shadow .22s ease,transform .22s ease; }
+ .sidebar-pages button[aria-current="page"] .nav-glyph { transform:translateY(-1px); }
+ .nav-label { transition:opacity .18s ease,transform .29s cubic-bezier(.2,.76,.24,1); }
+ .sidebar-hint { transition:opacity .14s ease,transform .18s ease; }
  .flight-ambience > div { transition:opacity .58s cubic-bezier(.22,.78,.23,1); }
  .page-enter { animation:section-arrive .42s cubic-bezier(.17,.68,.24,1) both; }
  .page-enter .section-emblem { animation:emblem-arrive .56s cubic-bezier(.16,.85,.26,1) both; }

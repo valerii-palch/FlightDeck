@@ -38,6 +38,7 @@ __EXTRA_CSS__
  <div class="flight-ambience" aria-hidden="true"></div>
  <div id="windowControls" class="window-controls"></div>
  <aside class="sidebar" id="nav"></aside>
+ <div class="sidebar-hint" id="sidebarHint" aria-hidden="true"></div>
  <div class="workspace">
   <main id="main"></main>
   
@@ -443,11 +444,72 @@ window.addEventListener('languagechange',()=>{
  render();
 });
 let mapCleanup, renderedPage;
-const navIcons={home:'⌂',center:'⌖',fleet:'✈',airports:'⚑',journal:'≡',pilot:'◉'};
+const navIcons={
+ home:'<path d="M3 15h18M5 19h14M7 12a5 5 0 0 1 10 0M12 3v2M4.5 7l1.5 1.5m13.5-1.5L18 8.5"/>',
+ center:'<path d="M4 17a8 8 0 1 1 16 0M4 17h16M12 13l4-5M7 12l1 1m9 0 1-1M12 7v1"/><circle cx="12" cy="13" r="1"/>',
+ fleet:'<path d="M3 12l8 2 2 7 2-1v-7l5-4c2-2 1-4-1-3l-6 4-7-2-2 1 4 4-5-1Z"/>',
+ airports:'<path d="M12 21s6-5 6-11a6 6 0 1 0-12 0c0 6 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/>',
+ journal:'<path d="M7 4h12v16H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm0 0v16m3-12h6m-6 4h6m-6 4h4"/>',
+ pilot:'<circle cx="12" cy="8" r="3"/><path d="M5 19v-1a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v1M4 22h16"/>'
+};
+const navIcon=section=>'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">'+navIcons[section]+'</svg>';
+function showSidebarHint(button){
+ const hint=byId('sidebarHint');
+ if(!button||innerWidth<=720||!document.querySelector('.shell').classList.contains('sidebar-compact')){
+  hint.classList.remove('visible');
+  return;
+ }
+ const rect=button.getBoundingClientRect();
+ hint.textContent=button.getAttribute('aria-label');
+ hint.style.left=rect.right+16+'px';
+ hint.style.top=rect.top+rect.height/2+'px';
+ hint.classList.add('visible');
+}
 function sectionEmblem(section){
- const symbol=section==='home'||section==='fleet'||section==='aircraft'?planeIcon:navIcons[section];
+ const symbol=section==='home'||section==='fleet'||section==='aircraft'?planeIcon:navIcon(section);
  return '<div class="section-emblem" aria-hidden="true"><span>'+symbol+'</span></div>';
 }
+function renderSidebar(shell){
+ const sidebar=byId('nav');
+ const compact=shell.classList.contains('sidebar-compact');
+ if(sidebar.dataset.language!==appLanguage()){
+  sidebar.dataset.language=appLanguage();
+  sidebar.innerHTML=`<div class="sidebar-toolbar"><button class="primary sidebar-new" data-action="new" aria-label="${tr('Добавить рейс')}" title="${tr('Добавить рейс')}"><span aria-hidden="true">＋</span><span class="sidebar-new-label">${tr('Добавить рейс')}</span></button>
+   <button type="button" class="sidebar-toggle icon-button" data-action="toggle-sidebar" aria-controls="sidebarPages"><span aria-hidden="true">‹</span></button></div>
+   <nav id="sidebarPages" class="sidebar-pages" aria-label="${tr('Навигация')}">`+pages.map(([id,label])=>
+   '<button type="button" data-page="'+id+'" data-tone="'+id+'" aria-label="'+tr(label)+'"><span class="nav-glyph">'+navIcon(id)+'</span><span class="nav-label">'+tr(label)+'</span></button>'
+  ).join('')+'</nav><section class="sidebar-fleet" aria-label="'+tr('Флот')+'"></section><footer class="sidebar-footer"></footer>';
+  for(const button of byId('sidebarPages').children){
+   button.onpointerenter=button.onfocus=()=>showSidebarHint(button);
+   button.onpointerleave=button.onblur=()=>showSidebarHint(null);
+  }
+ }
+ for(const button of byId('sidebarPages').children){
+  const selected=button.dataset.page===(page==='aircraft'?'fleet':page);
+  if(selected)button.setAttribute('aria-current','page');
+  else button.removeAttribute('aria-current');
+ }
+ const toggle=sidebar.querySelector('.sidebar-toggle');
+ const toggleLabel=tr(compact?'Развернуть боковое меню':'Свернуть боковое меню');
+ toggle.title=toggleLabel;
+ toggle.setAttribute('aria-label',toggleLabel);
+ toggle.setAttribute('aria-expanded',String(!compact));
+ const operating=activeFlight(summaryFlights());
+ sidebar.querySelector('.sidebar-fleet').innerHTML='<h2>'+tr('Флот')+'</h2>'+fleet.map(a=>{
+  const selected=page==='center'&&explicitAircraft&&tail===a.tail;
+  const active=operating?.tail===a.tail;
+  const name=aircraftDisplayName(a);
+  const label=esc([aircraftModel(a),name,a.tail,active?tr('В работе'):''].filter(Boolean).join(' · '));
+  return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'" title="'+label+'" aria-label="'+label+'"><span class="tail-detail"><strong>'+aircraftModel(a)+'</strong>'+
+   (name?'<small class="tail-airframe" title="'+tr('Название самолёта')+'">'+esc(name)+'</small>':'')+
+   '<small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></span><span class="tail-compact" aria-hidden="true">'+a.short+'</span></button>';
+ }).join('');
+ sidebar.querySelector('.sidebar-footer').innerHTML=
+ (demoWorkspace?'<button class="sidebar-demo" data-action="exit-demo" aria-label="'+tr('Выйти из демо')+'" title="'+tr('Выйти из демо')+'"><span aria-hidden="true">↩</span><span class="sidebar-demo-label">'+tr('Выйти из демо')+'</span></button>':
+ '<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+appCredit;
+}
+byId('nav').addEventListener('scroll',()=>showSidebarHint(null));
+window.addEventListener('resize',()=>showSidebarHint(null));
 function render() {
  mapCleanup?.();
  const gated=!demoWorkspace&&!cloudSession;
@@ -476,22 +538,7 @@ function render() {
  '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
- const operating=activeFlight(summaryFlights());
- byId('nav').innerHTML=`<button class="primary sidebar-new" data-action="new">＋ ${tr("Добавить рейс")}</button>`+
- '<nav class="sidebar-pages" aria-label="'+tr('Навигация')+'">'+pages.map(([id,label])=>{
-  const current=page===id||page==='aircraft'&&id==='fleet';
-  return '<button data-page="'+id+'"'+(current?' class="active" aria-current="page"':'')+'><span aria-hidden="true">'+navIcons[id]+'</span>'+tr(label)+'</button>';
- }).join('')+'</nav>'+
- '<section class="sidebar-fleet" aria-label="'+tr('Флот')+'"><h2>'+tr('Флот')+'</h2>'+fleet.map(a=>{
-  const selected=page==='center'&&explicitAircraft&&tail===a.tail;
-  const active=operating?.tail===a.tail;
-  const name=aircraftDisplayName(a);
-  return '<button class="tail'+(selected?' tail-selected':'')+'" aria-pressed="'+selected+'" data-tail="'+a.tail+'"><strong>'+aircraftModel(a)+'</strong>'+
-   (name?'<small class="tail-airframe" title="'+tr('Название самолёта')+'">'+esc(name)+'</small>':'')+
-   '<small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></button>';
- }).join('')+'</section><footer class="sidebar-footer">'+
- (demoWorkspace?'<button data-action="exit-demo">'+tr('Выйти из демо')+'</button>':'<button class="sidebar-sync" data-page="pilot" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></button>')+
- appCredit+'</footer>';
+ renderSidebar(shell);
  byId('main').dataset.page = page;
  byId('main').innerHTML=(page==='home'?'':'<header class="top section-heading"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1>'+sectionEmblem(page)+'</header>')+
  ({home,center,fleet:fleetPage,aircraft:aircraftPage,airports:airportsPage,journal,pilot}[page])();
@@ -746,6 +793,12 @@ document.addEventListener('click',e=>{
  if(d.nextFlight)advanceFlight(d.nextFlight);
  if(d.nextStage)advanceStage(d.nextStage);
  if(d.stage) editStage(d.stage);
+ if(d.action==='toggle-sidebar'){
+  const shell=document.querySelector('.shell');
+  shell.classList.toggle('sidebar-compact');
+  showSidebarHint(null);
+  renderSidebar(shell);
+ }
  if(d.action==='window-close') window.webkit?.messageHandlers?.closeWindow?.postMessage('');
  if(d.action==='fullscreen'){
   const handler=window.webkit?.messageHandlers?.toggleFullscreen;

@@ -323,6 +323,8 @@ const english = {
  "Последние 30 дней": "Last 30 days",
  "Название самолёта": "Aircraft name",
  "Следующий этап": "Next preparation stage",
+ "Свернуть боковое меню": "Collapse sidebar",
+ "Развернуть боковое меню": "Expand sidebar",
  "Синхронизируются имя, фотография профиля, рейсы и аэропорты.": "Your profile name, profile photo, flights, and airports are synced.",
  "Последний рейс": "Latest flight",
  "Предыдущая страница": "Previous page",
