@@ -37,19 +37,10 @@ function setFlightStatus(f,status,now=Date.now()) {
  f.status=status;
  return true;
 }
-function changeFlightStatus(f,status,markPreparation=false){
- const now=Date.now();
- if(!setFlightStatus(f,status,now)){
+function changeFlightStatus(f,status){
+ if(!setFlightStatus(f,status)){
   notice(tr("Прилет должен быть после вылета."));
   return;
- }
- if(markPreparation){
-  const keys={'Подготовка':['fuel','bags'],'Идет посадка':['board'],'Посадка завершена':['close']}[status]||[];
-  if(keys.length){
-   f.stages??={};
-   const stamp=new Date(now).toISOString();
-   for(const key of keys)if(!f.stages[key])f.stages[key]=stamp;
-  }
  }
  save();
  render();
@@ -120,7 +111,33 @@ function advanceFlight(id) {
  const f=workingFlight(summaryFlights());
  const next=f&&nextStatus[f.status];
  if(!next||id!==f.id)return;
- changeFlightStatus(f,next,true);
+ changeFlightStatus(f,next);
+}
+const preparationStatuses=['Подготовка','Идет посадка','Посадка завершена'];
+const stageStatus={fuel:0,bags:0,board:1,close:2};
+const canAdvanceStage=f=>!f.atd&&!f.ata&&
+ (preparationStatuses.includes(f.status)||['Запланирован','Задержан'].includes(f.status));
+const pendingStage=f=>canAdvanceStage(f)&&stages.find(([key])=>!Number.isFinite(Date.parse(f.stages?.[key])));
+function recordFlightStage(f,key,stamp){
+ f.stages??={};
+ if(!stamp){delete f.stages[key];return;}
+ f.stages[key]=stamp;
+ const rank=stageStatus[key];
+ if(canAdvanceStage(f)&&rank>preparationStatuses.indexOf(f.status))setFlightStatus(f,preparationStatuses[rank]);
+}
+function nextStageButton(next){
+ if(!next)return '';
+ return '<button type="button" class="preparation-next" data-next-stage="'+next[0]+'"><span>'+
+  tr('Следующий этап')+'</span><small>'+tr(next[1])+'</small></button>';
+}
+function advanceStage(key){
+ const f=flight();
+ if(!f||pendingStage(f)?.[0]!==key)return;
+ recordFlightStage(f,key,new Date().toISOString());
+ save();
+ render();
+ const target=document.querySelector('.preparation-next')||byId('preparationTitle');
+ target?.focus({preventScroll:true});
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
@@ -130,7 +147,7 @@ function home() {
  const recent=newest(rows).slice(0,6), working=workingFlight(rows), latest=working||recent[0];
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const city=code=>esc(airportCity(code));
- return `<header class="dashboard-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
+ return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div>'+sectionEmblem('home')+'</header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div>'+planeIcon+'<div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest):`<p class="muted">${tr("Журнал пуст")}</p>`)+

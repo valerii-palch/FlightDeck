@@ -295,11 +295,15 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           check(document.querySelector('[data-next-flight]'), 'quick status button');
           const current = workingFlight(summaryFlights());
           const previousStatus = current.status;
+          const preparationBefore = JSON.stringify(current.stages);
           document.querySelector('[data-next-flight]').click();
           check(current.status === nextStatus[previousStatus], 'advance active flight once');
-          if (current.status === 'Посадка завершена') {
-            check(Number.isFinite(Date.parse(current.stages.close)), 'quick status records boarding completion');
-          }
+          check(JSON.stringify(current.stages) === preparationBefore, 'changing status leaves existing preparation times');
+          document.querySelector('[data-page=center]').click();
+          const stage = document.querySelector('[data-next-stage]');
+          check(stage?.dataset.nextStage === 'close', 'preparation button suggests unrecorded stage');
+          stage.click();
+          check(Number.isFinite(Date.parse(current.stages.close)), 'preparation button records stage time');
           check(displayDate('2026-11-20') === '20.11.2026' && parseDisplayDate('29.02.2024') === '2024-02-29' &&
                 parseDisplayDate('29.02.2026') === '', 'fixed date format and leap year');
           data.flights.length=0;
