@@ -1,0 +1,29 @@
+name: Remove superseded FlightDeck patch releases
+on:
+  push:
+    branches: [maintenance/remove-flightdeck-v0.2-patch-releases]
+permissions:
+  contents: write
+jobs:
+  remove-published-patches:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify v0.3.0 is the current published release
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = "valerii-palch/FlightDeck"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = "v0.3.0"
+      - name: Delete the six confirmed releases and verify what remains
+        run: |
+          set -eu
+          for tag in v0.2.1 v0.2.2 v0.2.3 v0.2.4 v0.2.5 v0.2.6; do
+            gh release delete "$tag" --yes
+          done
+          tags="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq '.[].tag_name')"
+          for tag in v0.1.0 v0.2.0 v0.3.0; do
+            printf '%s\n' "$tags" | grep -Fx "$tag"
+          done
+          if printf '%s\n' "$tags" | grep -Ex 'v0\.2\.[1-6]'; then exit 1; fi
