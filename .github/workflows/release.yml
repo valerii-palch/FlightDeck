@@ -1,7 +1,7 @@
 name: Release FlightDeck
 on:
   push:
-    branches: ['release/v*', 'release/patch/v*']
+    branches: ['release/v*', 'release/patch/v*', 'release/windows/v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -21,6 +21,7 @@ env:
   ALLOW_PATCH: ${{ inputs.publish_patch || startsWith(github.ref, 'refs/heads/release/patch/') }}
 jobs:
   mac:
+    if: ${{ !startsWith(github.ref, 'refs/heads/release/windows/') }}
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +93,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate Windows release version
+        working-directory: FlightDeck-Windows
+        run: |
+          $tag = $env:RELEASE_REF -replace '^release/(patch/|windows/)?',''
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tag -cne "v$version") { throw "Tag must match the Windows app version" }
       - name: Build Windows installers and update metadata
         working-directory: FlightDeck-Windows
         env:
@@ -123,6 +130,7 @@ jobs:
             FlightDeck-Windows/dist/latest*.yml
   publish:
     needs: [mac, windows]
+    if: ${{ !cancelled() && needs.windows.result == 'success' && (needs.mac.result == 'success' || (startsWith(github.ref, 'refs/heads/release/windows/') && needs.mac.result == 'skipped')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,12 +138,30 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+      - name: Carry forward the signed macOS update
+        if: ${{ startsWith(github.ref, 'refs/heads/release/windows/') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous="$(gh release view --json tagName --jq .tagName)"
+          gh release download "$previous" --dir release-assets --pattern macos-update.json --pattern 'FlightDeck-macOS-*.pkg'
+          python3 - <<'PY'
+          import base64, hashlib, json
+          from pathlib import Path
+          assets = Path('release-assets')
+          manifest = json.loads((assets / 'macos-update.json').read_bytes())
+          payload = json.loads(base64.b64decode(manifest['payload']))
+          package = assets / f'FlightDeck-macOS-{payload["version"]}.pkg'
+          with package.open('rb') as file:
+              assert hashlib.file_digest(file, 'sha256').hexdigest() == payload['sha256'], 'macOS package checksum mismatch'
+          PY
       - name: Publish complete release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           RELEASE_TAG="${RELEASE_REF#release/}"
           RELEASE_TAG="${RELEASE_TAG#patch/}"
+          RELEASE_TAG="${RELEASE_TAG#windows/}"
           notes="$RUNNER_TEMP/flightdeck-release-notes.md"
           awk -v heading="## $RELEASE_TAG" '$0 == heading { found=1; next } found && /^## / { exit } found' CHANGELOG.md > "$notes"
           if ! grep -q '[^[:space:]]' "$notes"; then

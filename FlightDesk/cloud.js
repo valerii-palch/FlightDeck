@@ -14,7 +14,7 @@ async function saveSession(operation,value){
 function cloudIndicator(){
  if(navigator.onLine===false) return ['offline',tr("Не в сети")];
  if(!cloudSession) return ['signed-out',tr("Войти для синхронизации")];
- if(cloudConflict) return ['choice',tr("Выбрать копию")];
+ if(cloudConflict) return ['choice',tr(isWindowsDesktop?'Копии журнала различаются':'Выбрать копию')];
  if(cloudBusy) return ['busy',tr("Синхронизация…")];
  if(cloudState==='error') return ['error',tr("Ошибка синхронизации")];
  if(cloudState==='ready') return ['ready',tr("Синхронизировано")];
@@ -28,6 +28,8 @@ function updateCloudIndicator(){
  indicator.dataset.state=state;
  const status=indicator.lastElementChild;
  if(status.textContent!==label) status.textContent=label;
+ const action=byId('sidebarSyncAction');
+ if(action)action.hidden=state!=='choice';
 }
 
 function cloudEditing(){
@@ -49,8 +51,10 @@ async function autoSyncCloud(){
  if(cloudBusy){queueCloudSync(1000);return;}
  cloudBusy=true;
  updateCloudIndicator();
- const profileButtons=['cloudSync','cloudLogout'].map(byId).filter(Boolean);
- profileButtons.forEach(button=>button.disabled=true);
+ const profileButtonIds=['cloudSync','cloudLogout'];
+ if(isWindowsDesktop)profileButtonIds.push('cloudUpload','cloudDownload');
+ for(const id of profileButtonIds) byId(id)?.setAttribute('disabled','');
+ const previousConflict=cloudConflict;
  let repaint=false;
  try {
   const result=await synchronizeCloud('',undefined,true);
@@ -59,18 +63,19 @@ async function autoSyncCloud(){
    cloudConflict=null;
    cloudStatus=result.message;
    cloudState=cloudSame(cloudSnapshot(),cloudBase)?'ready':'pending';
-   repaint=result.applied;
+   repaint=result.applied||(isWindowsDesktop&&previousConflict&&page==='pilot'&&!cloudEditing());
    if(cloudState==='pending') queueCloudSync();
   } else {
    cloudConflict=result;
-   repaint=result.applied||page==='pilot';
+   repaint=result.applied||page==='pilot'&&(!isWindowsDesktop||!cloudEditing()&&
+    (!previousConflict||previousConflict.version!==result.version||!cloudSame(previousConflict.local,result.local)));
   }
  } catch(error){
   cloudStatus=error.message;
   cloudState='error';
  } finally {
   cloudBusy=false;
-  if(page==='pilot') for(const id of ['cloudSync','cloudLogout']) byId(id)?.removeAttribute('disabled');
+  if(page==='pilot') for(const id of profileButtonIds) byId(id)?.removeAttribute('disabled');
   if(repaint||!cloudSession) render();
   else {
    updateCloudIndicator();
@@ -272,17 +277,28 @@ async function resetCloudProfile() {
  } finally {cloudBusy=false;}
 }
 
+function windowsCloudConflict({local,remote},disabled){
+ const compare=(title,copy)=>`<div class="strip row"><strong>${tr(title)}</strong><span>${tr('Рейсы')}: ${copy.flights.length} · ${tr('Аэропорты')}: ${copy.airports.length}</span></div>`;
+ return `<div class="cloud-conflict stack facts">
+ <h3>${tr('Копии журнала различаются')}</h3>
+ ${remote?`<p>${tr('Выбери, какую копию сохранить. Она заменит данные во второй копии. Файл JSON для синхронизации не нужен.')}</p>
+ ${compare('На этом компьютере',local)}${compare('В облаке',remote)}
+ <div class="controls"><button id="cloudDownload"${disabled}>${tr('Заменить данные на компьютере')}</button><button id="cloudUpload"${disabled}>${tr('Заменить данные в облаке')}</button></div>`:
+ `<p>${tr('В облаке нет копии журнала. Можно загрузить данные с этого компьютера.')}</p><button id="cloudUpload"${disabled}>${tr('Загрузить в облако')}</button>`}
+ <div class="controls"><button type="button" data-action="export-backup">${tr('Сохранить локальную копию в JSON')}</button></div></div>`;
+}
+
 function cloudProfilePanel(){
  if(demoWorkspace) return '<section class="panel facts"><p>'+tr('Это демо. Изменения исчезнут при выходе.')+'</p></section>';
  const disabled=cloudBusy?' disabled':'';
  const conflict=cloudConflict;
- return `<section class="panel facts cloud-profile" aria-labelledby="cloudHeading"><h2 id="cloudHeading">${tr("Аккаунт и синхронизация")}</h2>`+
+ return `<section class="panel facts cloud-profile" aria-labelledby="cloudHeading"><h2 id="cloudHeading"${isWindowsDesktop?' tabindex="-1"':''}>${tr("Аккаунт и синхронизация")}</h2>`+
  `<p>${tr("Вход выполнен как")} <strong>`+esc(cloudSession.user.email)+'</strong></p>'+
  '<div class="controls facts"><button id="cloudSync" class="primary"'+disabled+`>${tr("Синхронизировать")}</button><button id="cloudLogout"`+disabled+`>${tr("Выйти")}</button></div>`+
- (conflict?'<div class="cloud-conflict facts">'+(conflict.remote?
+ (conflict?(isWindowsDesktop?windowsCloudConflict(conflict,disabled):'<div class="cloud-conflict facts">'+(conflict.remote?
  `<p>${tr("Копии различаются. Локально:")} `+conflict.local.flights.length+' '+tr('рейсов ·')+' '+esc(conflict.local.profileName)+'. '+tr('В облаке:')+' '+conflict.remote.flights.length+' '+tr('рейсов')+(conflict.remote.profileName?' · '+esc(conflict.remote.profileName):'')+'.</p>'+
  '<div class="controls facts"><button id="cloudDownload"'+disabled+`>${tr("Использовать облачную копию")}</button><button id="cloudUpload"`+disabled+`>${tr("Использовать локальную копию")}</button><button data-action="backup">${tr("Резервная копия")}</button></div>`:
- `<p>${tr("Облачной копии пока нет.")}</p><button id="cloudUpload" class="facts"`+disabled+`>${tr("Загрузить в облако")}</button>`)+'</div>':'')+
+ `<p>${tr("Облачной копии пока нет.")}</p><button id="cloudUpload" class="facts"`+disabled+`>${tr("Загрузить в облако")}</button>`)+'</div>'):'')+
  `<p class="muted facts">${tr("Синхронизируются имя, фотография профиля, рейсы и аэропорты.")}</p>`+
  '<p id="cloudStatus" class="muted" role="status">'+esc(cloudBusy?tr("Подождите…"):cloudMessage(cloudStatus))+'</p></section>';
 }
@@ -322,9 +338,9 @@ function bindCloudProfile(){
  }
  if(!cloudSession) return;
  const sync=async(choice,expected)=>{
-  cloudConflict=null;
+  if(!isWindowsDesktop)cloudConflict=null;
   const result=await synchronizeCloud(choice,expected);
-  if(result.message){cloudState='ready';return result.message;}
+  if(result.message){cloudConflict=null;cloudState='ready';return result.message;}
   cloudConflict=result;
  };
  const conflict=cloudConflict;

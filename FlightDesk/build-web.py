@@ -10,9 +10,14 @@ from worldwide_airports import catalog
 root = Path(__file__).resolve().parent
 parser = ArgumentParser(description='Build the standalone FlightDeck web interface.')
 parser.add_argument('--output', type=Path, default=root / 'FlightDesk.html')
+parser.add_argument('--windows', action='store_true')
 args = parser.parse_args()
-with (root / 'Info.plist').open('rb') as plist:
-    version = plistlib.load(plist)['CFBundleShortVersionString']
+if args.windows:
+    package = root.parent / 'FlightDeck-Windows' / 'package.json'
+    version = json.loads(package.read_text(encoding='utf-8'))['version']
+else:
+    with (root / 'Info.plist').open('rb') as plist:
+        version = plistlib.load(plist)['CFBundleShortVersionString']
 image = 'data:image/png;base64,' + b64encode((root / 'fleet.png').read_bytes()).decode()
 style = (root / 'style.css').read_text(encoding='utf-8').replace('__FLEET_IMAGE__', image)
 html = (root / 'index.template.html').read_text(encoding='utf-8')

@@ -1,12 +1,12 @@
 {
   "name": "flightdeck",
   "productName": "FlightDeck",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "FlightDeck flight planner and journal for Windows",
   "private": true,
   "main": "main.cjs",
   "scripts": {
-    "prepare:web": "python ../FlightDesk/build-web.py --output FlightDesk.html",
+    "prepare:web": "python ../FlightDesk/build-web.py --windows --output FlightDesk.html",
     "start": "npm run prepare:web && electron .",
     "build": "npm run prepare:web && electron-builder --win nsis --x64 --arm64"
   },

@@ -56,6 +56,8 @@ __EXTRA_CSS__
 <script id="map-config" type="application/json">__MAP_CONFIG__</script>
 <script>
 'use strict';
+const isWindowsDesktop=Boolean(window.flightDeckWindow);
+if(isWindowsDesktop) document.documentElement.dataset.platform='windows';
 __LOCALIZATION__
 applyLanguage();
 // Public aircraft registrations and commemorative names painted on the airframes.
@@ -500,9 +502,11 @@ function renderSidebar(){
    (name?'<small class="tail-airframe" title="'+tr('Название самолёта')+'">'+esc(name)+'</small>':'')+
    '<small class="tail-registration">'+a.tail+(active?' · '+tr('В работе'):'')+'</small></span></button>';
  }).join('');
+ const [syncState,syncLabel]=cloudIndicator();
  sidebar.querySelector('.sidebar-footer').innerHTML=
  (demoWorkspace?'<button class="sidebar-demo" data-action="exit-demo" aria-label="'+tr('Выйти из демо')+'" title="'+tr('Выйти из демо')+'"><span>'+tr('Выйти из демо')+'</span></button>':
- '<div class="sidebar-sync" id="sidebarSync" data-state="'+cloudIndicator()[0]+'"><span aria-hidden="true"></span><span role="status">'+cloudIndicator()[1]+'</span></div>')+appCredit;
+ '<div class="sidebar-sync" id="sidebarSync" data-state="'+syncState+'"><span aria-hidden="true"></span><span role="status">'+syncLabel+'</span></div>'+
+ (isWindowsDesktop?`<button type="button" id="sidebarSyncAction" data-action="resolve-sync"${syncState==='choice'?'':' hidden'}>${tr('Сравнить копии')}</button>`:''))+appCredit;
 }
 function preparePageMotion(main,workspace){
  pageMotion?.cancel();
@@ -511,6 +515,7 @@ function preparePageMotion(main,workspace){
  const index=section=>pages.findIndex(([key])=>key===(section==='aircraft'?'fleet':section));
  const direction=Math.sign(index(page)-index(renderedPage));
  if(!direction)return;
+ if(isWindowsDesktop)return direction*14;
  const overlay=document.createElement('div');
  overlay.className='departing-page';
  overlay.inert=true;
@@ -572,7 +577,11 @@ function render() {
  if(pageChanged){
   main.classList.remove('page-enter');
   workspace.scrollTop=0;
-  if(pageDistance)pageMotion=main.animate([
+  if(pageDistance&&isWindowsDesktop)pageMotion=main.animate([
+   {transform:`translateY(${pageDistance}px)`,opacity:.75},
+   {transform:'translateY(0)',opacity:1}
+  ],{duration:160,easing:'ease-out'});
+  else if(pageDistance)pageMotion=main.animate([
    {transform:`translateY(${pageDistance}px)`,opacity:.16,filter:'blur(6px)'},
    {transform:'translateY(0)',opacity:1,filter:'blur(0px)'}
   ],{duration:360,easing:'cubic-bezier(.22,.74,.25,1)'});
@@ -785,20 +794,22 @@ function validBackup(value) {
  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(f.date) && /^[0-9]{2}:[0-9]{2}$/.test(f.std) &&
  Number.isFinite(clockOn(f.date,f.std)) && typeof f.sta==='string');
 }
+function exportBackup() {
+ const {cloudCheckpoint,...exported}=data;
+ const content=JSON.stringify(exported,null,2);
+ if(window.webkit?.messageHandlers?.exportBackup) {
+  window.webkit.messageHandlers.exportBackup.postMessage(content); return;
+ }
+ const link=document.createElement('a'), url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+ link.href=url; link.download='flightdesk-backup.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function backup() {
  if(demoWorkspace){notice(tr('Резервные копии доступны в личном журнале.'));return;}
  openDialog(`<h2>${tr("Резервная копия")}</h2><div class="stack"><p>${tr("Сохрани рейсы и настройки аэропортов в JSON. Загрузка копии заменит текущие данные.")}</p>`+
+ (isWindowsDesktop?`<p class="muted">${tr('Для синхронизации с облаком открой «Аккаунт и синхронизация» в профиле.')}</p>`:'')+
  `<div class="controls"><button id="exportBackup">${tr("Сохранить JSON")}</button><button data-action="close">${tr("Закрыть")}</button></div>`+
  `<label>${tr("Загрузить копию")}<input id="backupFile" type="file" accept=".json,application/json"></label><button id="importBackup" disabled>${tr("Заменить данные из копии")}</button></div>`);
- byId('exportBackup').onclick=()=>{
-  const {cloudCheckpoint,...exported}=data;
- const content=JSON.stringify(exported,null,2);
-  if(window.webkit?.messageHandlers?.exportBackup) {
-   window.webkit.messageHandlers.exportBackup.postMessage(content); return;
-  }
-  const link=document.createElement('a'), url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
-  link.href=url; link.download='flightdesk-backup.json'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
- };
+ byId('exportBackup').onclick=exportBackup;
  byId('backupFile').onchange=()=>byId('importBackup').disabled=!byId('backupFile').files.length;
  byId('importBackup').onclick=async()=>{
   try {
@@ -853,6 +864,10 @@ document.addEventListener('click',e=>{
  if(d.action==='clear-journal-date'){journalDate='';render();byId('journalDate')?.focus();}
  if(d.action==='settings') editSettings(b);
  if(d.action==='exit-demo') exitDemoWorkspace();
+ if(d.action==='resolve-sync'){
+  explicitAircraft=false;page='pilot';render();
+  byId('cloudHeading')?.focus();
+ }
  if(d.action==='reset-profile'&&!demoWorkspace) confirmProfileReset();
  if(d.action==='pick-profile-photo')byId('profilePhotoInput')?.click();
  if(d.action==='remove-profile-photo')removeProfilePhoto();
@@ -868,6 +883,7 @@ document.addEventListener('click',e=>{
   else byId('dialog').close();
  }
  if(d.action==='backup') backup();
+ if(d.action==='export-backup'&&!demoWorkspace) exportBackup();
 });
 document.addEventListener('keydown',e=>{
  if (!e.target.closest('.fleet-carousel') || !['ArrowLeft','ArrowRight'].includes(e.key)) return;

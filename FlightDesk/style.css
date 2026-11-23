@@ -1470,7 +1470,9 @@ html:has(.desktop-controls:not([hidden])) .window-controls button { -webkit-app-
  align-items:center; gap:8px; -webkit-app-region:drag;
 }
 .desktop-controls button {
- -webkit-app-region:no-drag; width:14px; height:14px; padding:0; display:grid; place-items:center;
+ -webkit-app-region:no-drag; appearance:none; box-sizing:border-box;
+ flex:0 0 14px; width:14px; height:14px; min-width:0; min-height:0; padding:0; margin:0;
+ display:grid; place-items:center; box-shadow:none;
  color:#25202b; background:var(--window-dot); border:1px solid #14162640; border-radius:50%;
 }
 .desktop-controls [data-window-action="close"] { --window-dot:#ff6059; }
@@ -1480,6 +1482,21 @@ html:has(.desktop-controls:not([hidden])) .window-controls button { -webkit-app-
 .desktop-controls:is(:hover,:focus-within) :is(svg,span) { opacity:1; }
 .desktop-controls button:focus-visible { outline:2px solid #f2f7ff; outline-offset:2px; }
 
+:root[data-platform="windows"] #nav .sidebar-toolbar .sidebar-new {
+ width:100%; border:1px solid transparent; background:transparent; box-shadow:none;
+ line-height:1.2; font-size:14px; font-weight:560; text-align:left;
+}
+:root[data-platform="windows"] #nav .sidebar-toolbar .sidebar-new:is(:hover,:focus-visible) {
+ background:#c3ddff16;
+}
+:root[data-platform="windows"] #nav .sidebar-new .nav-glyph svg { width:21px; height:21px; }
+:root[data-platform="windows"] #nav #sidebarSyncAction:not([hidden]) {
+ width:100%; text-align:left; font-size:12px; color:var(--blue);
+}
+@media(prefers-reduced-motion:no-preference) {
+ :root[data-platform="windows"] .page-enter { animation:windows-page-arrive .16s ease-out both; }
+ @keyframes windows-page-arrive { from { opacity:.75; } to { opacity:1; } }
+}
 
 .local-flight-time { display:block; font-size:12px; font-variant-numeric:tabular-nums; }
 dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 32px)); }
