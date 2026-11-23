@@ -456,15 +456,11 @@ const navIcons={
  pilot:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>'
 };
 const navIcon=section=>'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">'+navIcons[section]+'</svg>';
-function sectionEmblem(section){
- const symbol=section==='home'||section==='fleet'||section==='aircraft'?planeIcon:navIcon(section);
- return '<div class="section-emblem" aria-hidden="true"><span>'+symbol+'</span></div>';
-}
 function renderSidebar(){
  const sidebar=byId('nav');
  if(sidebar.dataset.language!==appLanguage()){
   sidebar.dataset.language=appLanguage();
-  sidebar.innerHTML=`<div class="sidebar-toolbar"><button class="primary sidebar-new" data-action="new" aria-label="${tr('Добавить рейс')}" title="${tr('Добавить рейс')}"><span aria-hidden="true">＋</span><span>${tr('Добавить рейс')}</span></button></div>
+  sidebar.innerHTML=`<div class="sidebar-toolbar"><button class="sidebar-new" data-action="new" aria-label="${tr('Добавить рейс')}" title="${tr('Добавить рейс')}"><span aria-hidden="true">＋</span><span>${tr('Добавить рейс')}</span></button></div>
    <nav id="sidebarPages" class="sidebar-pages" aria-label="${tr('Навигация')}">`+pages.map(([id,label])=>
    '<button type="button" data-page="'+id+'" data-tone="'+id+'" aria-label="'+tr(label)+'"><span class="nav-glyph">'+navIcon(id)+'</span><span class="nav-label">'+tr(label)+'</span></button>'
   ).join('')+'</nav><section class="sidebar-fleet" aria-label="'+tr('Флот')+'"></section><footer class="sidebar-footer"></footer>';
@@ -530,17 +526,15 @@ function render() {
  const pageDistance=pageChanged?preparePageMotion(main,workspace):0;
  if(pageChanged)shell.dataset.tone=page==='aircraft'?'fleet':page;
  renderedPage=page;
- const native=!!window.webkit?.messageHandlers?.closeWindow;
- const windowButton=(action,label,icon)=>`<button type="button" class="icon-button" data-action="${action}" aria-label="${tr(label)}" title="${tr(label)}">${icon}</button>`;
- byId('windowControls').innerHTML='<div class="window-buttons'+(native?' window-traffic':'')+'">'+
- (native?windowButton('window-close','Закрыть окно',toolbarIcon('close'))+windowButton('window-minimize','Свернуть окно','<span aria-hidden="true">−</span>'):'')+
- windowButton('fullscreen','Полноэкранный режим',toolbarIcon('fullscreen'))+'</div>'+
+ const fullscreenLabel=tr('Полноэкранный режим');
+ byId('windowControls').innerHTML='<div class="window-buttons">'+
+ (window.flightDeckNativeWindow?'':`<button type="button" class="icon-button" data-action="fullscreen" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${toolbarIcon('fullscreen')}</button>`)+'</div>'+
  '<div class="window-brand"><img src="'+brandImage+'" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
  renderSidebar();
  main.dataset.page = page;
- main.innerHTML=(page==='home'?'':'<header class="top section-heading"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1>'+sectionEmblem(page)+'</header>')+
+ main.innerHTML=(page==='home'?'':'<header class="top section-heading"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1></header>')+
  ({home,center,fleet:fleetPage,aircraft:aircraftPage,airports:airportsPage,journal,pilot}[page])();
  if(pageChanged){
   main.classList.remove('page-enter');
@@ -796,12 +790,8 @@ document.addEventListener('click',e=>{
  if(d.nextFlight)advanceFlight(d.nextFlight);
  if(d.nextStage)advanceStage(d.nextStage);
  if(d.stage) editStage(d.stage);
- if(d.action==='window-close') window.webkit?.messageHandlers?.closeWindow?.postMessage('');
- if(d.action==='window-minimize') window.webkit?.messageHandlers?.minimizeWindow?.postMessage('');
  if(d.action==='fullscreen'){
-  const handler=window.webkit?.messageHandlers?.toggleFullscreen;
-  if(handler) handler.postMessage('');
-  else if(document.fullscreenElement) document.exitFullscreen().catch(()=>notice(tr("Не удалось выйти из полноэкранного режима.")));
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>notice(tr("Не удалось выйти из полноэкранного режима.")));
   else if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>notice(tr("Браузер не разрешил полноэкранный режим.")));
   else notice(tr("Полноэкранный режим доступен через меню браузера."));
  }

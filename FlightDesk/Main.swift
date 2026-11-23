@@ -51,7 +51,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             controller.addScriptMessageHandler(self, contentWorld: .page, name: "sessionStore")
         }
         let completed = testing || UserDefaults.standard.bool(forKey: "flightdeck.onboarding.v1")
-        controller.addUserScript(WKUserScript(source: "window.flightDeckTourCompleted = \(completed);",
+        controller.addUserScript(WKUserScript(source: "window.flightDeckTourCompleted = \(completed); window.flightDeckNativeWindow = true;",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let languages = testing ? ["ru"] : Locale.preferredLanguages
         if let encoded = try? JSONEncoder().encode(languages),
@@ -60,9 +60,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
                 window.flightDeckSystemLanguages = \(json);
                 """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
-        controller.add(self, name: "closeWindow")
-        controller.add(self, name: "minimizeWindow")
-        controller.add(self, name: "toggleFullscreen")
         if !testing {
             if let key = UserDefaults.standard.string(forKey: "yandexMapsJavaScriptKey"),
                let encoded = try? JSONEncoder().encode(key),
@@ -108,9 +105,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
-        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-            window.standardWindowButton(kind)?.isHidden = true
-        }
         window.contentView = webView
         let dragHandle = WindowDragHandle(frame: .zero)
         dragHandle.translatesAutoresizingMaskIntoConstraints = false
@@ -182,9 +176,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             if text == "install" { appUpdater.install() }
             return
         }
-        if message.name == "closeWindow" { window.close(); return }
-        if message.name == "minimizeWindow" { window.miniaturize(nil); return }
-        if message.name == "toggleFullscreen" { window.toggleFullScreen(nil); return }
         if message.name == "googleSignIn" {
             if googleOAuth != nil { return }
             let auth = GoogleOAuth(anchor: { self.window })

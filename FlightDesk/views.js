@@ -167,7 +167,7 @@ function home() {
  const progress=latest?Math.round(routeProgress(latest)):0;
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const city=code=>esc(airportCity(code));
- return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div>'+sectionEmblem('home')+'</header>'+
+ return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div><div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<div class="dashboard-flight-meter"><div class="dashboard-progress-track" id="dashboardFlightProgress" role="progressbar" aria-label="'+tr('Прогресс рейса')+'" aria-valuenow="'+progress+'" aria-valuetext="'+esc(routeProgressLabel(latest,progress))+'" data-flight-id="'+esc(latest.id)+'" style="--progress:'+progress+'%">'+
