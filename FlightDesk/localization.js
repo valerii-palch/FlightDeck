@@ -321,6 +321,14 @@ const english = {
  "Посетил:": "Visited:",
  "Посещено стран и территорий": "Countries and territories visited",
  "Последние 30 дней": "Last 30 days",
+ "Прогресс рейса": "Flight progress",
+ "Прогресс обновления": "Update progress",
+ "Оформление": "Appearance",
+ "Цветовая схема": "Color scheme",
+ "Автоматически": "Automatic",
+ "Океан": "Ocean",
+ "Сумерки": "Twilight",
+ "Свернуть окно": "Minimize window",
  "Название самолёта": "Aircraft name",
  "Следующий этап": "Next preparation stage",
  "Свернуть боковое меню": "Collapse sidebar",
@@ -481,9 +489,8 @@ const english = {
  "Подключи облако": "Connect your account",
  "Войди через Google или по почте. Один аккаунт открывает общий журнал на macOS и Windows.": "Sign in with Google or email to access your logbook on macOS and Windows.",
  "Настрой FlightDeck под себя": "Make FlightDeck yours",
- "Выбери язык интерфейса. В настройках можно повторить обучение и написать обратную связь.": "Choose your interface language. Settings also lets you replay this guide and send feedback.",
+ "Выбери цветовую схему. В настройках можно повторить обучение и написать обратную связь.": "Choose a color scheme. Settings also lets you replay this guide and send feedback.",
  "Здесь виден актуальный рейс, время и статус. Потяни экран вниз, чтобы обновить журнал.": "See your current flight, times and status here. Pull down to refresh the logbook.",
- "В профиле можно выбрать язык, повторить обучение и написать обратную связь.": "In Profile, choose a language, replay this guide or send feedback.",
  "Пропустить": "Skip",
  "Готово": "Done",
  "Далее": "Next",
@@ -503,18 +510,10 @@ const english = {
  "Не удалось отправить письмо. Попробуй Gmail.": "Could not send the email. Try Gmail."
 };
 
-const languageOptions = [['system', 'Как в системе'], ['ru', 'Русский'], ['en', 'English']];
-const languageKey = 'flightdeck.language';
-let languagePreference = 'system';
-try { languagePreference = localStorage.getItem(languageKey) || 'system'; } catch {}
-languagePreference = window.flightDeckLanguage ?? languagePreference;
-if (!languageOptions.some(([value]) => value === languagePreference)) languagePreference = 'system';
-
-function systemLanguage() {
+function appLanguage() {
  const languages = window.flightDeckSystemLanguages ?? navigator.languages ?? [navigator.language];
  return languages.map(locale => locale.toLowerCase().split(/[-_]/)[0]).find(locale => locale === 'ru' || locale === 'en') ?? 'en';
 }
-const appLanguage = () => languagePreference === 'system' ? systemLanguage() : languagePreference;
 const tr = key => appLanguage() === 'en' && Object.hasOwn(english, key) ? english[key] : key;
 
 function applyLanguage() {
@@ -523,11 +522,3 @@ function applyLanguage() {
  document.querySelector('#splash p').textContent = tr('Маршрутный лист');
 }
 
-function saveLanguage(value) {
- if (!languageOptions.some(([key]) => key === value)) return;
- languagePreference = value;
- const native = window.webkit?.messageHandlers?.saveLanguage;
- if (native) native.postMessage(value);
- else try { localStorage.setItem(languageKey, value); } catch {}
- applyLanguage();
-}

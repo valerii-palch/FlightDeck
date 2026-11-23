@@ -22,11 +22,9 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
     }
 
     private func configureApplicationMenu() {
-        let preference = UserDefaults.standard.string(forKey: "flightdeck.language") ?? "system"
-        let systemLanguage = Locale.preferredLanguages.compactMap {
+        let language = Locale.preferredLanguages.compactMap {
             Locale(identifier: $0).language.languageCode?.identifier
         }.first { $0 == "ru" || $0 == "en" } ?? "en"
-        let language = ["ru", "en"].contains(preference) ? preference : systemLanguage
         let menu = NSMenu()
         let applicationItem = NSMenuItem()
         let applicationMenu = NSMenu(title: "FlightDeck")
@@ -55,18 +53,15 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         let completed = testing || UserDefaults.standard.bool(forKey: "flightdeck.onboarding.v1")
         controller.addUserScript(WKUserScript(source: "window.flightDeckTourCompleted = \(completed);",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        let languages = Locale.preferredLanguages
-        let language = testing ? "ru" : (UserDefaults.standard.string(forKey: "flightdeck.language") ?? "system")
-        if let encoded = try? JSONEncoder().encode(["languages": languages, "preference": [language]]),
+        let languages = testing ? ["ru"] : Locale.preferredLanguages
+        if let encoded = try? JSONEncoder().encode(languages),
            let json = String(data: encoded, encoding: .utf8) {
             controller.addUserScript(WKUserScript(source: """
-                { const settings = \(json);
-                  window.flightDeckSystemLanguages = settings.languages;
-                  window.flightDeckLanguage = settings.preference[0]; }
+                window.flightDeckSystemLanguages = \(json);
                 """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
-        if !testing { controller.add(self, name: "saveLanguage") }
         controller.add(self, name: "closeWindow")
+        controller.add(self, name: "minimizeWindow")
         controller.add(self, name: "toggleFullscreen")
         if !testing {
             if let key = UserDefaults.standard.string(forKey: "yandexMapsJavaScriptKey"),
@@ -90,6 +85,10 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         appUpdater.status = { [weak self] state in
             guard let data = try? JSONEncoder().encode(state), let json = String(data: data, encoding: .utf8) else { return }
             self?.webView.evaluateJavaScript("window.flightDeckUpdateStatus?.(\(json))")
+        }
+        appUpdater.progress = { [weak self] fraction in
+            guard fraction.isFinite else { return }
+            self?.webView.evaluateJavaScript("window.flightDeckUpdateProgress?.(\(fraction))")
         }
         appUpdater.available = { [weak self] version, notes in
             guard let data = try? JSONEncoder().encode([version, notes]),
@@ -183,6 +182,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             return
         }
         if message.name == "closeWindow" { window.close(); return }
+        if message.name == "minimizeWindow" { window.miniaturize(nil); return }
         if message.name == "toggleFullscreen" { window.toggleFullScreen(nil); return }
         if message.name == "googleSignIn" {
             if googleOAuth != nil { return }
@@ -203,13 +203,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         }
         if message.name == "completeOnboarding" {
             UserDefaults.standard.set(true, forKey: "flightdeck.onboarding.v1")
-            return
-        }
-        if message.name == "saveLanguage" {
-            if ["system", "ru", "en"].contains(text) {
-                UserDefaults.standard.set(text, forKey: "flightdeck.language")
-                configureApplicationMenu()
-            }
             return
         }
         if message.name == "saveState" {
@@ -438,13 +431,11 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           parking.dispatchEvent(new Event('change', {bubbles:true}));
           check(flight().depStand === parking.value, 'stand selection');
           const snapshot = JSON.stringify(cloudSnapshot());
-          const chooseLanguage = value => {
-            document.querySelector('[data-action=settings]').click();
-            const settings = document.querySelector('#settingsForm');
-            settings.elements.language.value = value;
-            settings.requestSubmit();
+          const chooseLanguage = languages => {
+            window.flightDeckSystemLanguages = languages;
+            window.dispatchEvent(new Event('languagechange'));
           };
-          chooseLanguage('en');
+          chooseLanguage(['en']);
           check(document.documentElement.lang === 'en' && document.querySelector('h1').textContent === 'Flight center', 'English flight center');
           check(document.querySelector('#status option').textContent === 'Scheduled' &&
                 document.querySelector('#status option').value === 'Запланирован', 'English label, canonical value');
@@ -452,13 +443,11 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
           check(document.querySelector('h1').textContent === 'Logbook' && document.querySelector('.flight-board').textContent.includes('Completed'), 'English logbook');
           document.querySelector('[data-page=airports]').click();
           check(document.querySelector('h1').textContent === 'Airports' && countryName('RU') === 'Russia', 'English airports');
-          window.flightDeckSystemLanguages = ['fr-FR', 'ru-RU'];
-          chooseLanguage('system');
+          chooseLanguage(['fr-FR', 'ru-RU']);
           check(document.documentElement.lang === 'ru' && document.querySelector('h1').textContent === 'Аэропорты', 'system language');
-          window.flightDeckSystemLanguages = ['fr-FR'];
-          chooseLanguage('system');
+          chooseLanguage(['fr-FR']);
           check(document.documentElement.lang === 'en', 'fallback language');
-          chooseLanguage('ru');
+          chooseLanguage(['ru']);
           check(JSON.stringify(cloudSnapshot()) === snapshot, 'language leaves journal intact');
           return 'PASS: flight editing, journal, airports and language selection';
         })()

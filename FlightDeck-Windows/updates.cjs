@@ -11,7 +11,9 @@ module.exports = ({ app, ipcMain, appURL, autoUpdater }) => {
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.on('update-available', info => { available = info; });
-  autoUpdater.on('download-progress', () => status('downloading'));
+  autoUpdater.on('download-progress', ({ percent }) => {
+    if (Number.isFinite(percent)) send('update-progress', percent / 100);
+  });
   autoUpdater.on('error', () => status('failed'));
   ipcMain.handle('update-application', async (event, action) => {
     if (event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== appURL) throw new Error('Invalid sender');

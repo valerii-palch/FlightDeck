@@ -24,12 +24,13 @@ const mapsKey=(()=>{
  return [bundledKey,window.flightDeckMapsKey,legacyKey].find(key=>typeof key==='string'&&mapKeyPattern.test(key));
 })();
 
+const appearanceThemes=[['adaptive','Автоматически'],['ocean','Океан'],['violet','Сумерки']];
 function editSettings(anchor = null) {
  const p=preferences();
  openDialog(`<header class="settings-header"><div><h2 id="settingsTitle">${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
  '<form id="settingsForm" class="settings-layout settings-flyout">'+
- '<fieldset class="settings-section"><legend>'+tr('Язык')+'</legend><div class="settings-languages">'+
- languageOptions.map(([key,label])=>`<label><input type="radio" name="language" value="${key}" ${key===languagePreference?'checked':''}><span>${tr(label)}</span></label>`).join('')+'</div></fieldset>'+
+ `<fieldset class="settings-section"><legend>${tr('Оформление')}</legend><label>${tr('Цветовая схема')}
+ <select name="appearance">${appearanceThemes.map(([key,label])=>option(key,tr(label),p.appearance||'adaptive')).join('')}</select></label></fieldset>`+
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
  `<label>${tr("Имя в профиле")}<input name="profileName" autocomplete="nickname" maxlength="80" value="`+esc(p.profileName)+'"></label>'+
  `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
@@ -40,9 +41,8 @@ function editSettings(anchor = null) {
  const form=byId('settingsForm');
  form.onsubmit=e=>{
   e.preventDefault();
-  const {language,...settings}=Object.fromEntries(new FormData(form));
+  const settings=Object.fromEntries(new FormData(form));
   data.preferences={...preferences(),...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()};
-  if(!demoWorkspace)saveLanguage(language);
   save();closeSettings(render);
  };
 }

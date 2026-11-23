@@ -438,19 +438,18 @@ function airportsPage() {
  [['narrow',tr("Стоянки Airbus A321")],['wide',tr("Стоянки Airbus A350 и Boeing 777")]].map(([k,l])=>'<label class="facts">' +tr(l)+'<textarea data-parking="'+k+'" rows="4" placeholder="'+tr('Номера стоянок, через запятую')+'">'+esc(a.stands?.[k]||'')+'</textarea></label>').join('')+airportSceneryDetails(a)+'</section>':'')+'</div>';
 }
 window.addEventListener('languagechange',()=>{
- if(languagePreference!=='system') return;
  applyLanguage();
  if(byId('dialog').open) return;
  render();
 });
-let mapCleanup, renderedPage;
+let mapCleanup, renderedPage, departingPage, pageMotion;
 const navIcons={
- home:'<path d="M3 15h18M5 19h14M7 12a5 5 0 0 1 10 0M12 3v2M4.5 7l1.5 1.5m13.5-1.5L18 8.5"/>',
- center:'<path d="M4 17a8 8 0 1 1 16 0M4 17h16M12 13l4-5M7 12l1 1m9 0 1-1M12 7v1"/><circle cx="12" cy="13" r="1"/>',
- fleet:'<path d="M3 12l8 2 2 7 2-1v-7l5-4c2-2 1-4-1-3l-6 4-7-2-2 1 4 4-5-1Z"/>',
+ home:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+ center:'<path d="M4 17a8 8 0 1 1 16 0M12 14l4-5M4 17h16"/>',
+ fleet:'<path d="m4 13 7 2 2 6 2-1v-7l5-4c2-2 1-4-1-3l-6 4-7-2-2 1 4 3Z"/>',
  airports:'<path d="M12 21s6-5 6-11a6 6 0 1 0-12 0c0 6 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/>',
- journal:'<path d="M7 4h12v16H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm0 0v16m3-12h6m-6 4h6m-6 4h4"/>',
- pilot:'<circle cx="12" cy="8" r="3"/><path d="M5 19v-1a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v1M4 22h16"/>'
+ journal:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6m-6 4h6"/>',
+ pilot:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>'
 };
 const navIcon=section=>'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">'+navIcons[section]+'</svg>';
 function showSidebarHint(button){
@@ -510,15 +509,45 @@ function renderSidebar(shell){
 }
 byId('nav').addEventListener('scroll',()=>showSidebarHint(null));
 window.addEventListener('resize',()=>showSidebarHint(null));
+function preparePageMotion(main,workspace){
+ pageMotion?.cancel();
+ departingPage?.remove();
+ if(!renderedPage||!main.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const index=section=>pages.findIndex(([key])=>key===(section==='aircraft'?'fleet':section));
+ const direction=Math.sign(index(page)-index(renderedPage));
+ if(!direction)return;
+ const overlay=document.createElement('div');
+ overlay.className='departing-page';
+ overlay.inert=true;
+ overlay.setAttribute('aria-hidden','true');
+ const snapshot=main.cloneNode(true);
+ snapshot.removeAttribute('id');
+ snapshot.classList.remove('page-enter');
+ snapshot.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+ snapshot.querySelectorAll('iframe').forEach(frame=>frame.remove());
+ snapshot.style.marginTop=-workspace.scrollTop+'px';
+ overlay.append(snapshot);
+ workspace.append(overlay);
+ departingPage=overlay;
+ const distance=Math.max(120,workspace.clientHeight)*direction;
+ const easing='cubic-bezier(.22,.74,.25,1)';
+ overlay.animate([{transform:'translateY(0)',opacity:1},{transform:`translateY(${-distance}px)`,opacity:.12}],{duration:300,easing})
+  .finished.then(()=>overlay.remove(),()=>overlay.remove());
+ return distance;
+}
 function render() {
  mapCleanup?.();
  const gated=!demoWorkspace&&!cloudSession;
  const shell=document.querySelector('.shell');
+ const appearance=preferences().appearance;
+ document.body.dataset.appearance=appearanceThemes.some(([key])=>key===appearance)?appearance:'adaptive';
  shell.hidden=gated;
  byId('accessGate').hidden=!gated;
  if(gated){renderAccessGate();return;}
  byId('accessGate').replaceChildren();
  const pageChanged=renderedPage!==page;
+ const main=byId('main'), workspace=main.parentElement;
+ const pageDistance=pageChanged?preparePageMotion(main,workspace):0;
  if(pageChanged){
   const tone=page==='aircraft'?'fleet':page;
   shell.dataset.tone=tone;
@@ -533,20 +562,23 @@ function render() {
  }
  renderedPage=page;
  const native=!!window.webkit?.messageHandlers?.closeWindow;
- byId('windowControls').innerHTML='<div class="window-buttons">'+(native?`<button class="icon-button" data-action="window-close" aria-label="${tr("Закрыть окно")}">`+toolbarIcon('close')+'</button>':'')+
- `<button class="icon-button" data-action="fullscreen" aria-label="${tr("Полноэкранный режим")}">`+toolbarIcon('fullscreen')+'</button></div>'+
+ const windowButton=(action,label,icon)=>`<button type="button" class="icon-button" data-action="${action}" aria-label="${tr(label)}" title="${tr(label)}">${icon}</button>`;
+ byId('windowControls').innerHTML='<div class="window-buttons'+(native?' window-traffic':'')+'">'+
+ (native?windowButton('window-close','Закрыть окно',toolbarIcon('close'))+windowButton('window-minimize','Свернуть окно','<span aria-hidden="true">−</span>'):'')+
+ windowButton('fullscreen','Полноэкранный режим',toolbarIcon('fullscreen'))+'</div>'+
  '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
  renderSidebar(shell);
- byId('main').dataset.page = page;
- byId('main').innerHTML=(page==='home'?'':'<header class="top section-heading"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1>'+sectionEmblem(page)+'</header>')+
+ main.dataset.page = page;
+ main.innerHTML=(page==='home'?'':'<header class="top section-heading"><h1>'+(page==='aircraft'?detailTail:tr(pages.find(p=>p[0]===page)[1]))+'</h1>'+sectionEmblem(page)+'</header>')+
  ({home,center,fleet:fleetPage,aircraft:aircraftPage,airports:airportsPage,journal,pilot}[page])();
  if(pageChanged){
-  byId('main').classList.remove('page-enter');
-  void byId('main').offsetWidth;
-  byId('main').classList.add('page-enter');
-  document.querySelector('.workspace').scrollTop=0;
+  main.classList.remove('page-enter');
+  workspace.scrollTop=0;
+  if(pageDistance)pageMotion=main.animate([{transform:`translateY(${pageDistance}px)`,opacity:.22},{transform:'translateY(0)',opacity:1}],
+   {duration:330,easing:'cubic-bezier(.22,.74,.25,1)'});
+  else if(!departingPage)main.classList.add('page-enter');
  }
  if(page==='pilot')bindCloudProfile();
  if(page==='home')bindActivityChart();
@@ -800,6 +832,7 @@ document.addEventListener('click',e=>{
   renderSidebar(shell);
  }
  if(d.action==='window-close') window.webkit?.messageHandlers?.closeWindow?.postMessage('');
+ if(d.action==='window-minimize') window.webkit?.messageHandlers?.minimizeWindow?.postMessage('');
  if(d.action==='fullscreen'){
   const handler=window.webkit?.messageHandlers?.toggleFullscreen;
   if(handler) handler.postMessage('');
@@ -909,6 +942,15 @@ setInterval(()=>{
   const progress=routeProgress(flight());
   track.style.setProperty('--progress',progress+'%');
   byId('flightProgressLabel').textContent=routeProgressLabel(flight(),progress);
+ }
+ const dashTrack=byId('dashboardFlightProgress');
+ const current=dashTrack&&data.flights.find(row=>row.id===dashTrack.dataset.flightId);
+ if(current){
+  const progress=Math.round(routeProgress(current));
+  dashTrack.style.setProperty('--progress',progress+'%');
+  dashTrack.setAttribute('aria-valuenow',progress);
+  byId('dashboardProgressLabel').textContent=routeProgressLabel(current,progress);
+  byId('dashboardProgressValue').textContent=progress+'%';
  }
 },1000);
 </script></body></html>
