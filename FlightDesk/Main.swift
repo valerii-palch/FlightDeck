@@ -97,7 +97,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         window.title = "FlightDeck"
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 9.0 / 255, green: 13.0 / 255, blue: 22.0 / 255, alpha: 1)
-        window.contentMinSize = NSSize(width: 1280, height: 820)
+        window.contentMinSize = NSSize(width: 1360, height: 860)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -110,7 +110,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
             dragHandle.leadingAnchor.constraint(equalTo: webView.leadingAnchor, constant: 106),
             dragHandle.trailingAnchor.constraint(equalTo: webView.trailingAnchor, constant: -220),
             dragHandle.topAnchor.constraint(equalTo: webView.topAnchor),
-            dragHandle.heightAnchor.constraint(equalToConstant: 50)
+            dragHandle.heightAnchor.constraint(equalToConstant: 56)
         ])
         window.center()
         if !testing {
@@ -263,13 +263,25 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     private func alignNativeToolbar() {
         guard let button = window?.standardWindowButton(.closeButton), let webView else { return }
-        let center = NSPoint(x: button.bounds.midX, y: button.bounds.midY)
-        let point = webView.convert(button.convert(center, to: nil), from: nil)
-        let top = webView.isFlipped ? point.y : webView.bounds.height - point.y
+        func topOfCenter(_ control: NSButton) -> CGFloat {
+            let center = NSPoint(x: control.bounds.midX, y: control.bounds.midY)
+            let point = webView.convert(control.convert(center, to: nil), from: nil)
+            return webView.isFlipped ? point.y : webView.bounds.height - point.y
+        }
+        let top = topOfCenter(button)
         guard top.isFinite, top > 0 else { return }
+        let inset = max(0, 24 - top)
+        if inset > 0 {
+            for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                guard let control = window.standardWindowButton(kind), let container = control.superview else { continue }
+                var frame = control.frame
+                frame.origin.y += container.isFlipped ? inset : -inset
+                control.frame = frame
+            }
+        }
         webView.evaluateJavaScript("""
             document.documentElement.dataset.nativeToolbar = '';
-            document.documentElement.style.setProperty('--native-toolbar-offset', '\(top - 25)px');
+            document.documentElement.style.setProperty('--native-toolbar-offset', '\(topOfCenter(button) - 28)px');
             """)
     }
 

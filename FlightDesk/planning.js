@@ -151,7 +151,7 @@ function bindPlanningSteps(form){
   for(const [label,value] of [
    ['Маршрут',[dep,arr].filter(Boolean).map(code=>airportCity(code)+' ('+code+')').join(' → ')],
    ['Дата UTC',displayDate(date)],['Расписание',[std,sta].filter(Boolean).join(' → ')+' UTC'],
-   ['Борт',aircraftModel(aircraft)],['Рейс',fields.number.value],['Статус',tr(fields.status.value)],
+   ['Борт',aircraftModel(aircraft)],['Рейс',formatFlightNumber(fields.number.value)],['Статус',tr(fields.status.value)],
    ['Пассажиры',byId('plannerLoad').textContent],['Загрузка багажа',byId('plannerBaggage').textContent],
    ['Коммерческий груз',byId('plannerCargo').textContent]
   ]){
@@ -166,7 +166,9 @@ function bindPlanningSteps(form){
   indicators.forEach((item,i)=>i===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));
   byId('plannerBack').hidden=step===0;
   byId('plannerNext').hidden=step===steps.length-1;
-  byId('plannerSave').hidden=byId('plannerReturn').hidden=step!==steps.length-1;
+  byId('plannerSave').hidden=step!==steps.length-1;
+  const returnButton=byId('plannerReturn');
+  if(returnButton)returnButton.hidden=step!==steps.length-1;
   form.querySelector('.flight-editor-body').scrollTop=0;
   update();
  }
@@ -207,6 +209,19 @@ function bindPlanningSteps(form){
 }
 
 
+function flightNumberParts(value){
+ return /^([A-Z]+|[A-Z][0-9]|[0-9][A-Z]) *(\d+)([A-Z]?)$/.exec(value.trim().toUpperCase());
+}
+function formatFlightNumber(value){
+ const parts=flightNumberParts(value);
+ return parts?parts[1]+' '+parts[2]+parts[3]:value;
+}
+function nextFlightNumber(value){
+ const parts=flightNumberParts(value);
+ if(!parts)return '';
+ const number=String(BigInt(parts[2])+1n).padStart(parts[2].length,'0');
+ return parts[1]+' '+number+parts[3];
+}
 const flightCodeText=(value,kind)=>(
  kind==='airport'?value.replace(/[^A-Za-z]/g,'').slice(0,4):value.replace(/[^A-Za-z0-9 -]/g,'')
 ).toUpperCase();

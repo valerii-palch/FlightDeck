@@ -114,17 +114,19 @@ function boardRow(f, kind, date, groupDate) {
  const place=(code,label,original='')=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span>'+
   (original?'<del class="board-original" title="'+city(original)+'">'+city(original)+'</del>':'')+
   '<strong class="board-city" title="'+city(code)+'">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
- const changed=Number.isFinite(t.actualDeparture)&&t.actualDeparture!==t.scheduledDeparture;
- const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,date):'—';
- const time='<span class="board-time">'+(changed?'<del>'+clock(t.scheduledDeparture)+'</del><strong>'+clock(t.actualDeparture)+'</strong>':'<strong>'+clock(t.scheduledDeparture)+'</strong>')+'</span>';
+ const time=(planned,actual)=>{
+  const changed=Number.isFinite(planned)&&Number.isFinite(actual)&&planned!==actual;
+  const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,date):'—';
+  return '<span class="board-time">'+(changed?'<del>'+clock(planned)+'</del>':'')+
+   '<strong>'+clock(Number.isFinite(actual)?actual:planned)+'</strong></span>';
+ };
  const actualArrival=stop?t.actualArrival:destinationArrival(f,t);
  const arrival=`<td class="board-arrival"><span class="board-mobile-label">${tr("Прилет UTC")}</span>`+
-  (stop?'':`<span>${tr("План")} <time>`+clock(t.scheduledArrival)+'</time></span>')+
-  '<span'+(!stop&&actualArrival>t.scheduledArrival?' class="late"':'')+`>${tr(stop?"Посадка":"Факт")} <time>`+clock(actualArrival)+'</time></span></td>';
+  time(stop?NaN:t.scheduledArrival,actualArrival)+'</td>';
  const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
  const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
  return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
- '<td>'+time+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
+ '<td>'+time(t.scheduledDeparture,t.actualDeparture)+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
  place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
  '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
  '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+

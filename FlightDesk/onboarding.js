@@ -35,18 +35,23 @@ function tourKeydown(event){
  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
 }
-function positionTour(){
+function positionTour(immediate=false){
  if(!tourRoot)return;
  cancelAnimationFrame(tourFrame);
- tourFrame=requestAnimationFrame(()=>{
+ const paint=()=>{
   if(!tourRoot)return;
   const target=document.querySelector(tourSteps[tourIndex].target)||byId('main');
-  const bounds=target.getBoundingClientRect(),pad=6;
-  const left=Math.max(6,bounds.left-pad),top=Math.max(6,bounds.top-pad);
-  const right=Math.min(innerWidth-6,bounds.right+pad),bottom=Math.min(innerHeight-6,bounds.bottom+pad);
-  for(const [name,value] of Object.entries({left,top,right,bottom}))tourRoot.style.setProperty('--tour-'+name,value+'px');
+  const bounds=target.getBoundingClientRect();
+  const left=Math.max(0,bounds.left),top=Math.max(0,bounds.top);
+  const right=Math.min(innerWidth,bounds.right),bottom=Math.min(innerHeight,bounds.bottom);
+  const radius=Math.max(0,Math.min((right-left)/2,(bottom-top)/2,parseFloat(getComputedStyle(target).borderTopLeftRadius)||0));
+  const hole=`M ${left+radius} ${top} H ${right-radius} A ${radius} ${radius} 0 0 1 ${right} ${top+radius}
+   V ${bottom-radius} A ${radius} ${radius} 0 0 1 ${right-radius} ${bottom}
+   H ${left+radius} A ${radius} ${radius} 0 0 1 ${left} ${bottom-radius}
+   V ${top+radius} A ${radius} ${radius} 0 0 1 ${left+radius} ${top} Z`.replace(/\s+/g,' ');
+  tourRoot.querySelector('.tour-shade').style.clipPath=`path(evenodd, "M 0 0 H ${innerWidth} V ${innerHeight} H 0 Z ${hole}")`;
   const highlight=tourRoot.querySelector('.tour-highlight');
-  Object.assign(highlight.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px'});
+  Object.assign(highlight.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px',borderRadius:radius+'px'});
   const card=tourRoot.querySelector('.tour-card');
   const width=card.offsetWidth,height=card.offsetHeight;
   const x=Math.min(innerWidth-width-12,Math.max(12,left));
@@ -54,7 +59,9 @@ function positionTour(){
   if(y+height>innerHeight-12)y=top-height-16;
   if(y<12){y=Math.max(12,innerHeight-height-16);}
   Object.assign(card.style,{left:x+'px',top:y+'px'});
- });
+ };
+ if(immediate===true)paint();
+ else tourFrame=requestAnimationFrame(paint);
 }
 function showTourStep(){
  const step=tourSteps[tourIndex];page=step.page;render();
@@ -65,7 +72,7 @@ function showTourStep(){
  tourRoot.querySelector('.tour-count').textContent=(tourIndex+1)+' / '+tourSteps.length;
  tourRoot.querySelector('[data-tour="back"]').disabled=tourIndex===0;
  tourRoot.querySelector('[data-tour="next"]').textContent=tr(tourIndex===tourSteps.length-1?'Готово':'Далее');
- positionTour();tourRoot.querySelector('[data-tour="next"]').focus();
+ positionTour(true);tourRoot.querySelector('[data-tour="next"]').focus();
 }
 function startTour(){
  if(tourRoot)return;
