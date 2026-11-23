@@ -2,11 +2,11 @@ const feedbackEmail='valvah2000@gmail.com';
 const tourStorageKey='flightdeck.onboarding.v1';
 let tourRoot=null,tourIndex=0,tourReturnPage='home',tourFrame;
 const tourSteps=[
- {page:'home',target:'.sidebar-new',title:'Добавь первый рейс',body:'Укажи маршрут и время вылета. FlightDeck предложит длительность по журналу и реальным рейсам.'},
- {page:'home',target:'.dashboard-latest',title:'Актуальный рейс под рукой',body:'На главной появляется текущий или ближайший рейс. Открой его данные, чтобы отмечать этапы полета.'},
- {page:'journal',target:'.board-panel',title:'Весь журнал полетов',body:'Здесь можно найти рейс, проверить время прилета и открыть его для редактирования.'},
- {page:'pilot',target:'.cloud-profile',title:'Подключи облако',body:'Войди через Google или по почте. Один аккаунт открывает общий журнал на macOS и Windows.'},
- {page:'home',target:'[data-action="settings"]',title:'Настрой FlightDeck под себя',body:'Выбери цветовую схему. В настройках можно повторить обучение и написать обратную связь.'}
+ {page:'home',target:'.sidebar-new',title:'Добавь рейс',body:'Укажи маршрут, дату и время вылета.'},
+ {page:'home',target:'.dashboard-latest',title:'Следи за рейсом',body:'Открой карточку рейса, чтобы отметить этапы полёта.'},
+ {page:'journal',target:'.board-filters',title:'Открой журнал',body:'Найди рейс по номеру, дате или борту.'},
+ {page:'pilot',target:'.cloud-profile',title:'Проверь синхронизацию',body:'В профиле виден статус синхронизации журнала.'},
+ {page:'home',target:'[data-action="settings"]',title:'Открой настройки',body:'Здесь можно обновить приложение или повторить обучение.'}
 ];
 function tourCompleted(){
  if(typeof window.flightDeckTourCompleted==='boolean')return window.flightDeckTourCompleted;
@@ -44,6 +44,7 @@ function positionTour(){
   const bounds=target.getBoundingClientRect(),pad=6;
   const left=Math.max(6,bounds.left-pad),top=Math.max(6,bounds.top-pad);
   const right=Math.min(innerWidth-6,bounds.right+pad),bottom=Math.min(innerHeight-6,bounds.bottom+pad);
+  for(const [name,value] of Object.entries({left,top,right,bottom}))tourRoot.style.setProperty('--tour-'+name,value+'px');
   const highlight=tourRoot.querySelector('.tour-highlight');
   Object.assign(highlight.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px'});
   const card=tourRoot.querySelector('.tour-card');
@@ -64,13 +65,13 @@ function showTourStep(){
  tourRoot.querySelector('.tour-count').textContent=(tourIndex+1)+' / '+tourSteps.length;
  tourRoot.querySelector('[data-tour="back"]').disabled=tourIndex===0;
  tourRoot.querySelector('[data-tour="next"]').textContent=tr(tourIndex===tourSteps.length-1?'Готово':'Далее');
- positionTour();setTimeout(positionTour,260);tourRoot.querySelector('[data-tour="next"]').focus();
+ positionTour();tourRoot.querySelector('[data-tour="next"]').focus();
 }
 function startTour(){
  if(tourRoot)return;
  byId('dialog').close();tourReturnPage=page;tourIndex=0;
  tourRoot=document.createElement('div');tourRoot.className='tour-overlay';
- tourRoot.innerHTML='<div class="tour-highlight" aria-hidden="true"></div><section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourDescription"><div class="row"><small class="tour-count"></small><button type="button" data-tour="skip">'+tr('Пропустить')+'</button></div><h2 id="tourTitle"></h2><p class="tour-description" id="tourDescription"></p><div class="controls"><button type="button" data-tour="back">'+tr('Назад')+'</button><button type="button" class="primary" data-tour="next"></button></div></section>';
+ tourRoot.innerHTML='<div class="tour-shade" aria-hidden="true"></div><div class="tour-highlight" aria-hidden="true"></div><section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourDescription"><div class="row"><small class="tour-count"></small><button type="button" data-tour="skip">'+tr('Пропустить')+'</button></div><h2 id="tourTitle"></h2><p class="tour-description" id="tourDescription"></p><div class="controls"><button type="button" data-tour="back">'+tr('Назад')+'</button><button type="button" class="primary" data-tour="next"></button></div></section>';
  document.body.append(tourRoot);document.querySelector('.shell').inert=true;
  tourRoot.addEventListener('click',event=>{
   const action=event.target.closest('[data-tour]')?.dataset.tour;

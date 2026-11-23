@@ -14,22 +14,7 @@ struct SignedUpdate: Codable { let payload: String; let signature: String }
 
 enum UpdateFailure: Error { case invalid, unsupported, download, install }
 
-private final class DownloadProgress: NSObject, URLSessionDownloadDelegate {
-    let report: @Sendable (Double) -> Void
 
-    init(report: @escaping @Sendable (Double) -> Void) {
-        self.report = report
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
-                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
-                    totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        report(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
-    }
-}
 
 enum UpdateVerification {
     static func manifest(_ data: Data, publicKey: String) throws -> UpdateManifest {
@@ -69,7 +54,6 @@ enum UpdateVerification {
     private var busy = false
     private var installer: Process?
     var status: ((String) -> Void)?
-    var progress: ((Double) -> Void)?
     var available: ((String, String) -> Void)?
     private var candidate: UpdateManifest?
     private let feed = URL(string: "https://github.com/valerii-palch/FlightDeck/releases/latest/download/macos-update.json")!
@@ -138,10 +122,7 @@ enum UpdateVerification {
             let session = makeSession()
             defer { session.invalidateAndCancel() }
             do {
-                let delegate = DownloadProgress { [weak self] fraction in
-                    Task { @MainActor in self?.progress?(fraction) }
-                }
-                let (download, downloadResponse) = try await session.download(from: URL(string: manifest.url)!, delegate: delegate)
+                let (download, downloadResponse) = try await session.download(from: URL(string: manifest.url)!)
                 defer { try? FileManager.default.removeItem(at: download) }
                 guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200,
                       let size = try download.resourceValues(forKeys: [.fileSizeKey]).fileSize,

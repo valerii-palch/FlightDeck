@@ -10,7 +10,7 @@ final class WindowDragHandle: NSView {
     }
 }
 
-final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
+final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var googleOAuth: GoogleOAuth?
@@ -83,10 +83,6 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
             guard let data = try? JSONEncoder().encode(state), let json = String(data: data, encoding: .utf8) else { return }
             self?.webView.evaluateJavaScript("window.flightDeckUpdateStatus?.(\(json))")
         }
-        appUpdater.progress = { [weak self] fraction in
-            guard fraction.isFinite else { return }
-            self?.webView.evaluateJavaScript("window.flightDeckUpdateProgress?.(\(fraction))")
-        }
         appUpdater.available = { [weak self] version, notes in
             guard let data = try? JSONEncoder().encode([version, notes]),
                   let json = String(data: data, encoding: .utf8) else { return }
@@ -97,6 +93,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 880),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
+        window.delegate = self
         window.title = "FlightDeck"
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 9.0 / 255, green: 13.0 / 255, blue: 22.0 / 255, alpha: 1)
@@ -260,7 +257,24 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         decisionHandler(.allow)
     }
 
+    func windowDidResize(_ notification: Notification) {
+        alignNativeToolbar()
+    }
+
+    private func alignNativeToolbar() {
+        guard let button = window?.standardWindowButton(.closeButton), let webView else { return }
+        let center = NSPoint(x: button.bounds.midX, y: button.bounds.midY)
+        let point = webView.convert(button.convert(center, to: nil), from: nil)
+        let top = webView.isFlipped ? point.y : webView.bounds.height - point.y
+        guard top.isFinite, top > 0 else { return }
+        webView.evaluateJavaScript("""
+            document.documentElement.dataset.nativeToolbar = '';
+            document.documentElement.style.setProperty('--native-toolbar-offset', '\(top - 25)px');
+            """)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        alignNativeToolbar()
         guard testing else { return }
         var fixture = "null"
         if let path = ProcessInfo.processInfo.environment["FLIGHTDECK_SELF_TEST_FIXTURE"],

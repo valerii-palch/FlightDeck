@@ -7,7 +7,7 @@ function routeDurationEstimate(dep, arr, aircraftTail, excludeID) {
  const samples=data.flights.filter(f=>!f.demo&&f.id!==excludeID).flatMap(physicalLegs)
   .filter(f=>f.dep===dep&&f.arr===arr&&f.status!=='Отменен'&&!isDiversion(f)&&legFlown(f))
   .map(f=>{const t=flightTimes(f);return {
-   minutes:Number.isFinite(f.actualMinutes)?f.actualMinutes:(t.actualArrival-t.actualDeparture)/minute,
+   minutes:actualFlightMinutes(f,t)??f.actualMinutes,
    type:aircraftFor(f.tail)?.short
   };}).filter(s=>Number.isFinite(s.minutes)&&s.minutes>0&&s.minutes<1440);
  const matching=samples.filter(s=>s.type===type);
@@ -78,8 +78,9 @@ function localAirportTime(code,stamp){
 }
 function resolveAirportInput(value){
  const search=value.trim().toUpperCase();
+ if(!/^[A-Z]{3,4}$/.test(search))return '';
  if(!search||airport(search))return search;
- const matches=data.airports.filter(a=>a.iata===search||airportCity(a.icao).toUpperCase()===search);
+ const matches=data.airports.filter(a=>a.iata===search);
  return matches.length===1?matches[0].icao:search;
 }
 const randomInteger=(min,max,random=Math.random)=>min+Math.floor(random()*(max-min+1));
@@ -165,7 +166,7 @@ function bindPlanningSteps(form){
   indicators.forEach((item,i)=>i===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));
   byId('plannerBack').hidden=step===0;
   byId('plannerNext').hidden=step===steps.length-1;
-  byId('plannerSave').hidden=step!==steps.length-1;
+  byId('plannerSave').hidden=byId('plannerReturn').hidden=step!==steps.length-1;
   form.querySelector('.flight-editor-body').scrollTop=0;
   update();
  }
@@ -203,4 +204,42 @@ function bindPlanningSteps(form){
  },true);
  const timer=setInterval(()=>{if(!form.isConnected)clearInterval(timer);else updateClocks();},1000);
  openStep(0);
+}
+
+
+const flightCodeText=(value,kind)=>(
+ kind==='airport'?value.replace(/[^A-Za-z]/g,'').slice(0,4):value.replace(/[^A-Za-z0-9 -]/g,'')
+).toUpperCase();
+function normalizeFlightInputs(form){
+ for(const input of form.querySelectorAll('[data-code]')){
+  const normalize=()=>{
+   const previous=input.value, caret=input.selectionStart;
+   const value=flightCodeText(previous,input.dataset.code);
+   if(value===previous)return;
+   input.value=value;
+   if(caret!==null){
+    const position=flightCodeText(previous.slice(0,caret),input.dataset.code).length;
+    input.setSelectionRange(position,position);
+   }
+  };
+  input.addEventListener('input',event=>{if(!event.isComposing)normalize();});
+  input.addEventListener('compositionend',normalize);
+ }
+}
+function legacyFlightMinutes(previous,current){
+ return ['atd','ata','atdDate','ataDate'].every(key=>(previous[key]||'')===(current[key]||''))
+  ?previous.actualMinutes??null:null;
+}
+function bindActualDuration(form,previous){
+ const fields=form.elements;
+ const keys=['date','std','sta','atd','ata','atdDate','ataDate'];
+ const update=()=>{
+  const values=Object.fromEntries(keys.map(key=>{
+   const field=fields[key];
+   return [key,field.matches('[data-flight-date]')?parseDisplayDate(field.value.trim()):parseFlightTime(field.value)];
+  }));
+  fields.actualMinutes.value=actualFlightMinutes(values)??legacyFlightMinutes(previous,values)??'';
+ };
+ form.addEventListener('input',event=>{if(keys.includes(event.target.name))update();});
+ update();
 }

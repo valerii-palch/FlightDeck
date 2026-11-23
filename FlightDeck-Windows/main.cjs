@@ -7,6 +7,18 @@ const htmlPath = join(__dirname, 'FlightDesk.html');
 require('./google-auth.cjs')({ ipcMain, shell, appURL });
 require('./updates.cjs')({ app, ipcMain, appURL, autoUpdater: require('electron-updater').autoUpdater });
 
+ipcMain.handle('window-action', (event, action) => {
+  if (event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== appURL) throw new Error('Invalid sender');
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return;
+  if (action === 'close') window.close();
+  if (action === 'minimize') window.minimize();
+  if (action === 'maximize') {
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
+  }
+});
+
 ipcMain.handle('session-store', async (event, operation, value) => {
   if (event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== appURL) throw new Error('Invalid sender');
   const path = join(app.getPath('userData'), 'session.bin');
@@ -43,6 +55,7 @@ async function createWindow() {
   nativeTheme.themeSource = 'dark';
   const window = new BrowserWindow({
     title: 'FlightDeck',
+    frame: false,
     width: 1400,
     height: 900,
     minWidth: 1280,

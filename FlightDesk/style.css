@@ -721,7 +721,12 @@ button:not(.icon-button,.sidebar-sync), input:not([type="checkbox"],[type="radio
 }
 
 .tour-overlay { position:fixed; inset:0; z-index:10000; overflow:hidden; }
-.tour-highlight { position:absolute; border:2px solid var(--blue); border-radius:14px; box-shadow:0 0 0 9999px #020815b8; pointer-events:none; }
+.tour-shade {
+ position:absolute; inset:0; background:#090c1bad; backdrop-filter:blur(7px);
+ --left:var(--tour-left,0px); --top:var(--tour-top,0px); --right:var(--tour-right,0px); --bottom:var(--tour-bottom,0px);
+ clip-path:polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,var(--left) var(--top),var(--right) var(--top),var(--right) var(--bottom),var(--left) var(--bottom),var(--left) var(--top),0 0);
+}
+.tour-highlight { position:absolute; border-radius:var(--control-radius); background:#e1eeff12; box-shadow:0 0 14px #b9d9ff2e; pointer-events:none; }
 .tour-card { position:absolute; width:min(360px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; padding:20px; border:1px solid var(--glass-border); border-radius:22px; background:#202c43e8; line-height:1.5; }
 .tour-card h2 { font-size:20px; margin:10px 0; }
 .tour-card .controls { justify-content:flex-end; margin-top:18px; }
@@ -1153,7 +1158,12 @@ body { isolation:isolate; }
 body[data-daylight="morning"] .flight-ambience > [data-daylight="morning"],
 body[data-daylight="day"] .flight-ambience > [data-daylight="day"],
 body[data-daylight="evening"] .flight-ambience > [data-daylight="evening"] { opacity:1; }
-.sidebar .sidebar-toolbar .sidebar-new { display:flex; align-items:center; gap:8px; padding-inline:12px; white-space:nowrap; }
+.sidebar .sidebar-toolbar .sidebar-new {
+ display:grid; grid-template-columns:37px minmax(0,1fr); align-items:center;
+ gap:12px; min-height:46px; padding:6px 12px; white-space:nowrap; border-radius:16px;
+}
+.sidebar-new .nav-glyph { width:32px; height:32px; background:none; box-shadow:none; }
+.sidebar-new .nav-glyph svg { width:21px; height:21px; }
 .sidebar-pages { gap:5px; }
 .sidebar .sidebar-pages button[data-page] {
  position:relative; isolation:isolate; display:grid; grid-template-columns:28px minmax(0,1fr); align-items:center;
@@ -1319,10 +1329,10 @@ body[data-daylight="evening"] .flight-ambience > [data-daylight="evening"] { opa
 .window-brand img { width:22px; height:22px; }
 .window-controls .toolbar-utc { color:#d2e3fa; }
 
-#nav :is(button.sidebar-new,.sidebar-fleet button.tail,.sidebar-footer button.sidebar-sync) {
+#nav :is(button.sidebar-new,.sidebar-fleet button.tail) {
  background:transparent; border-color:transparent; box-shadow:none;
 }
-#nav :is(button.sidebar-new,.sidebar-fleet button.tail,.sidebar-footer button.sidebar-sync):hover,
+#nav :is(button.sidebar-new,.sidebar-fleet button.tail):hover,
 #nav .sidebar-fleet button.tail[aria-pressed="true"] { background:#c3ddff16; }
 .sidebar-pages .nav-glyph,
 .sidebar-pages button:is([aria-current="page"],:hover,:focus-visible) .nav-glyph {
@@ -1347,10 +1357,13 @@ body { position:fixed; inset:0; }
 .dashboard-grid > .dashboard-latest { justify-content:space-between; padding:clamp(22px,2.6vw,38px); gap:clamp(9px,1.35vh,18px); }
 .dashboard-latest .flight-badges { flex-flow:row wrap; align-items:center; }
 .dashboard-flight-times,.dashboard-flight-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin:0; }
-.dashboard-flight-times > div { padding:10px 12px; background:#0b183d37; border:1px solid #d5e7ff26; border-radius:var(--control-radius); }
+.dashboard-flight-times > div,.dashboard-flight-details > div { padding:10px 12px; background:#0b183d37; border:1px solid #d5e7ff26; border-radius:var(--control-radius); }
 .dashboard-flight-times dt,.dashboard-flight-details dt { color:var(--muted); font-size:12px; }
 .dashboard-flight-times dd,.dashboard-flight-details dd { margin:4px 0 0; }
-.dashboard-flight-times small { display:block; margin-top:3px; }
+.dashboard-flight-times > :last-child { text-align:right; }
+.flight-time-stack { display:grid; justify-items:start; gap:2px; margin:4px 0; }
+.flight-time-stack del { color:var(--muted); font:13px ui-monospace,monospace; }
+.dashboard-flight-times > :last-child .flight-time-stack { justify-items:end; }
 .dashboard-flight-details dd { font-weight:650; }
 .dashboard-flight-actions { display:grid; gap:7px; }
 .dashboard-grid > .dashboard-latest .dashboard-flight-actions button { margin-top:0; }
@@ -1402,9 +1415,9 @@ dialog[data-layout="settings"] {
 }
 dialog[data-layout="settings"] .settings-section { background:#dce6ff0b; border-color:#d5dfff32; }
 dialog[data-layout="settings"] .switch-row { background:#dbe6ff15; }
-body[data-daylight="morning"] { --settings-surface:#654a54; --filter-surface:#473244c9; --flight-editor-light:255 184 132; }
-body[data-daylight="day"] { --settings-surface:#284c6a; --filter-surface:#203d59c9; --flight-editor-light:125 201 255; }
-body[data-daylight="evening"] { --settings-surface:#633f56; --filter-surface:#432c45c9; --flight-editor-light:248 158 141; }
+body[data-daylight="morning"] { --settings-surface:#654a54; --filter-surface:#473244c9; --flight-editor-light:255 184 132; --accent-chip:#7c5375; }
+body[data-daylight="day"] { --settings-surface:#284c6a; --filter-surface:#203d59c9; --flight-editor-light:125 201 255; --accent-chip:#37658f; }
+body[data-daylight="evening"] { --settings-surface:#633f56; --filter-surface:#432c45c9; --flight-editor-light:248 158 141; --accent-chip:#795276; }
 @media(prefers-reduced-motion:no-preference) {
  .board-filters > :is(input,select,.board-date) { transition:background-color 2.4s ease-in-out; }
 }
@@ -1419,12 +1432,6 @@ select:not(.flight-select select) {
  background-size:12px 8px; background-repeat:no-repeat; background-position:right 11px center;
 }
 :is(input:not([type="checkbox"],[type="radio"],[type="range"]),select,textarea,.board-date,.flight-select select) { border-radius:var(--control-radius); }
-.update-meter { display:flex; align-items:center; gap:10px; margin-top:8px; }
-.update-meter:has(progress[hidden]) { display:none; }
-.update-meter progress { width:100%; height:11px; accent-color:#78c9ff; border:0; border-radius:999px; overflow:hidden; }
-.update-meter progress::-webkit-progress-bar { background:#0b193c; border-radius:999px; }
-.update-meter progress::-webkit-progress-value { background:linear-gradient(90deg,#648ffe,#87dffc); border-radius:999px; }
-.update-meter span { min-width:3ch; color:#cfe9ff; font-variant-numeric:tabular-nums; }
 .board-filters > select {
  appearance:none;
  -webkit-appearance:none;
@@ -1432,3 +1439,30 @@ select:not(.flight-select select) {
  background-position:right 11px center;
  text-overflow:ellipsis;
 }
+
+
+:root { --accent-chip:#434e82; }
+:is(.flight-hero,.dashboard-latest) .badge,
+.flight-marker,.dashboard-progress-plane,.flight-track::before,.flight-track::after {
+ background-color:var(--accent-chip);
+ border-color:#d4e7ff57;
+}
+:is(.flight-hero,.dashboard-latest) .badge { background-image:linear-gradient(120deg,#e2efff14,#0d17372b); }
+.window-brand,.window-right { transform:translateY(var(--native-toolbar-offset,0px)); }
+:root[data-native-toolbar] .window-right > .icon-button { width:28px; height:28px; min-height:28px; flex-basis:28px; }
+html:has(.desktop-controls:not([hidden])) .window-controls { -webkit-app-region:drag; }
+html:has(.desktop-controls:not([hidden])) .window-controls button { -webkit-app-region:no-drag; }
+.desktop-controls:not([hidden]) {
+ position:fixed; top:0; left:0; z-index:9; height:50px; padding:0 16px; display:flex;
+ align-items:center; gap:8px; -webkit-app-region:drag;
+}
+.desktop-controls button {
+ -webkit-app-region:no-drag; width:14px; height:14px; padding:0; display:grid; place-items:center;
+ color:#25202b; background:var(--window-dot); border:1px solid #14162640; border-radius:50%;
+}
+.desktop-controls [data-window-action="close"] { --window-dot:#ff6059; }
+.desktop-controls [data-window-action="minimize"] { --window-dot:#ffbd2e; }
+.desktop-controls [data-window-action="maximize"] { --window-dot:#28c840; }
+.desktop-controls :is(svg,span) { opacity:0; width:10px; height:10px; font:700 11px/10px system-ui; }
+.desktop-controls:is(:hover,:focus-within) :is(svg,span) { opacity:1; }
+.desktop-controls button:focus-visible { outline:2px solid #f2f7ff; outline-offset:2px; }

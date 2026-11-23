@@ -12,8 +12,8 @@ async function saveSession(operation,value){
 }
 
 function cloudIndicator(){
+ if(navigator.onLine===false) return ['offline',tr("Не в сети")];
  if(!cloudSession) return ['signed-out',tr("Войти для синхронизации")];
- if(navigator.onLine===false) return ['offline',tr("Нет сети")];
  if(cloudConflict) return ['choice',tr("Выбрать копию")];
  if(cloudBusy) return ['busy',tr("Синхронизация…")];
  if(cloudState==='error') return ['error',tr("Ошибка синхронизации")];

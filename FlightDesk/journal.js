@@ -69,11 +69,12 @@ function editContinuation(f) {
  field('std',tr("Вылет по плану UTC"),'time',true)+field('sta',tr("Прилет по плану UTC"),'time',true)+
  field('atd',tr("Вылет фактически UTC"),'time')+field('ata',tr("Прилет фактически UTC"),'time')+
  field('atdDate',tr("Дата фактического вылета UTC"),'date')+field('ataDate',tr("Дата фактического прилета UTC"),'date')+
- `<label>${tr("Время полета, мин")}<input name="actualMinutes" type="number" min="0" max="1440" value="`+esc(leg.actualMinutes)+'"></label>'+
+ `<label>${tr("Время полета, мин")}<input name="actualMinutes" type="number" readonly value="`+esc(leg.actualMinutes)+'"></label>'+
  `<label class="full">${tr("Примечание")}<textarea name="note" rows="2">`+esc(leg.note)+'</textarea></label>'+
  `<div class="full controls"><button class="primary">${tr("Сохранить")}</button><button type="button" data-action="close">${tr("Отмена")}</button>`+
  (next?`<button type="button" id="removeContinuation">${tr("Удалить продолжение")}</button>`:'')+'</div></form>');
  const form=byId('continuationForm');
+ bindActualDuration(form,leg);
  if (next) byId('removeContinuation').onclick=event=>{
   const button=event.currentTarget;
   if (button.dataset.confirmed!=='true') {
@@ -89,8 +90,8 @@ function editContinuation(f) {
   e.preventDefault();
   const values=flightFormValues(form);
   if(!values)return;
-  values.actualMinutes=values.actualMinutes===''?null:Number(values.actualMinutes);
   const times=flightTimes(values);
+  values.actualMinutes=actualFlightMinutes(values,times)??legacyFlightMinutes(leg,values);
   let error='';
   let key='ata';
   if (values.status==='Выполнен'&&!values.ata) error=tr("Укажи фактическое время прилета.");

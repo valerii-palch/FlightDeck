@@ -12,7 +12,7 @@ const updateMessages={
  development:'Обновления доступны в установленной версии приложения.'
 };
 const updateBusyStates=['checking','downloading','verifying','installing'];
-let updateState='idle', updateInfo, promptForUpdate=false, updateFraction;
+let updateState='idle', updateInfo, promptForUpdate=false;
 const updateBridge=window.webkit?.messageHandlers?.updateApplication;
 const updateRequest=action=>{
  if(updateBridge)updateBridge.postMessage(action);
@@ -24,14 +24,6 @@ function paintUpdateDialog(){
  if(!status)return;
  status.textContent=updateMessages[updateState]?tr(updateMessages[updateState]):'';
  const busy=updateBusyStates.includes(updateState);
- const bar=byId('updateProgress');
- const downloading=updateState==='downloading';
- const known=downloading&&Number.isFinite(updateFraction);
- bar.hidden=!busy;
- if(known)bar.value=updateFraction;
- else if(updateState==='verifying')bar.value=1;
- else bar.removeAttribute('value');
- byId('updatePercent').textContent=known?Math.round(updateFraction*100)+'%':'';
  byId('releaseVersion').textContent=updateInfo?'FlightDeck v'+updateInfo.version:'';
  byId('releaseDetails').hidden=!updateInfo;
  byId('releaseNotes').textContent=updateInfo?.notes.trim().replace(/^[ \t]*[-*] /gm,'• ').replace(/^#{1,6} /gm,'')||tr('Описание выпуска недоступно.');
@@ -41,13 +33,7 @@ function paintUpdateDialog(){
 }
 window.flightDeckUpdateStatus=state=>{
  if(!Object.hasOwn(updateMessages,state))return;
- if(updateState!==state)updateFraction=undefined;
  updateState=state;
- paintUpdateDialog();
-};
-window.flightDeckUpdateProgress=fraction=>{
- if(updateState!=='downloading'||!Number.isFinite(fraction))return;
- updateFraction=Math.max(updateFraction??0,Math.min(1,Math.max(0,fraction)));
  paintUpdateDialog();
 };
 window.flightDeckUpdateAvailable=(version,notes)=>{
@@ -58,7 +44,6 @@ window.flightDeckUpdateAvailable=(version,notes)=>{
  maybeOfferUpdate();
 };
 window.flightDeckUpdates?.onStatus(window.flightDeckUpdateStatus);
-window.flightDeckUpdates?.onProgress?.(window.flightDeckUpdateProgress);
 window.flightDeckUpdates?.onAvailable(window.flightDeckUpdateAvailable);
 function checkApplicationUpdate(atLaunch=false){
  if(updateBusyStates.includes(updateState))return;
@@ -75,7 +60,7 @@ function maybeOfferUpdate(){
 function openApplicationUpdate(){
  openDialog('<h2 id="updateTitle">'+tr('Обновление FlightDeck')+'</h2>'+
  '<section id="releaseDetails" class="release-details" hidden><strong id="releaseVersion"></strong><h3>'+tr('Что нового')+'</h3><p id="releaseNotes"></p></section>'+
- '<p id="updateStatus" role="status" aria-live="polite"></p><div class="update-meter"><progress id="updateProgress" max="1" aria-label="'+tr('Прогресс обновления')+'" hidden></progress><span id="updatePercent" aria-hidden="true"></span></div><div class="update-actions"><button type="button" id="installUpdate" class="primary">'+tr('Обновить')+'</button>'+
+ '<p id="updateStatus" role="status" aria-live="polite"></p><div class="update-actions"><button type="button" id="installUpdate" class="primary">'+tr('Обновить')+'</button>'+
  '<button type="button" id="retryUpdate">'+tr('Проверить снова')+'</button><button type="button" id="closeUpdate" data-action="close">'+tr('Закрыть')+'</button></div>','update');
  byId('installUpdate').onclick=()=>{
   if(!updateInfo||updateBusyStates.includes(updateState))return;
