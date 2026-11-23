@@ -149,16 +149,17 @@ function home() {
  const city=code=>esc(airportCity(code));
  return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div>'+sectionEmblem('home')+'</header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Последний рейс"))+'</h2>'+
+ '<div class="flight-widget-visual" aria-hidden="true"><span class="flight-widget-ring">'+planeIcon+'</span></div>'+
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div>'+planeIcon+'<div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest):`<p class="muted">${tr("Журнал пуст")}</p>`)+
  '</section>'+
- `<section class="panel dashboard-card"><h2>${tr("Активность")}</h2><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity()+
+ `<section class="panel dashboard-card dashboard-activity" data-tone="journal"><h2><span class="nav-glyph">${navIcon('journal')}</span>${tr("Активность")}</h2><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity()+
  '<p>'+stats.count+` ${tr("выполнено ·")} `+duration(stats.minutes)+`</p><button data-page="journal">${tr("Журнал полетов")}</button></section>`+
- `<section class="panel dashboard-card"><h2>${tr("Флот")}</h2>`+fleet.map(a=>{
+ `<section class="panel dashboard-card dashboard-fleet" data-tone="fleet"><h2><span class="nav-glyph">${navIcon('fleet')}</span>${tr("Флот")}</h2>`+fleet.map(a=>{
   const count=flightStats(rows.filter(f=>f.tail===a.tail)).count;
   return '<div class="dashboard-aircraft"><div><span>'+aircraftModel(a)+'</span><small>'+a.tail+'</small></div><strong>'+count+'</strong></div>';
  }).join('')+`<button data-page="fleet">${tr("Открыть флот")}</button></section>`+
- `<section class="panel dashboard-card"><h2>${tr("Аэропорты")}</h2><p class="dashboard-number">`+data.airports.filter(a=>a.scenery).length+' <small>/ '+data.airports.length+'</small></p>'+
+ `<section class="panel dashboard-card dashboard-airports" data-tone="airports"><h2><span class="nav-glyph">${navIcon('airports')}</span>${tr("Аэропорты")}</h2><p class="dashboard-number">`+data.airports.filter(a=>a.scenery).length+' <small>/ '+data.airports.length+'</small></p>'+
  `<p class="muted">${tr("Установлено сценариев")}</p><button data-page="airports">${tr("Каталог аэропортов")}</button></section></div>`+
  `<section class="panel facts"><div class="row"><h2>${tr("Недавние рейсы")}</h2><button data-page="journal">${tr("Весь журнал")}</button></div>`+
  (recent.length?flightTable(recent):`<p class="muted">${tr("Рейсов пока нет.")}</p>`)+'</section>'+routeMap();

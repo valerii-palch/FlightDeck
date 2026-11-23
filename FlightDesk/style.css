@@ -1277,6 +1277,115 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 @media(prefers-contrast:more) {
  .flight-ambience > div { background:#0c1626; }
 }
+
+/* A shared thin outline across window controls, menus, dialogs and actions. */
+:root {
+ --control-glass:linear-gradient(115deg,#b9d9ff24,#92b3ed12 75%);
+ --control-shadow:inset 0 1px 0 #daebff15;
+ --glass-fill:linear-gradient(141deg,#a6c8ff1d,#738de728 59%,#4558a41d);
+ --surface-radius:25px;
+ --control-radius:14px;
+}
+:is(.shell,#accessGate,dialog,.tour-card) button:not(:where(.sidebar-pages button,.activity-bars button,.calendar-days button,.board-date button,.avatar-tools-empty button)) {
+ color:#f2f7ff; background:var(--control-glass); border:1px solid #c9e2ff42; box-shadow:var(--control-shadow);
+}
+:is(.shell,#accessGate,dialog,.tour-card) button:is(.primary,.preparation-next) {
+ color:#f4fbff;
+ background:linear-gradient(115deg,#72c7ff37,#87aaff28 80%);
+ border-color:#b2dcff80;
+ font-weight:650;
+}
+:is(.shell,#accessGate,dialog,.tour-card) button.danger { color:#ffd0db; background:#df759022; border-color:#ff9ab06a; }
+:is(.shell,#accessGate,dialog,.tour-card) button.active:not(:where(.activity-bars button)) {
+ background:linear-gradient(115deg,#86baff4a,#8299ef2a); border-color:#b5d4ff77;
+}
+:is(.shell,#accessGate,dialog,.tour-card) button:hover:not(:where(:disabled,.sidebar-pages button,.activity-bars button,.calendar-days button,.board-date button)) {
+ border-color:#d8ecff9c;
+ box-shadow:inset 0 0 16px #c5ddff18;
+}
+:is(.shell,#accessGate,dialog,.tour-card) button:focus-visible { outline:2px solid #99d9ff; outline-offset:2px; }
+
+@media(min-width:721px) {
+ .shell { grid-template-columns:clamp(232px,19.6vw,274px) minmax(0,1fr); }
+ .shell.sidebar-compact { grid-template-columns:85px minmax(0,1fr); }
+ .sidebar { padding:21px 15px 16px; gap:15px; height:calc(100% - 22px); }
+ .sidebar-compact .sidebar { padding-inline:8px; }
+}
+.shell[data-tone] .sidebar {
+ background:radial-gradient(ellipse at 5% 24%,rgba(var(--section-rgb),.14),transparent 70%),
+  radial-gradient(ellipse at 90% 85%,rgba(var(--section-glow),.24),transparent 78%),
+  linear-gradient(156deg,#18254ddc,#111938db 72%,#0f122ed9);
+}
+.sidebar-pages { gap:9px; padding-block:3px; }
+.sidebar .sidebar-pages button[data-page] {
+ grid-template-columns:37px minmax(0,1fr); gap:13px; min-height:51px; padding:7px 13px;
+ border-radius:16px; font-size:14px; font-weight:560;
+}
+.sidebar .sidebar-pages button[data-page]::before {
+ background:linear-gradient(112deg,rgba(var(--section-rgb),.22),rgba(var(--section-glow),.10) 86%);
+ border-color:rgba(var(--section-rgb),.38);
+ box-shadow:inset 0 1px 0 #d5e8ff26;
+}
+.sidebar .sidebar-pages button[aria-current="page"]::before {
+ background:linear-gradient(112deg,rgba(var(--section-rgb),.29),rgba(var(--section-glow),.15) 86%);
+ border-color:rgba(var(--section-rgb),.47);
+ box-shadow:inset 0 1px 0 #ecf2ff24;
+}
+.sidebar-pages .nav-glyph {
+ width:32px; height:32px; border-radius:10px; color:#e8ecfa;
+ background:linear-gradient(150deg,#d0e5ff35,#718adb31 70%,#272955);
+ box-shadow:inset 0 1px 0 #e8f5ff4d,inset 0 -1px 2px #121728a1;
+}
+.sidebar-pages .nav-glyph svg { width:21px; height:21px; filter:drop-shadow(0 1px 0 #121b48b7); }
+.sidebar-pages button:is([aria-current="page"],:hover,:focus-visible) .nav-glyph {
+ color:#f0faff;
+ background:linear-gradient(151deg,rgba(var(--section-rgb),.69),rgba(var(--section-glow),.41) 67%,#252b60);
+ box-shadow:inset 0 1px 0 #eefaff63,0 0 10px rgba(var(--section-rgb),.29);
+}
+.sidebar .sidebar-fleet button.tail { padding:7px 10px; min-height:42px; }
+@media(min-width:721px) {
+ .sidebar-compact .sidebar-pages button[data-page] { grid-template-columns:32px minmax(0,1fr); gap:4px; padding-inline:9px; }
+}
+
+.dashboard-grid { display:grid; grid-template-columns:minmax(0,1.23fr) minmax(0,1fr); grid-auto-rows:auto; gap:14px; }
+.dashboard-grid > .dashboard-latest {
+ grid-row:span 3; padding:clamp(20px,2.8vw,34px); gap:13px;
+ background:radial-gradient(ellipse at 50% 25%,#579cf33d,transparent 64%),linear-gradient(148deg,#294875a6,#33397269 76%);
+}
+.dashboard-grid > .dashboard-latest::before { display:none; }
+.dashboard-grid > .dashboard-card:not(.dashboard-latest) {
+ padding:17px 21px;
+ background:linear-gradient(134deg,rgba(var(--section-rgb),.16),rgba(var(--section-glow),.17));
+ border-color:rgba(var(--section-rgb),.38);
+}
+.dashboard-card:not(.dashboard-latest) h2 { display:flex; align-items:center; gap:10px; }
+.dashboard-card:not(.dashboard-latest) h2 .nav-glyph {
+ width:29px; height:29px; background:linear-gradient(145deg,rgba(var(--section-rgb),.48),rgba(var(--section-glow),.28));
+}
+.dashboard-card:not(.dashboard-latest) > button:last-child { align-self:flex-end; }
+.dashboard-grid > .dashboard-fleet { gap:5px; }
+.dashboard-fleet .dashboard-aircraft { padding-block:4px; }
+.dashboard-grid .dashboard-latest .dashboard-route .code { font-size:clamp(17px,2.3vw,31px); }
+.dashboard-latest .dashboard-route { grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr); }
+.dashboard-latest .dashboard-route .code { white-space:normal; }
+.flight-widget-visual { flex:1 0 auto; min-height:168px; display:grid; place-items:center; position:relative; padding-block:16px; }
+.flight-widget-ring {
+ display:grid; place-items:center; position:relative; width:clamp(146px,19vw,260px); aspect-ratio:1;
+ border-radius:44% 56% 47% 53%; transform:rotate(-23deg);
+ border:1px solid #a9dfff99;
+ background:radial-gradient(ellipse at 43% 27%,#9edeff5c,#4377cc1c 55%,#372f7f45);
+ box-shadow:inset 0 0 24px #75cfff4f,0 0 27px #6cacf064;
+}
+.flight-widget-ring::before {
+ content:""; position:absolute; inset:-10px; border:1px dashed #a9d7ff55; border-radius:49% 51% 55% 45%;
+}
+.flight-widget-ring svg { width:42%; color:#d9f6ff; filter:drop-shadow(0 3px 14px #5bdfff95); transform:rotate(-15deg); }
+@media(max-width:950px) {
+ .dashboard-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+ .dashboard-grid > .dashboard-latest { grid-row:auto; grid-column:1/-1; }
+ .dashboard-grid > .dashboard-airports { grid-column:1/-1; }
+}
+@media(max-width:560px) { .dashboard-grid { grid-template-columns:minmax(0,1fr); } }
 .board-filters > select {
  appearance:none;
  -webkit-appearance:none;
