@@ -110,8 +110,23 @@ async function cloudRequest(path,{method='GET',body,token,representation=false}=
  return result;
 }
 
+function selectAccountJournal(owner){
+ if(journalOwner===owner)return;
+ if(journalOwner){
+  deviceJournals.set(journalOwner,data);
+  data=deviceJournals.get(owner)??{airports:[],flights:[]};
+  deviceJournals.delete(owner);
+  airportCode=data.airports[0]?.icao||'';
+  explicitAircraft=false;
+  pickTail(tail);
+ }
+ journalOwner=owner;
+ save(false);
+}
+
 async function acceptCloudSession(result){
  if(!result?.access_token||!result.refresh_token||!result.user?.id) throw Error('Сервер не вернул данные сеанса.');
+ selectAccountJournal(result.user.id);
  cloudSession={access_token:result.access_token,refresh_token:result.refresh_token,
   user:{id:result.user.id,email:result.user.email},expiresAt:Date.now()+Number(result.expires_in||0)*1000};
  await saveSession('write',JSON.stringify(cloudSession));
@@ -122,6 +137,7 @@ async function restoreCloudSession(){
  try {
   const stored=JSON.parse(await sessionStore('read')||'null');
   if(!stored?.access_token||!stored.refresh_token||!stored.user?.id||!Number.isFinite(stored.expiresAt))return;
+  selectAccountJournal(stored.user.id);
   cloudSession=stored;
   loadCloudCheckpoint();
   if(navigator.onLine!==false)await cloudToken(true);

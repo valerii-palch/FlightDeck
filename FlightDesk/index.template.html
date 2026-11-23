@@ -83,14 +83,20 @@ const byId = id => document.getElementById(id);
 const brandImage=byId('appIcon').href;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data = {airports:[],flights:[]};
+let journalOwner;
+const deviceJournals = new Map();
 const nativeStorage = window.webkit?.messageHandlers?.saveState;
 let storageAvailable = true;
 try {
  const saved = nativeStorage ? null : localStorage.getItem(storageKey);
  const stored = window.flightDeskState ?? (saved ? JSON.parse(saved) : null);
  if (Array.isArray(stored?.airports)&&Array.isArray(stored?.flights)) {
-  data=stored;
-  delete data.workspaceUnlocked;
+  const {journalOwner:owner,deviceJournals:archives,workspaceUnlocked,...journal}=stored;
+  data=journal;
+  journalOwner=owner||journal.cloudCheckpoint?.owner;
+  for(const [id,archive] of Object.entries(archives??{})){
+   if(Array.isArray(archive?.airports)&&Array.isArray(archive?.flights))deviceJournals.set(id,archive);
+  }
  }
 } catch { storageAvailable = false; }
 let page = 'home', tail = fleet[0].tail, selected, explicitAircraft=false, airportCode = '';
@@ -102,8 +108,9 @@ function notice(message) {
 }
 function save(sync=true) {
  if(sync) queueCloudSync();
- if (nativeStorage) { nativeStorage.postMessage(JSON.stringify(data)); return; }
- try { localStorage.setItem(storageKey, JSON.stringify(data)); storageAvailable = true; }
+ const stored=JSON.stringify({...data,journalOwner,deviceJournals:Object.fromEntries(deviceJournals)});
+ if (nativeStorage) { nativeStorage.postMessage(stored); return; }
+ try { localStorage.setItem(storageKey, stored); storageAvailable = true; }
  catch { storageAvailable = false; notice(tr("Хранилище недоступно. Выгрузи резервную копию.")); }
 }
 const aircraft = () => fleet.find(a => a.tail === tail);
@@ -811,7 +818,8 @@ function backup() {
   try {
    const restored=JSON.parse(await byId('backupFile').files[0].text());
    if(!validBackup(restored)) throw Error('format');
-   data=migrateDiversion(restored); delete data.workspaceUnlocked; delete data.cloudCheckpoint; airportCode=data.airports[0]?.icao||''; pickTail(tail);
+   const {workspaceUnlocked,cloudCheckpoint,journalOwner:owner,deviceJournals:archives,...journal}=restored;
+   data=migrateDiversion(journal); airportCode=data.airports[0]?.icao||''; pickTail(tail);
    save(); byId('dialog').close(); render(); notice(tr("Копия загружена."));
   } catch {notice(tr("Не удалось прочитать резервную копию."));}
  };
