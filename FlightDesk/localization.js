@@ -1,4 +1,5 @@
 const english = {
+ "Обновления": "Updates",
  "Копии журнала различаются": "Logbook copies differ",
  "Сравнить копии": "Compare copies",
  "Выбери, какую копию сохранить. Она заменит данные во второй копии. Файл JSON для синхронизации не нужен.": "Choose which copy to keep. It will replace the other copy. Sync does not require a JSON file.",

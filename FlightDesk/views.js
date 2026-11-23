@@ -94,11 +94,10 @@ function journalStatus(f) {
  return f.ata ? 'Выполнен' : f.status;
 }
 const statusBadge = f => '<span class="badge '+(statusColors[journalStatus(f)]||'scheduled')+'">'+esc(tr(journalStatus(f)))+'</span>';
-const demoBadge=f=>f.demo?`<span class="badge demo-badge">${tr("Демо")}</span>`:'';
 const flightNumber = f => esc(f.number?formatFlightNumber(f.number):tr("Без номера"));
 function flightTable(rows) {
  return `<div class="table-wrap"><table class="journal-table flight-summary-table"><thead><tr><th>${tr("Дата UTC")}</th><th>${tr("Рейс")}</th><th>${tr("Борт")}</th><th>${tr("Маршрут")}</th><th>${tr("Статус")}</th><th></th></tr></thead><tbody>`+
- rows.map(f=>'<tr class="'+(arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'')+'"><td>'+displayDate(f.date)+'</td><td>'+flightNumber(f)+' '+demoBadge(f)+'</td><td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="codes">'+codeLabel(f.dep)+' <span>→</span> '+codeLabel(f.arr)+'</div></td><td><div class="flight-badges">'+statusBadge(f)+delayBadge(f)+'</div></td><td><button data-flight="'+esc(f.id)+`">${tr("Открыть")}</button></td></tr>`).join('')+'</tbody></table></div>';
+ rows.map(f=>'<tr class="'+(arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'')+'"><td>'+displayDate(f.date)+'</td><td>' +flightNumber(f)+'</td><td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="codes">'+codeLabel(f.dep)+' <span>→</span> '+codeLabel(f.arr)+'</div></td><td><div class="flight-badges">'+statusBadge(f)+delayBadge(f)+'</div></td><td><button data-flight="'+esc(f.id)+`">${tr("Открыть")}</button></td></tr>`).join('')+'</tbody></table></div>';
 }
 const flown = f => isDiversion(f) ? !!continuationLeg(f)&&legFlown(continuationLeg(f)) : legFlown(f);
 function loggedMinutes(f) {
@@ -224,7 +223,7 @@ function home() {
 let fleetSlide = 0;
 function fleetPage() {
  const a = fleet[fleetSlide];
- const stats = flightStats(data.flights.filter(f=>f.tail===a.tail));
+ const stats = flightStats(summaryFlights().filter(f=>f.tail===a.tail));
  const previous = (fleetSlide+fleet.length-1)%fleet.length;
  const next = (fleetSlide+1)%fleet.length;
  return `<section class="fleet-carousel" aria-roledescription="${tr("карусель")}" aria-label="${tr("Борта флота")}">`+
@@ -240,7 +239,7 @@ function fleetPage() {
 }
 function aircraftPage() {
  const a = fleet.find(a=>a.tail===detailTail);
- const rows = newest(data.flights.filter(f=>f.tail===a.tail));
+ const rows = newest(summaryFlights().filter(f=>f.tail===a.tail));
  const stats = flightStats(rows);
  return `<div class="controls page-actions"><button data-page="fleet">← ${tr("К флоту")}</button><button data-tail="`+a.tail+`">${tr("Полетный центр борта")}</button></div>`+
  '<div class="grid two"><section class="panel"><h2>'+a.type+'</h2><p class="muted">'+tr(a.name)+' · '+a.tail+'</p>'+
@@ -262,7 +261,7 @@ function pilot() {
  const domestic = routes.filter(f=>isDomestic(airport(f.dep))&&isDomestic(airport(f.arr))).length;
  const international = routes.filter(f=>airport(f.dep).country!==airport(f.arr).country).length;
  const name=preferences().profileName;
- return `<section class="panel pilot-identity">${profileAvatar()}<div class="pilot-name"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><h2>${esc(name||tr('Летная книжка'))}</h2></div><div class="pilot-profile-actions"><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button>${demoWorkspace?'':`<button data-action="reset-profile">${tr('Сбросить рейсы и профиль')}</button>`}</div></section>`+pilotRankPanel(stats.minutes)+
+ return `<section class="panel pilot-identity">${profileAvatar()}<div class="pilot-name"><div class="eyebrow">${tr("Летная книжка · симулятор")}</div><h2>${esc(name||tr('Летная книжка'))}</h2></div><div class="pilot-profile-actions"><button data-action="profile-name">${tr(name?'Изменить имя':'Указать имя')}</button><button type="button" id="cloudLogout"${cloudBusy?' disabled':''}>${tr('Выйти')}</button></div></section>`+pilotRankPanel(stats.minutes)+
  '<div class="profile-metrics facts">'+metric(tr("Общее время"),duration(stats.minutes))+metric(tr("Выполнено перелетов"),stats.count)+metric(tr("Посадки"),landings)+metric(tr("Страны"),travelAchievements(rows).countries.size)+'</div>'+
  `<div class="grid two facts"><section class="panel"><h2>${tr("Налет по типам")}</h2>`+
  fleet.map(a=>{const part=flightStats(rows.filter(f=>f.tail===a.tail));return '<div class="strip row"><span>'+a.type+'</span><strong>'+duration(part.minutes)+' · '+part.count+` ${tr("перел.")}</strong></div>`;}).join('')+'</section>'+

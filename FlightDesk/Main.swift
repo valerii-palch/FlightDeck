@@ -301,9 +301,17 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           const check = (condition, name) => { if (!condition) throw Error(name); };
           check(data.airports.length === 0 && data.flights.length === 0 && preferences().profileName === '', 'empty installation');
           check(!byId('accessGate').hidden && document.querySelector('.shell').hidden, 'initial authorization gate');
-          byId('openDemo').click();
-          check(data.flights.length > 0 && data.airports.length > 0 && fleet.every(a=>a.tail.startsWith('DEMO')), 'fictional workspace');
-          const current = workingFlight(summaryFlights());
+          check(!byId('openDemo'), 'demo mode removed');
+          data.workspaceUnlocked=true;
+          render();
+          check(!byId('accessGate').hidden, 'saved unlock flag cannot bypass sign-in');
+          cloudSession={user:{id:'test-user',email:'test@example.com'},expiresAt:Date.now()+3600000};
+          render();
+          check(document.querySelector('h1').textContent === 'Главная', 'initial view');
+          const current={id:'active-test',number:'FD 100',tail:fleet[0].tail,dep:'UUEE',arr:'USPP',
+            status:'Идет посадка',date:dateUTC(),std:'11:00',sta:'14:00',
+            stages:{fuel:new Date().toISOString(),bags:new Date().toISOString(),board:new Date().toISOString()}};
+          data.flights.push(current);
           tail=current.tail; selected=current.id; page='center'; render();
           check(document.querySelector('[data-next-flight]'), 'quick status button');
           const previousStatus = current.status;
@@ -329,24 +337,25 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
             !corrected.atd && !corrected.ata && !corrected.atdDate && !corrected.ataDate &&
             corrected.actualMinutes===null && !legFlown(corrected) && !delayBadge(corrected), 'corrected status clears stale completion');
           data.flights.length=0;
-          save();
-          exitDemoWorkspace();
-          check(data.flights.length === 0 && !byId('accessGate').hidden, 'demo remains separate');
-          data.workspaceUnlocked=true;
-          render();
-          check(!byId('accessGate').hidden, 'saved unlock flag cannot bypass sign-in');
-          cloudSession={user:{id:'test-user',email:'test@example.com'},expiresAt:Date.now()+3600000};
-          render();
-          check(document.querySelector('h1').textContent === 'Главная', 'initial view');
           check(validBackup(data), 'empty backup');
           applyCloudCopy({airports: [], flights: [], profileName: ''});
           document.querySelector('[data-page=pilot]').click();
+          check(byId('cloudLogout') && !document.querySelector('[data-action=reset-profile]'), 'profile actions');
+          document.querySelector('[data-action=settings]').click();
+          const settings = byId('dialog');
+          check(!settings.querySelector('input') && settings.querySelector('[data-action=reset-profile]'), 'settings actions');
+          check(settings.querySelector('[data-action=update]')?.closest('fieldset')?.querySelector('legend')?.textContent==='Обновления', 'separate update settings');
+          settings.close();
           document.querySelector('[data-action=profile-name]').click();
-          const settings = document.querySelector('#settingsForm');
-          check(!settings.elements.mapsKey && !settings.elements.mapProvider && !settings.elements.density, 'obsolete settings hidden');
-          settings.elements.profileName.value = 'Тестовый пилот';
-          settings.requestSubmit();
+          const profileForm = byId('profileNameForm');
+          profileForm.elements.profileName.value = 'Тестовый пилот';
+          profileForm.requestSubmit();
           check(preferences().profileName === 'Тестовый пилот', 'editable profile');
+          const notes=document.createElement('div');
+          renderReleaseNotes(notes,'<ul><li>Изменение &amp; исправление</li></ul>');
+          check(notes.querySelector('ul li')?.textContent==='Изменение & исправление','HTML release notes');
+          renderReleaseNotes(notes,'- Первый пункт\\n- Второй пункт');
+          check(notes.querySelectorAll('ul li').length===2,'Markdown release notes');
           document.querySelector('[data-page=airports]').click();
           document.querySelector('[data-action=add-airport]').click();
           const airportForm = document.querySelector('#airportForm');
@@ -420,7 +429,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           check(forecast(sample).includes('09:17 UTC · +7 мин'), 'delay prediction');
           check(validBackup(data), 'backup format');
           check(summaryFlights().length===48 && flightStats(summaryFlights()).minutes===9007, 'A321 PDF total');
-          check(data.flights.filter(f=>f.demo).length===8, 'demo flights');
+          check(data.flights.filter(f=>f.demo).length===8, 'legacy demo flights kept in storage');
           const diverted = data.flights.find(f=>f.number==='SU 1485');
           check(continuationLeg(diverted)?.number==='SU 1485' && arrivalDelay(diverted)===195, 'linked diversion');
           document.querySelector('[data-page=journal]').click();

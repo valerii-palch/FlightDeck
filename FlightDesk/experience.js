@@ -13,9 +13,9 @@ const countryName=code=>displayCountries[appLanguage()].of(code);
 const knownCountries={ARMENIA:'AM',AZERBAIJAN:'AZ',BELARUS:'BY',CHINA:'CN',CUBA:'CU',EGIPT:'EG','HONG KONG':'HK',INDIA:'IN',INDONESIA:'ID',KAZAKHSTAN:'KZ',KYRGYZSTAN:'KG',MALDIVES:'MV',SEYCHELLES:'SC','SRI-LANKA':'LK',THAILAND:'TH',TURKEY:'TR',UAE:'AE',UZBEKISTAN:'UZ',VIETNAM:'VN','РОССИЯ':'RU',RUSSIA:'RU'};
 const airportCountry=a=>a?.countryCode||knownCountries[a?.country?.trim().toUpperCase()];
 const preferences=()=>{
- return {profileName:'',includeDemo:false,...data.preferences};
+ return {profileName:'',...data.preferences};
 };
-const summaryFlights=()=>preferences().includeDemo?data.flights:data.flights.filter(f=>!f.demo);
+const summaryFlights=()=>data.flights.filter(f=>!f.demo);
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
 const mapsKey=(()=>{
  let legacyKey;
@@ -25,21 +25,26 @@ const mapsKey=(()=>{
 })();
 
 function editSettings(anchor = null) {
- const p=preferences();
- openDialog(`<header class="settings-header"><div><h2 id="settingsTitle">${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
- '<form id="settingsForm" class="settings-layout settings-flyout">'+
- `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
- `<label>${tr("Имя в профиле")}<input name="profileName" autocomplete="nickname" maxlength="80" value="`+esc(p.profileName)+'"></label>'+
- `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
- '<fieldset class="settings-section"><legend>'+tr('Приложение')+'</legend><div class="settings-links">'+
- (demoWorkspace?[]:[['update','Обновить приложение'],['tour','Повторить обучение'],['backup','Резервная копия']]).concat([['feedback','Обратная связь']]).map(([action,label])=>`<button type="button" data-action="${action}"><span>${tr(label)}</span><span aria-hidden="true">›</span></button>`).join('')+
- '</div></fieldset><div class="settings-actions"><button class="primary">'+tr('Сохранить')+'</button></div></form>','settings',anchor);
- const form=byId('settingsForm');
- form.onsubmit=e=>{
-  e.preventDefault();
-  const settings=Object.fromEntries(new FormData(form));
-  data.preferences={...preferences(),...settings,includeDemo:settings.includeDemo==='on',profileName:settings.profileName.trim()};
-  save();closeSettings(render);
+ const link=([action,label])=>`<button type="button" data-action="${action}"><span>${tr(label)}</span><span aria-hidden="true">›</span></button>`;
+ const section=(title,links)=>'<fieldset class="settings-section"><legend>'+tr(title)+'</legend><div class="settings-links">'+links.map(link).join('')+'</div></fieldset>';
+ openDialog(`<header class="settings-header"><h2 id="settingsTitle">${tr("Настройки")}</h2><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
+ '<div class="settings-layout settings-flyout">'+
+ section('Приложение',[['tour','Повторить обучение'],['feedback','Обратная связь']])+
+ section('Журнал',[['backup','Резервная копия'],['reset-profile','Сбросить рейсы и профиль']])+
+ section('Обновления',[['update','Обновить приложение']])+'</div>','settings',anchor);
+}
+
+function editProfileName() {
+ openDialog(`<h2>${tr('Изменить имя')}</h2><form id="profileNameForm" class="stack">
+ <label>${tr('Имя в профиле')}<input name="profileName" autocomplete="nickname" maxlength="80" value="${esc(preferences().profileName)}" autofocus></label>
+ <div class="controls"><button type="submit" class="primary">${tr('Сохранить')}</button><button type="button" data-action="close">${tr('Отмена')}</button></div></form>`);
+ const form=byId('profileNameForm');
+ form.elements.profileName.focus();
+ form.onsubmit=event=>{
+  event.preventDefault();
+  data.preferences={...preferences(),profileName:form.elements.profileName.value.trim()};
+  save();byId('dialog').close();render();
+  document.querySelector('[data-action="profile-name"]')?.focus();
  };
 }
 
@@ -134,7 +139,7 @@ function pilotLevel(minutes){
  return {rank:current[1],next:next?.[1],progress:next?Math.max(0,(minutes-current[0])/(next[0]-current[0])):1,
   remaining:next?next[0]-minutes:0};
 }
-const profilePhotoOwner=()=>demoWorkspace?'demo':cloudSession?.user.id;
+const profilePhotoOwner=()=>cloudSession?.user.id;
 const validProfilePhoto=photo=>typeof photo==='string'&&photo.length<=240_000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo);
 function storeProfilePhoto(photo){
  const p=preferences(), photos={...p.profilePhotos};

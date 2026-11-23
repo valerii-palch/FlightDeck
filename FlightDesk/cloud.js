@@ -37,7 +37,7 @@ function cloudEditing(){
 }
 
 function queueCloudSync(delay=350){
- if(demoWorkspace||!cloudSession) return;
+ if(!cloudSession) return;
  if(delay&&cloudState==='ready'){
   cloudState='pending';
   updateCloudIndicator();
@@ -117,7 +117,7 @@ async function acceptCloudSession(result){
  await saveSession('write',JSON.stringify(cloudSession));
 }
 async function restoreCloudSession(){
- if(cloudSession||cloudBusy||demoWorkspace)return;
+ if(cloudSession||cloudBusy)return;
  cloudBusy=true;
  try {
   const stored=JSON.parse(await sessionStore('read')||'null');
@@ -289,12 +289,11 @@ function windowsCloudConflict({local,remote},disabled){
 }
 
 function cloudProfilePanel(){
- if(demoWorkspace) return '<section class="panel facts"><p>'+tr('Это демо. Изменения исчезнут при выходе.')+'</p></section>';
  const disabled=cloudBusy?' disabled':'';
  const conflict=cloudConflict;
  return `<section class="panel facts cloud-profile" aria-labelledby="cloudHeading"><h2 id="cloudHeading"${isWindowsDesktop?' tabindex="-1"':''}>${tr("Аккаунт и синхронизация")}</h2>`+
  `<p>${tr("Вход выполнен как")} <strong>`+esc(cloudSession.user.email)+'</strong></p>'+
- '<div class="controls facts"><button id="cloudSync" class="primary"'+disabled+`>${tr("Синхронизировать")}</button><button id="cloudLogout"`+disabled+`>${tr("Выйти")}</button></div>`+
+ '<div class="controls facts"><button id="cloudSync" class="primary"'+disabled+`>${tr("Синхронизировать")}</button></div>`+
  (conflict?(isWindowsDesktop?windowsCloudConflict(conflict,disabled):'<div class="cloud-conflict facts">'+(conflict.remote?
  `<p>${tr("Копии различаются. Локально:")} `+conflict.local.flights.length+' '+tr('рейсов ·')+' '+esc(conflict.local.profileName)+'. '+tr('В облаке:')+' '+conflict.remote.flights.length+' '+tr('рейсов')+(conflict.remote.profileName?' · '+esc(conflict.remote.profileName):'')+'.</p>'+
  '<div class="controls facts"><button id="cloudDownload"'+disabled+`>${tr("Использовать облачную копию")}</button><button id="cloudUpload"`+disabled+`>${tr("Использовать локальную копию")}</button><button data-action="backup">${tr("Резервная копия")}</button></div>`:
@@ -311,7 +310,7 @@ function bindCloudProfile(){
   updateCloudIndicator();
   const status=byId('cloudStatus');
   status.textContent=tr("Подождите…");
-  const buttons=[...status.parentElement.querySelectorAll('button')];
+  const buttons=[...status.parentElement.querySelectorAll('button'),byId('cloudLogout')].filter(Boolean);
   buttons.forEach(button=>button.disabled=true);
   try {cloudStatus=await action()||'';}
   catch(error){cloudStatus=error.message;cloudState='error';}

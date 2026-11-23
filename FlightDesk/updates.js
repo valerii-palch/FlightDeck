@@ -19,6 +19,44 @@ const updateRequest=action=>{
  else if(window.flightDeckUpdates)window.flightDeckUpdates.request(action).catch(()=>window.flightDeckUpdateStatus('failed'));
  else window.flightDeckUpdateStatus('development');
 };
+function renderReleaseNotes(container,notes){
+ container.replaceChildren();
+ const add=(parent,tag,value)=>{
+  const element=document.createElement(tag);
+  element.textContent=value;
+  parent.append(element);
+  return element;
+ };
+ if(/^\s*<(?:ul|ol|li|p|div|h[1-6])\b/i.test(notes)){
+  const template=document.createElement('template');
+  template.innerHTML=notes;
+  template.content.querySelectorAll('script,style,template').forEach(node=>node.remove());
+  for(const block of template.content.childNodes){
+   if(block.nodeName==='UL'||block.nodeName==='OL'){
+    const list=document.createElement(block.nodeName.toLowerCase());
+    for(const item of block.children){
+     if(item.nodeName==='LI'&&item.textContent.trim())add(list,'li',item.textContent.trim());
+    }
+    if(list.childElementCount)container.append(list);
+   } else if(block.textContent?.trim()){
+    add(container,'p',block.textContent.trim());
+   }
+  }
+ } else {
+  let list;
+  for(const line of notes.split(/\r?\n/)){
+   const item=line.match(/^\s*[-*+]\s+(.+)/);
+   if(item){
+    if(!list){list=document.createElement('ul');container.append(list);}
+    add(list,'li',item[1].trim());
+   } else if(line.trim()){
+    list=null;
+    add(container,'p',line.trim().replace(/^#{1,6}\s+/, ''));
+   }
+  }
+ }
+ if(!container.childElementCount)add(container,'p',tr('Описание выпуска недоступно.'));
+}
 function paintUpdateDialog(){
  const status=byId('updateStatus');
  if(!status)return;
@@ -26,7 +64,7 @@ function paintUpdateDialog(){
  const busy=updateBusyStates.includes(updateState);
  byId('releaseVersion').textContent=updateInfo?'FlightDeck v'+updateInfo.version:'';
  byId('releaseDetails').hidden=!updateInfo;
- byId('releaseNotes').textContent=updateInfo?.notes.trim().replace(/^[ \t]*[-*] /gm,'• ').replace(/^#{1,6} /gm,'')||tr('Описание выпуска недоступно.');
+ renderReleaseNotes(byId('releaseNotes'),updateInfo?.notes??'');
  byId('installUpdate').hidden=busy||!updateInfo;
  byId('retryUpdate').hidden=busy||!!updateInfo;
  byId('closeUpdate').disabled=updateState==='installing';
@@ -59,7 +97,7 @@ function maybeOfferUpdate(){
 }
 function openApplicationUpdate(){
  openDialog('<h2 id="updateTitle">'+tr('Обновление FlightDeck')+'</h2>'+
- '<section id="releaseDetails" class="release-details" hidden><strong id="releaseVersion"></strong><h3>'+tr('Что нового')+'</h3><p id="releaseNotes"></p></section>'+
+ '<section id="releaseDetails" class="release-details" hidden><strong id="releaseVersion"></strong><h3>'+tr('Что нового')+'</h3><div id="releaseNotes"></div></section>'+
  '<p id="updateStatus" role="status" aria-live="polite"></p><div class="update-actions"><button type="button" id="installUpdate" class="primary">'+tr('Обновить')+'</button>'+
  '<button type="button" id="retryUpdate">'+tr('Проверить снова')+'</button><button type="button" id="closeUpdate" data-action="close">'+tr('Закрыть')+'</button></div>','update');
  byId('installUpdate').onclick=()=>{

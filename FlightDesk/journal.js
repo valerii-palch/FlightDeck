@@ -132,14 +132,14 @@ function boardRow(f, kind, date, groupDate) {
  return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
  '<td>'+time(t.scheduledDeparture,preflightStatuses.includes(f.status)?NaN:t.actualDeparture)+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
  place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
- '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
+ '<td><strong>'+flightNumber(f)+'</strong><small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
  '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+
  '<td><button data-flight="'+esc(f.id)+'"'+(kind==='continuation'?' data-show-continuation':'')+' aria-label="'+tr('Открыть рейс')+' '+flightNumber(f)+'">→</button></td></tr>';
 }
 
 function boardRows() {
  const needle=journalQuery.trim().toLocaleLowerCase('ru').replace(/\s+/g,'');
- const matching=data.flights.filter(f=>{
+ const matching=summaryFlights().filter(f=>{
   const codes=[f.dep,alternate(f),f.arr];
   const terms=[f.number,f.tail,...codes.flatMap(c=>[c,airport(c)?.iata,airportInfo(c)?.cityRu,airportInfo(c)?.cityEn])];
   return terms.join(' ').toLocaleLowerCase('ru').replace(/\s+/g,'').includes(needle) &&

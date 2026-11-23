@@ -13,10 +13,7 @@ ipcMain.handle('window-action', (event, action) => {
   if (!window) return;
   if (action === 'close') window.close();
   if (action === 'minimize') window.minimize();
-  if (action === 'maximize') {
-    if (window.isMaximized()) window.unmaximize();
-    else window.maximize();
-  }
+  if (action === 'fullscreen') window.setFullScreen(!window.isFullScreen());
 });
 
 ipcMain.handle('session-store', async (event, operation, value) => {
