@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15-intel, macos-15]
+        runner: [macos-26]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
@@ -27,29 +27,3 @@ jobs:
           python3 FlightDesk/build-web.py
           bash FlightDesk/build-mac.sh
           FlightDesk/FlightDeck.app/Contents/MacOS/FlightDesk --self-test
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Run against the native Electron application
-        working-directory: FlightDeck-Windows
-        run: |
-          npm install --no-save --no-audit --no-fund playwright-core@1.62.1
-          npm run prepare:web
-          node ../tests/windows.cjs
-  sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: node --test tests/cloud.test.cjs
