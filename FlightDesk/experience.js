@@ -13,7 +13,7 @@ const countryName=code=>displayCountries[appLanguage()].of(code);
 const knownCountries={ARMENIA:'AM',AZERBAIJAN:'AZ',BELARUS:'BY',CHINA:'CN',CUBA:'CU',EGIPT:'EG','HONG KONG':'HK',INDIA:'IN',INDONESIA:'ID',KAZAKHSTAN:'KZ',KYRGYZSTAN:'KG',MALDIVES:'MV',SEYCHELLES:'SC','SRI-LANKA':'LK',THAILAND:'TH',TURKEY:'TR',UAE:'AE',UZBEKISTAN:'UZ',VIETNAM:'VN','РОССИЯ':'RU',RUSSIA:'RU'};
 const airportCountry=a=>a?.countryCode||knownCountries[a?.country?.trim().toUpperCase()];
 const preferences=()=>{
- return {profileName:'',startPage:'home',includeDemo:false,...data.preferences};
+ return {profileName:'',includeDemo:false,...data.preferences};
 };
 const summaryFlights=()=>preferences().includeDemo?data.flights:data.flights.filter(f=>!f.demo);
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
@@ -24,16 +24,12 @@ const mapsKey=(()=>{
  return [bundledKey,window.flightDeckMapsKey,legacyKey].find(key=>typeof key==='string'&&mapKeyPattern.test(key));
 })();
 
-const appearanceThemes=[['adaptive','Автоматически'],['ocean','Океан'],['violet','Сумерки']];
 function editSettings(anchor = null) {
  const p=preferences();
  openDialog(`<header class="settings-header"><div><h2 id="settingsTitle">${tr("Настройки")}</h2></div><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}" autofocus>`+toolbarIcon('close')+'</button></header>'+
  '<form id="settingsForm" class="settings-layout settings-flyout">'+
- `<fieldset class="settings-section"><legend>${tr('Оформление')}</legend><label>${tr('Цветовая схема')}
- <select name="appearance">${appearanceThemes.map(([key,label])=>option(key,tr(label),p.appearance||'adaptive')).join('')}</select></label></fieldset>`+
  `<fieldset class="settings-section"><legend>${tr("Профиль и журнал")}</legend><div class="settings-fields">`+
  `<label>${tr("Имя в профиле")}<input name="profileName" autocomplete="nickname" maxlength="80" value="`+esc(p.profileName)+'"></label>'+
- `<label>${tr("Стартовый экран")}<select name="startPage">`+pages.map(([k,v])=>option(k,tr(v),p.startPage)).join('')+'</select></label>'+
  `<label class="switch-row"><span>${tr("Учитывать демо в сводке и на карте")}</span><input type="checkbox" role="switch" name="includeDemo" `+(p.includeDemo?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label></div></fieldset>'+
  '<fieldset class="settings-section"><legend>'+tr('Приложение')+'</legend><div class="settings-links">'+
  (demoWorkspace?[]:[['update','Обновить приложение'],['tour','Повторить обучение'],['backup','Резервная копия']]).concat([['feedback','Обратная связь']]).map(([action,label])=>`<button type="button" data-action="${action}"><span>${tr(label)}</span><span aria-hidden="true">›</span></button>`).join('')+
