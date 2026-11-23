@@ -136,6 +136,8 @@ const english = {
  "Выбрать стоянку": "Select a stand",
  "Выйти": "Sign out",
  "Вылет": "Departure",
+ "Время полета": "Flight time",
+ "Время полета по плану": "Scheduled flight time",
  "Вылет UTC": "Departure UTC",
  "Вылет по плану UTC": "Scheduled departure UTC",
  "Вылет фактически UTC": "Actual departure UTC",

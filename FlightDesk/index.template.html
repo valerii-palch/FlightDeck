@@ -2,7 +2,7 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <title>FlightDeck — Маршрутный лист</title>
-<link rel="icon" href="__LOGO__">
+<link rel="icon" id="appIcon" href="__LOGO__">
 <style>
 :root{color-scheme:dark;--bg:#0b1421;--panel:#121f30;--border:#2b3d54;--muted:#a9bbd2;--blue:#4daaff;--green:#70dbab;--amber:#ffc25f}
 *{box-sizing:border-box}body{margin:0;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:#eef4ff}
@@ -26,7 +26,8 @@ __EXTRA_CSS__
 <body>
 <div id="splash" role="status">
  <div class="splash-card">
-  <img class="splash-mark" src="__LOGO__" alt="">
+  <img class="splash-mark" alt="">
+  <script>document.currentScript.previousElementSibling.src=document.getElementById("appIcon").href;</script>
   <strong class="splash-title">FlightDeck</strong>
   <p>Маршрутный лист</p>
   <div class="splash-progress" aria-hidden="true"><span></span></div>
@@ -77,6 +78,7 @@ const preparationOffset=(f,key,offset)=>key==='fuel'&&aircraftFor(f.tail)?.short
 const pages = [['home','Главная'],['center','Полетный центр'],['fleet','Флот'],['airports','Аэропорты'],['journal','Журнал'],['pilot','Профиль']];
 const storageKey = 'flightdesk.v1';
 const byId = id => document.getElementById(id);
+const brandImage=byId('appIcon').href;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data = {airports:[],flights:[]};
 const nativeStorage = window.webkit?.messageHandlers?.saveState;
@@ -508,7 +510,10 @@ function preparePageMotion(main,workspace){
  departingPage=overlay;
  const distance=Math.max(120,workspace.clientHeight)*direction;
  const easing='cubic-bezier(.22,.74,.25,1)';
- overlay.animate([{transform:'translateY(0)',opacity:1},{transform:`translateY(${-distance}px)`,opacity:.12}],{duration:300,easing})
+ overlay.animate([
+  {transform:'translateY(0)',opacity:1,filter:'blur(0px)'},
+  {transform:`translateY(${-distance}px)`,opacity:.08,filter:'blur(5px)'}
+ ],{duration:350,easing})
   .finished.then(()=>overlay.remove(),()=>overlay.remove());
  return distance;
 }
@@ -530,7 +535,7 @@ function render() {
  byId('windowControls').innerHTML='<div class="window-buttons'+(native?' window-traffic':'')+'">'+
  (native?windowButton('window-close','Закрыть окно',toolbarIcon('close'))+windowButton('window-minimize','Свернуть окно','<span aria-hidden="true">−</span>'):'')+
  windowButton('fullscreen','Полноэкранный режим',toolbarIcon('fullscreen'))+'</div>'+
- '<div class="window-brand"><img src="__LOGO__" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
+ '<div class="window-brand"><img src="'+brandImage+'" draggable="false" alt="">FlightDeck'+(demoWorkspace?' <span class="badge demo-badge">'+tr('Демо')+'</span>':'')+'</div>'+
  '<div class="window-right"><time class="toolbar-utc" id="utcClock">'+utcLabel()+`</time><button class="icon-button" data-action="settings" aria-label="${tr("Настройки")}">`+toolbarIcon('settings')+'</button></div>';
 
  renderSidebar();
@@ -540,8 +545,10 @@ function render() {
  if(pageChanged){
   main.classList.remove('page-enter');
   workspace.scrollTop=0;
-  if(pageDistance)pageMotion=main.animate([{transform:`translateY(${pageDistance}px)`,opacity:.22},{transform:'translateY(0)',opacity:1}],
-   {duration:330,easing:'cubic-bezier(.22,.74,.25,1)'});
+  if(pageDistance)pageMotion=main.animate([
+   {transform:`translateY(${pageDistance}px)`,opacity:.16,filter:'blur(6px)'},
+   {transform:'translateY(0)',opacity:1,filter:'blur(0px)'}
+  ],{duration:360,easing:'cubic-bezier(.22,.74,.25,1)'});
   else if(!departingPage)main.classList.add('page-enter');
  }
  if(page==='pilot')bindCloudProfile();

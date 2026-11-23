@@ -141,9 +141,28 @@ function advanceStage(key){
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
+function dashboardFlightFacts(f) {
+ const times=flightTimes(f);
+ const actualArrival=destinationArrival(f,times);
+ const timing=(label,planned,actual)=>'<div><dt>'+tr(label)+' UTC</dt><dd class="time">'+
+  (Number.isFinite(actual)?formatTime(actual,f.date):Number.isFinite(planned)?formatTime(planned,f.date):'—')+'</dd>'+
+  (Number.isFinite(actual)&&Number.isFinite(planned)&&actual!==planned?'<small>'+tr('План')+' '+formatTime(planned,f.date)+'</small>':'')+'</div>';
+ const recorded=physicalLegs(f).filter(leg=>legFlown(leg)&&(Number.isFinite(leg.actualMinutes)||
+  (leg.atd&&leg.ata)));
+ const plannedMinutes=Math.round((times.scheduledArrival-times.scheduledDeparture)/minute);
+ const minutes=recorded.length?recorded.reduce((total,leg)=>total+loggedMinutes(leg),0):plannedMinutes;
+ return '<dl class="dashboard-flight-times">'+timing('Вылет',times.scheduledDeparture,times.actualDeparture)+
+  timing('Прилет',times.scheduledArrival,actualArrival)+'</dl><dl class="dashboard-flight-details">'+
+  '<div><dt>'+tr(recorded.length?'Время полета':'Время полета по плану')+'</dt><dd>'+duration(minutes)+'</dd></div>'+
+  (f.pax==null?'':'<div><dt>'+tr('Пассажиры')+'</dt><dd>'+esc(f.pax)+'</dd></div>')+'</dl>';
+}
 function home() {
  const rows=summaryFlights();
- const stats=flightStats(rows);
+ const cutoff=new Date(Date.now()-29*day).toISOString().slice(0,10);
+ const recent=rows.filter(f=>f.date>=cutoff&&f.date<=dateUTC());
+ const stats=flightStats(recent);
+ const countsByTail=new Map();
+ for(const f of rows)if(flown(f))countsByTail.set(f.tail,(countsByTail.get(f.tail)||0)+1);
  const working=workingFlight(rows), latest=working||newest(rows)[0];
  const progress=latest?Math.round(routeProgress(latest)):0;
  const name=preferences().profileName.trim().split(/\s+/)[0];
@@ -153,12 +172,12 @@ function home() {
  (latest?'<p class="dashboard-number">'+flightNumber(latest)+'</p><div class="dashboard-route"><div>'+codeLabel(latest.dep)+'<small title="'+city(latest.dep)+'">'+city(latest.dep)+'</small></div><div>'+codeLabel(latest.arr)+'<small title="'+city(latest.arr)+'">'+city(latest.arr)+'</small></div></div>'+
  '<div class="dashboard-flight-meter"><div class="dashboard-progress-track" id="dashboardFlightProgress" role="progressbar" aria-label="'+tr('Прогресс рейса')+'" aria-valuenow="'+progress+'" aria-valuetext="'+esc(routeProgressLabel(latest,progress))+'" data-flight-id="'+esc(latest.id)+'" style="--progress:'+progress+'%">'+
  '<span class="dashboard-progress-fill"></span><span class="dashboard-progress-plane" aria-hidden="true">'+planeIcon+'</span></div></div>'+
- '<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest):`<p class="muted">${tr("Журнал пуст")}</p>`)+
+ dashboardFlightFacts(latest)+'<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+'</time></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div><footer class="dashboard-flight-actions"><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest)+'</footer>':`<p class="muted">${tr("Журнал пуст")}</p>`)+
  '</section>'+
- `<section class="panel dashboard-card dashboard-activity" data-tone="journal"><header class="widget-heading"><h2><span class="nav-glyph">${navIcon('journal')}</span>${tr("Активность")}</h2><button data-page="journal">${tr("Журнал полетов")}</button></header><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity()+
+ `<section class="panel dashboard-card dashboard-activity" data-tone="journal"><header class="widget-heading"><h2><span class="nav-glyph">${navIcon('journal')}</span>${tr("Активность")}</h2><button data-page="journal">${tr("Журнал полетов")}</button></header><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity(recent)+
  '<p>'+stats.count+` ${tr("выполнено ·")} `+duration(stats.minutes)+'</p></section>'+
  `<section class="panel dashboard-card dashboard-fleet" data-tone="fleet"><header class="widget-heading"><h2><span class="nav-glyph">${navIcon('fleet')}</span>${tr("Флот")}</h2><button data-page="fleet">${tr("Открыть флот")}</button></header>`+fleet.map(a=>{
-  const count=flightStats(rows.filter(f=>f.tail===a.tail)).count;
+  const count=countsByTail.get(a.tail)||0;
   return '<div class="dashboard-aircraft"><div><span>'+aircraftModel(a)+'</span><small>'+a.tail+'</small></div><strong>'+count+'</strong></div>';
  }).join('')+'</section>'+
  `<section class="panel dashboard-card dashboard-airports" data-tone="airports"><header class="widget-heading"><h2><span class="nav-glyph">${navIcon('airports')}</span>${tr("Аэропорты")}</h2><button data-page="airports">${tr("Каталог аэропортов")}</button></header><p class="dashboard-number">`+data.airports.filter(a=>a.scenery).length+' <small>/ '+data.airports.length+'</small></p>'+

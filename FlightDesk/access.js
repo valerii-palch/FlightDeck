@@ -9,7 +9,7 @@ function signInFields(disabled) {
 
 function renderAccessGate() {
  byId('accessGate').innerHTML=`<div class="access-card panel">
-  <div class="access-brand"><img src="__LOGO__" alt=""><strong>FlightDeck</strong></div>
+  <div class="access-brand"><img src="${brandImage}" alt=""><strong>FlightDeck</strong></div>
   <h1>${tr('Вход в FlightDeck')}</h1><p class="muted">${tr('Войди, чтобы открыть личный журнал.')}</p>
   ${signInFields(cloudBusy?' disabled':'')}
   <p id="cloudStatus" role="status">${esc(cloudMessage(cloudStatus))}</p>

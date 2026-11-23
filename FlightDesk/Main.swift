@@ -107,6 +107,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window.standardWindowButton(kind)?.isHidden = true
         }

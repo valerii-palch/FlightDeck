@@ -263,10 +263,10 @@ function achievementPanel() {
  (countries.size?'<div class="achievement-grid">'+[...countries].sort(([a],[b])=>countryName(a).localeCompare(countryName(b),appLanguage())).map(([c,date])=>tile(`${tr("Посетил:")} `+countryName(c),flag(c),date)).join('')+'</div>':`<p class="muted">${tr("Достижения появятся после прибытия в пункт назначения.")}</p>`)+'</section>';
 }
 
-function dashboardActivity() {
+function dashboardActivity(rows) {
  const dates=Array.from({length:30},(_,i)=>new Date(Date.now()-(29-i)*day).toISOString().slice(0,10));
  const counts=new Map(dates.map(date=>[date,0]));
- for(const f of summaryFlights().filter(flown)) if(counts.has(f.date)) counts.set(f.date,counts.get(f.date)+1);
+ for(const f of rows) if(flown(f)&&counts.has(f.date)) counts.set(f.date,counts.get(f.date)+1);
  const max=Math.max(1,...counts.values());
  return `<div class="activity-chart"><div class="activity-tooltip" aria-hidden="true"></div><div class="activity-bars" role="group" aria-label="${tr("Выполнено рейсов за 30 дней:")} `+[...counts.values()].reduce((a,b)=>a+b,0)+'">'+
  [...counts].map(([date,n],index)=>{
