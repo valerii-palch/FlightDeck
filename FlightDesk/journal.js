@@ -4,7 +4,7 @@ const alternate = f => f.diversionAirport || f.note?.match(/Запасной а�
 const isDiversion = f => f.status==='Уход на запасной';
 const continuationLeg = f => isDiversion(f)&&f.continuation
  ? {...f.continuation,dep:alternate(f),arr:f.arr,number:f.number,tail:f.tail,type:f.type,id:f.id,demo:f.demo} : null;
-const legFlown = leg => leg.status!=='Отменен' && (!!leg.ata || leg.status==='Выполнен' || (isDiversion(leg)&&Number.isFinite(leg.actualMinutes)));
+const legFlown = leg => leg.status!=='Отменен' && !preflightStatuses.includes(leg.status) && (!!leg.ata || leg.status==='Выполнен' || (isDiversion(leg)&&Number.isFinite(leg.actualMinutes)));
 function alternateLanded(f) {
  const next=continuationLeg(f);
  return isDiversion(f)&&!!alternate(f)&&(legFlown(f)||!!next&&(!!next.atd||next.status==='Вылетел'||legFlown(next)));
@@ -75,6 +75,7 @@ function editContinuation(f) {
  (next?`<button type="button" id="removeContinuation">${tr("Удалить продолжение")}</button>`:'')+'</div></form>');
  const form=byId('continuationForm');
  bindActualDuration(form,leg);
+ bindLocalFlightTimes(form,{dep:alternate(f),arr:f.arr});
  if (next) byId('removeContinuation').onclick=event=>{
   const button=event.currentTarget;
   if (button.dataset.confirmed!=='true') {
@@ -90,6 +91,9 @@ function editContinuation(f) {
   e.preventDefault();
   const values=flightFormValues(form);
   if(!values)return;
+  const corrected={...values,status:leg.status};
+  resetFlightActuals(corrected,values.status);
+  Object.assign(values,corrected,{status:values.status});
   const times=flightTimes(values);
   values.actualMinutes=actualFlightMinutes(values,times)??legacyFlightMinutes(leg,values);
   let error='';
@@ -126,7 +130,7 @@ function boardRow(f, kind, date, groupDate) {
  const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
  const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
  return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
- '<td>'+time(t.scheduledDeparture,t.actualDeparture)+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
+ '<td>'+time(t.scheduledDeparture,preflightStatuses.includes(f.status)?NaN:t.actualDeparture)+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
  place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
  '<td><strong>'+flightNumber(f)+'</strong> '+demoBadge(f)+'<small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
  '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+

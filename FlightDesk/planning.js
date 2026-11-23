@@ -210,7 +210,7 @@ function bindPlanningSteps(form){
 
 
 function flightNumberParts(value){
- return /^([A-Z]+|[A-Z][0-9]|[0-9][A-Z]) *(\d+)([A-Z]?)$/.exec(value.trim().toUpperCase());
+ return /^([A-Z][0-9]|[0-9][A-Z]|[A-Z]+) *(\d+)([A-Z]?)$/.exec(value.trim().toUpperCase());
 }
 function formatFlightNumber(value){
  const parts=flightNumberParts(value);
@@ -229,11 +229,16 @@ function normalizeFlightInputs(form){
  for(const input of form.querySelectorAll('[data-code]')){
   const normalize=()=>{
    const previous=input.value, caret=input.selectionStart;
-   const value=flightCodeText(previous,input.dataset.code);
+   const cleaned=flightCodeText(previous,input.dataset.code);
+   const value=input.dataset.code==='number'?formatFlightNumber(cleaned):cleaned;
    if(value===previous)return;
    input.value=value;
    if(caret!==null){
-    const position=flightCodeText(previous.slice(0,caret),input.dataset.code).length;
+    const prefix=flightCodeText(previous.slice(0,caret),input.dataset.code);
+    let remaining=prefix.replace(/ /g,'').length;
+    let position=0;
+    while(position<value.length&&remaining>0)if(value[position++]!==' ')remaining--;
+    if(prefix.endsWith(' ')&&value[position]===' ')position++;
     input.setSelectionRange(position,position);
    }
   };
@@ -256,5 +261,31 @@ function bindActualDuration(form,previous){
   fields.actualMinutes.value=actualFlightMinutes(values)??legacyFlightMinutes(previous,values)??'';
  };
  form.addEventListener('input',event=>{if(keys.includes(event.target.name))update();});
+ update();
+}
+
+
+function bindLocalFlightTimes(form,endpoints){
+ const fields=form.elements;
+ const outputs=[...form.querySelectorAll('[data-local-time]')];
+ const update=()=>{
+  const values=Object.fromEntries(['date','std','sta','atd','ata','atdDate','ataDate'].map(key=>{
+   const field=fields[key];
+   return [key,!field?'':field.matches('[data-flight-date]')?parseDisplayDate(field.value.trim()):parseFlightTime(field.value)];
+  }));
+  const times=flightTimes(values);
+  const dep=endpoints?.dep??resolveAirportInput(fields.dep.value);
+  const arr=endpoints?.arr??resolveAirportInput(fields.arr.value);
+  const entries={
+   std:[dep,times.scheduledDeparture],sta:[arr,times.scheduledArrival],
+   atd:[dep,times.actualDeparture],ata:[arr,times.actualArrival]
+  };
+  for(const node of outputs){
+   const [code,stamp]=entries[node.dataset.localTime];
+   const time=localAirportTime(code,stamp);
+   node.textContent=time?tr('Местное время')+' · '+time:tr('Местное время')+' · —';
+  }
+ };
+ form.addEventListener('input',update);
  update();
 }

@@ -120,7 +120,8 @@ function parseDisplayDate(value){
  const day=new Date(iso+'T00:00:00Z');
  return Number.isFinite(day.getTime())&&day.toISOString().slice(0,10)===iso?iso:'';
 }
-const timeField=(name,value,required=false)=>'<input name="'+name+'" type="text" data-flight-time inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="HH:MM" value="'+esc(value)+'" '+(required?'required':'')+'>';
+const timeField=(name,value,required=false)=>'<input name="'+name+'" type="text" data-flight-time inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="HH:MM" value="'+esc(value)+'" '+(required?'required':'')+'>'+
+ (['std','sta','atd','ata'].includes(name)?'<small class="local-flight-time" data-local-time="'+name+'"></small>':'');
 document.addEventListener('input',event=>{
  const field=event.target;
  if(!field.matches('[data-flight-time]')||event.isComposing)return;
@@ -239,7 +240,7 @@ function routeSide(f,key,title) {
  const code=f[key], arriving=key==='arr';
  const times=flightTimes(f);
  const planned=arriving?times.scheduledArrival:times.scheduledDeparture;
- const actual=arriving?destinationArrival(f,times):times.actualDeparture;
+ const actual=arriving?destinationArrival(f,times):preflightStatuses.includes(f.status)?NaN:times.actualDeparture;
  const destination=airport(code);
  const flags=destination?[[tr("Сценарий"),destination.scenery],['GSX',destination.gsx],['Python',destination.python]]
   .map(([label,enabled])=>'<span class="badge '+(enabled?'good':'muted')+'">'+label+' '+(enabled?'✓':'—')+'</span>').join(''):'';
@@ -248,7 +249,7 @@ function routeSide(f,key,title) {
   '<div class="controls facts">'+flags+'</div>'+standSelect(f,key+'Stand',code,title)+'</div>';
 }
 function segmentProgress(leg,now) {
- if(leg.status==='Отменен'||leg.status!=='Вылетел'&&!leg.atd) return 0;
+ if(leg.status==='Отменен'||preflightStatuses.includes(leg.status)||leg.status!=='Вылетел'&&!leg.atd) return 0;
  const times=flightTimes(leg);
  const start=times.actualDeparture||times.scheduledDeparture;
  const duration=times.scheduledArrival-times.scheduledDeparture;
@@ -617,30 +618,30 @@ function editFlight(existing,divert=false,prefill=null) {
  const airports=[...data.airports].sort((a,b)=>Number(b.icao==='UUEE')-Number(a.icao==='UUEE')||a.icao.localeCompare(b.icao,'en'))
   .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
  const icao='list="icaoChoices" data-code="airport" pattern="[A-Za-z]{3,4}" maxlength="4" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
- const section=(title,content)=>`<section class="flight-editor-section"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
+ const section=(title,content,kind='')=>`<section class="flight-editor-section ${kind}"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
  const loadFields=field('pax','Пассажиры','number',false,'min="0" step="1"')+
   field('baggageKg','Загрузка багажа, кг','number',false,'min="0" step="1"')+
   field('cargoKg','Коммерческий груз, кг','number',false,'min="0" step="1"');
  const actualFields=['atd','ata','atdDate','ataDate','pax','baggageKg','cargoKg','actualMinutes','goArounds','note'];
  openDialog(`<header class="flight-editor-header"><h2 id="flightEditorTitle">${tr(existing?'Изменить рейс':'Новый рейс')}</h2><button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
- <form id="editForm" class="editor flight-editor">
+ <form id="editForm" class="editor flight-editor"${existing?'':' data-planning'}>
  <datalist id="icaoChoices">${airports}</datalist>
  <div class="flight-editor-body">
  ${!existing?`<ol class="planner-steps"><li data-step-indicator>${tr('Маршрут и время')}</li><li data-step-indicator>${tr('Загрузка')}</li><li data-step-indicator>${tr('Итоги')}</li></ol>`:''}
- <div data-flight-step class="planner-section">
  ${!existing?`<div class="planner-clocks"><div><small>UTC</small><strong id="plannerUtc"></strong></div><div><small id="plannerDepLabel"></small><strong id="plannerDepNow"></strong><small id="plannerDepPlan"></small></div><div><small id="plannerArrLabel"></small><strong id="plannerArrNow"></strong><small id="plannerArrPlan"></small></div></div>`:''}
+ <div data-flight-step class="planner-section planner-route-step">
  ${section('Маршрут',
   `<div class="flight-editor-route full">${field('dep','Аэропорт вылета ICAO','text',true,icao)}${planeIcon}${field('arr','Аэропорт прилета ICAO','text',true,icao)}</div>`+
   (!airports?`<div class="flight-editor-empty full"><p class="muted">${tr('Сначала добавь аэропорты в каталог.')}</p><button type="button" data-action="add-airport">${tr('Добавить аэропорт')}</button></div>`:'')+
-  field('diversionAirport','Фактический запасной ICAO','text',false,icao))}
+  (existing?field('diversionAirport','Фактический запасной ICAO','text',false,icao):''),'planner-route-fields')}
  ${section('Данные рейса',
   field('number','Номер рейса','text',false,'data-code="number" maxlength="24" placeholder="SU 1124"')+
   select('tail','Борт',fleet.map(a=>option(a.tail,aircraftModel(a)+' · '+a.tail,f.tail)).join(''))+
   select('type','Тип рейса',[...flightTypes,'Не указан'].map(t=>option(t,tr(t),flightType(f))).join(''))+
-  select('status','Статус',statuses.map(s=>option(s,tr(s),f.status)).join('')))}
+  select('status','Статус',(existing?statuses:['Запланирован','Задержан']).map(s=>option(s,tr(s),f.status)).join('')))}
  ${section('Расписание',
   field('date','Дата вылета UTC','date',true)+field('std','Вылет по плану UTC','time',true)+field('sta','Прилет по плану UTC','time',true)+
-  (!existing?`<div class="flight-editor-estimate full"><p id="durationEstimate" role="status"></p><button type="button" id="applyDurationEstimate">${tr('Рассчитать время прилета')}</button></div>`:''))}
+  (!existing?`<div class="flight-editor-estimate full"><p id="durationEstimate" role="status"></p><button type="button" id="applyDurationEstimate">${tr('Рассчитать время прилета')}</button></div>`:'') ,'planner-schedule-fields')}
  </div>
  ${!existing?`<div data-flight-step class="planner-section" hidden>
  <section class="panel planner-load"><h3>${tr('Загрузка самолета')}</h3><strong id="plannerLoad"></strong>
@@ -649,41 +650,45 @@ function editFlight(existing,divert=false,prefill=null) {
  <div><small>${tr('Коммерческий груз')}</small><strong id="plannerCargo"></strong></div></div></section>
  ${section('Пассажиры и груз',loadFields)}</div>
  <div data-flight-step class="planner-section" hidden><section class="panel planner-review"><h3>${tr('Проверь данные рейса')}</h3><dl id="plannerSummary"></dl></section>`:''}
- <details class="flight-editor-section flight-editor-extra"${!existing||actualFields.some(key=>f[key])?' open':''}>
+ ${existing?`<details class="flight-editor-section flight-editor-extra"${actualFields.some(key=>f[key])?' open':''}>
  <summary>${tr('Фактические данные и примечание')}</summary>
  <div class="flight-editor-fields">
  ${!f.atd||!f.ata?`<p class="muted full">${tr('Пока фактическое время не записано, в полях показано плановое.')}</p>`:''}
  ${field('atd','Вылет фактически UTC','time')+field('ata','Посадка фактически UTC','time')+
   field('atdDate','Дата фактического вылета UTC','date')+field('ataDate','Дата фактического прилета UTC','date')+
-  (existing?loadFields:'')+
+  loadFields+
   field('actualMinutes','Фактическое время полета, мин','number',false,'readonly')+
   field('goArounds','Уходы на второй круг','number',false,'min="0" max="99" step="1"')}
  <label class="full">${tr('Примечание')}<textarea name="note" rows="2">${esc(f.note)}</textarea></label>
- </div></details>${!existing?'</div>':''}</div>
+ </div></details>`:`<label class="planner-note">${tr('Примечание')}<textarea name="note" rows="2"></textarea></label></div>`}</div>
  <footer class="flight-editor-footer"><button type="button" data-action="close">${tr('Отмена')}</button><div class="controls">
  ${!existing?`<button type="button" id="plannerBack">${tr('Назад')}</button><button type="button" id="plannerNext" class="primary">${tr('Далее')}</button>`:''}
  <button type="submit" id="plannerSave" class="primary">${tr('Сохранить')}</button>${!existing&&!prefill?`<button type="submit" id="plannerReturn" hidden>${tr('Добавить обратный рейс')}</button>`:''}</div></footer>
  </form>`,'flight');
  const form=byId('editForm');
- bindActualDuration(form,f);
  normalizeFlightInputs(form);
+ bindLocalFlightTimes(form);
+ if(existing)bindActualDuration(form,f);
  form.addEventListener('invalid',event=>{const section=event.target.closest('details');if(section) section.open=true;},true);
- const showPlannedTimes=()=>{
-  for(const [actual,planned] of [['atd','std'],['ata','sta']])
-   form.elements[actual].placeholder=parseFlightTime(form.elements[planned].value)||'HH:MM';
- };
- form.elements.std.addEventListener('input',showPlannedTimes);
- form.elements.sta.addEventListener('input',showPlannedTimes);
- showPlannedTimes();
+ if(existing){
+  const showPlannedTimes=()=>{
+   for(const [actual,planned] of [['atd','std'],['ata','sta']])
+    form.elements[actual].placeholder=parseFlightTime(form.elements[planned].value)||'HH:MM';
+  };
+  form.elements.std.addEventListener('input',showPlannedTimes);
+  form.elements.sta.addEventListener('input',showPlannedTimes);
+  showPlannedTimes();
+ }
  if(!existing){bindDurationEstimate(form);bindPlanningSteps(form);}
  const updateDiversion=()=>{
+  if(!form.elements.diversionAirport)return;
   const diverted=form.elements.status.value==='Уход на запасной';
   form.elements.diversionAirport.required=diverted;
   form.elements.diversionAirport.closest('label').hidden=!diverted;
  };
  updateDiversion();
  form.elements.status.addEventListener('change',()=>{
-  form.elements.diversionAirport.setCustomValidity('');
+  form.elements.diversionAirport?.setCustomValidity('');
   form.elements.status.setCustomValidity('');
   updateDiversion();
  });
@@ -701,7 +706,7 @@ function editFlight(existing,divert=false,prefill=null) {
   if(!values)return;
   values.dep=resolveAirportInput(values.dep);
   values.arr=resolveAirportInput(values.arr);
-  values.diversionAirport=resolveAirportInput(values.diversionAirport);
+  values.diversionAirport=resolveAirportInput(values.diversionAirport??'');
   values.number=formatFlightNumber(flightCodeText(values.number,'number'));
   if (!isDiversion(values)) values.diversionAirport='';
   else if(!airport(values.diversionAirport)){
@@ -726,17 +731,12 @@ function editFlight(existing,divert=false,prefill=null) {
   for (const key of ['pax','baggageKg','cargoKg']) values[key]=values[key]===''?null:Number(values[key]);
   if(form.dataset.estimatedMinutes) values.estimatedMinutes=Number(form.dataset.estimatedMinutes);
   const result={...f,...values,status:f.status,id:f.id||'flight-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)};
-  // Schedule defaults are a preview. Only explicit records or a flight milestone set actuals.
-  if(!existing&&values.status==='Выполнен'&&!result.atd)
-   setFlightStatus(result,'Вылетел',flightTimes(result).scheduledDeparture);
-  const scheduled=flightTimes(result);
-  const reference=existing?Date.now():values.status==='Вылетел'?scheduled.scheduledDeparture:scheduled.scheduledArrival;
-  if(!setFlightStatus(result,values.status,reference)){
+  if(!setFlightStatus(result,values.status)){
    form.elements.ata.setCustomValidity(tr("Прилет должен быть после вылета."));
    form.reportValidity();return;
   }
   const times = flightTimes(result);
-  result.actualMinutes=actualFlightMinutes(result,times)??legacyFlightMinutes(f,result);
+  result.actualMinutes=actualFlightMinutes(result,times)??(preflightStatuses.includes(result.status)&&f.status!==result.status?null:legacyFlightMinutes(f,result));
   if (times.actualArrival < times.actualDeparture) {
    form.elements.ataDate.setCustomValidity(tr("Прилет должен быть после вылета."));
    form.reportValidity(); return;

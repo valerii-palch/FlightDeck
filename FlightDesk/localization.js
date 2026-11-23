@@ -16,6 +16,8 @@ const english = {
  "Максимальный уровень достигнут": "Highest rank reached",
  "Посадки": "Landings",
  "Страны": "Countries",
+ "Нет запланированных или выполненных рейсов": "No scheduled or completed flights",
+ "Местное время": "Local time",
  "Местное время недоступно": "Local time unavailable",
  "Маршрут и время": "Route and timing",
  "Загрузка": "Load",

@@ -1350,6 +1350,13 @@ body { position:fixed; inset:0; }
 .dashboard-heading.section-heading { min-height:58px; margin-bottom:16px; }
 .dashboard-grid { gap:14px; }
 .dashboard-grid > .dashboard-latest { justify-content:space-between; padding:clamp(22px,2.6vw,38px); gap:clamp(9px,1.35vh,18px); }
+.dashboard-card-heading { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.dashboard-card-heading time { font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.dashboard-flight-heading .dashboard-number {
+ flex:1 0 min(100%,185px); min-width:0; padding-inline-end:12px;
+ font:900 clamp(25px,2.6vw,39px)/1.05 "Arial Black",system-ui,sans-serif; letter-spacing:-.02em;
+}
+.dashboard-flight-heading .dashboard-number span { display:inline-block; max-width:89%; overflow-wrap:anywhere; transform:scaleX(1.12); transform-origin:left; }
 .dashboard-flight-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
 .dashboard-flight-heading .flight-badges { flex-flow:row wrap; align-items:center; gap:0; padding:3px 7px; border:1px solid #d8e8ff3d; border-radius:999px; background:#e6efff12; }
 #main .dashboard-flight-heading .badge { background:transparent; padding:3px 7px; font-size:12px; }
@@ -1387,9 +1394,10 @@ main[data-page="home"] { padding-bottom:24px; }
 .dashboard-grid .dashboard-aircraft { padding-block:4px; }
 .dashboard-grid .dashboard-aircraft div small { margin-top:1px; }
 .dashboard-latest .dashboard-route { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
-.dashboard-grid .dashboard-latest .dashboard-flight-endpoint .code { font-size:clamp(20px,2.7vw,36px); font-weight:750; }
+.dashboard-grid .dashboard-latest .dashboard-flight-endpoint .code { font-size:clamp(20px,2.55vw,34px); font-weight:580; }
 .dashboard-flight-endpoint .flight-time-stack { margin-bottom:7px; }
 .dashboard-flight-endpoint:last-child .flight-time-stack { justify-items:end; }
+.dashboard-city { display:block; font-size:16px; font-weight:650; margin-top:7px; }
 .dashboard-flight-endpoint .dashboard-airport-name { display:block; margin-top:4px; line-height:1.35; }
 .dashboard-flight-meter { padding-block:12px; margin-inline:9px; }
 .dashboard-progress-track {
@@ -1471,3 +1479,21 @@ html:has(.desktop-controls:not([hidden])) .window-controls button { -webkit-app-
 .desktop-controls :is(svg,span) { opacity:0; width:10px; height:10px; font:700 11px/10px system-ui; }
 .desktop-controls:is(:hover,:focus-within) :is(svg,span) { opacity:1; }
 .desktop-controls button:focus-visible { outline:2px solid #f2f7ff; outline-offset:2px; }
+
+
+.local-flight-time { display:block; font-size:12px; font-variant-numeric:tabular-nums; }
+dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 32px)); }
+.flight-editor[data-planning] .flight-editor-body { align-content:start; padding-block:12px; gap:9px; }
+.flight-editor[data-planning] .planner-section { gap:9px; }
+.flight-editor[data-planning] .flight-editor-section { padding:10px 12px; }
+.flight-editor[data-planning] .flight-editor-fields { margin-top:7px; gap:7px 10px; }
+.flight-editor[data-planning] .planner-clocks > div { padding:6px 10px; gap:2px; }
+.flight-editor[data-planning] .planner-clocks strong { font-size:17px; }
+.flight-editor[data-planning] .planner-note { font-size:13px; }
+.flight-editor[data-planning] .planner-note textarea { min-height:46px; }
+.flight-editor[data-planning] .planner-review dl { gap:6px 12px; }
+@media(min-width:800px) {
+ .flight-editor[data-planning] .planner-route-step { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; }
+ .flight-editor[data-planning] .planner-route-fields { grid-column:1/-1; }
+ .flight-editor[data-planning] .planner-schedule-fields .flight-editor-fields > label:first-child { grid-column:1/-1; }
+}

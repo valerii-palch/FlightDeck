@@ -26,20 +26,33 @@ function actualFlightMinutes(f,times=flightTimes(f)) {
  const elapsed=Math.round((times.actualArrival-times.actualDeparture)/minute);
  return Number.isFinite(elapsed)&&elapsed>=0?elapsed:null;
 }
+const preflightStatuses=['Запланирован','Задержан','Подготовка','Идет посадка','Посадка завершена'];
+function resetFlightActuals(f,status){
+ if(f.status===status)return;
+ if(preflightStatuses.includes(status)){
+  f.atd=f.atdDate=f.ata=f.ataDate='';
+  f.actualMinutes=null;
+ }else if(status==='Вылетел'&&f.ata){
+  f.ata=f.ataDate='';
+  f.actualMinutes=null;
+ }
+}
 function setFlightStatus(f,status,now=Date.now()) {
  if(f.status===status)return true;
- const mark=status==='Вылетел'&&!f.atd?'atd':status==='Выполнен'&&!f.ata?'ata':null;
+ const reverted={...f};
+ resetFlightActuals(reverted,status);
+ const mark=status==='Вылетел'&&!reverted.atd?'atd':status==='Выполнен'&&!reverted.ata?'ata':null;
  if(mark){
   const stamp=new Date(now).toISOString();
   const fieldDate=mark+'Date';
-  const candidate={...f,[mark]:stamp.slice(11,16),[fieldDate]:stamp.slice(0,10)};
+  const candidate={...reverted,[mark]:stamp.slice(11,16),[fieldDate]:stamp.slice(0,10)};
   const {actualDeparture,actualArrival}=flightTimes(candidate);
   if(actualArrival<actualDeparture)return false;
-  f[mark]=candidate[mark];
-  f[fieldDate]=candidate[fieldDate];
+  reverted[mark]=candidate[mark];
+  reverted[fieldDate]=candidate[fieldDate];
  }
- f.actualMinutes=actualFlightMinutes(f)??f.actualMinutes;
- f.status=status;
+ reverted.actualMinutes=actualFlightMinutes(reverted)??reverted.actualMinutes;
+ Object.assign(f,reverted,{status});
  return true;
 }
 function changeFlightStatus(f,status){
@@ -52,7 +65,7 @@ function changeFlightStatus(f,status){
 }
 const stampLabel = (value,date) => Number.isFinite(value)?formatTime(value,date)+' UTC':'—';
 function destinationArrival(f,times=flightTimes(f)) {
- if(f.status==='Отменен') return NaN;
+ if(f.status==='Отменен'||preflightStatuses.includes(f.status)) return NaN;
  if(!isDiversion(f)) return times.actualArrival;
  const next=continuationLeg(f);
  return next&&next.status!=='Отменен'?flightTimes(next).actualArrival:NaN;
@@ -73,7 +86,7 @@ function delayBadge(f) {
  return '<span class="badge '+(difference>0?'late':'good')+'">'+(difference>0?'Задержка на ':'Раньше на ')+minutes+' '+unit+'</span>';
 }
 function journalStatus(f) {
- if (f.status==='Отменен') return f.status;
+ if (f.status==='Отменен'||preflightStatuses.includes(f.status)) return f.status;
  if (isDiversion(f)) {
   const next=continuationLeg(f);
   return next&&legFlown(next)?'Выполнен':f.status;
@@ -103,6 +116,17 @@ const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготов
 function workingFlight(rows, now=Date.now()) {
  return activeFlight(rows)||newest(rows.filter(f=>(f.status==='Запланирован'||f.status==='Задержан')&&!flown(f)&&clockOn(f.date,f.std)>=now)).at(-1);
 }
+function dashboardFlight(rows,now=Date.now()){
+ const upcoming=newest(rows.filter(f=>f.status==='Запланирован'&&clockOn(f.date,f.std)>=now)).at(-1);
+ if(upcoming)return {flight:upcoming,upcoming:true};
+ const completion=f=>{
+  const times=flightTimes(f);
+  const actual=destinationArrival(f,times);
+  return Number.isFinite(actual)?actual:Number.isFinite(times.scheduledArrival)?times.scheduledArrival:times.scheduledDeparture;
+ };
+ const completed=newest(rows.filter(flown)).sort((a,b)=>completion(b)-completion(a))[0];
+ return {flight:completed,upcoming:false};
+}
 const nextStatus = {
  'Запланирован':'Подготовка','Задержан':'Подготовка','Подготовка':'Идет посадка',
  'Идет посадка':'Посадка завершена','Посадка завершена':'Вылетел','Вылетел':'Выполнен'
@@ -120,8 +144,7 @@ function advanceFlight(id) {
 }
 const preparationStatuses=['Подготовка','Идет посадка','Посадка завершена'];
 const stageStatus={fuel:0,bags:0,board:1,close:2};
-const canAdvanceStage=f=>!f.atd&&!f.ata&&
- (preparationStatuses.includes(f.status)||['Запланирован','Задержан'].includes(f.status));
+const canAdvanceStage=f=>preflightStatuses.includes(f.status);
 const pendingStage=f=>canAdvanceStage(f)&&stages.find(([key])=>!Number.isFinite(Date.parse(f.stages?.[key])));
 function recordFlightStage(f,key,stamp){
  f.stages??={};
@@ -155,8 +178,8 @@ function flightTimeStack(planned,actual,date,utc=false) {
 function dashboardFlightEndpoint(code,label,planned,actual,date) {
  const city=airportCity(code), name=airportName(code);
  return '<div class="dashboard-flight-endpoint"><small>'+tr(label)+' UTC</small>'+
-  flightTimeStack(planned,actual,date)+codeLabel(code)+
-  '<small class="dashboard-airport-name">'+esc([city,name].filter((value,index,all)=>value&&all.indexOf(value)===index).join(' · '))+'</small></div>';
+  flightTimeStack(planned,actual,date)+(city&&city!==code?'<span class="dashboard-city">'+esc(city)+'</span>':'')+codeLabel(code)+
+  (name&&name!==city&&name!==code?'<small class="dashboard-airport-name">'+esc(name)+'</small>':'')+'</div>';
 }
 function dashboardFlightFacts(f,times) {
  const recorded=physicalLegs(f).filter(leg=>legFlown(leg)&&(Number.isFinite(leg.actualMinutes)||
@@ -174,18 +197,20 @@ function home() {
  const stats=flightStats(recent);
  const countsByTail=new Map();
  for(const f of rows)if(flown(f))countsByTail.set(f.tail,(countsByTail.get(f.tail)||0)+1);
- const working=workingFlight(rows), latest=working||newest(rows)[0];
+ const {flight:latest,upcoming}=dashboardFlight(rows);
  const progress=latest?Math.round(routeProgress(latest)):0;
  const name=preferences().profileName.trim().split(/\s+/)[0];
  const times=latest?flightTimes(latest):null;
  return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
- '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><h2>'+(working?(['Запланирован','Задержан'].includes(working.status)?tr("Ближайший рейс"):tr("Рейс в работе")):tr("Недавний рейс"))+'</h2>'+
- (latest?'<div class="dashboard-flight-heading"><p class="dashboard-number">'+flightNumber(latest)+'</p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div></div>'+
- '<div class="dashboard-route">'+dashboardFlightEndpoint(latest.dep,'Вылет',times.scheduledDeparture,times.actualDeparture,latest.date)+
+ '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><header class="dashboard-card-heading"><h2>'+
+ (upcoming?tr("Ближайший рейс"):tr("Недавний рейс"))+'</h2>'+
+ (latest?'<time class="muted" datetime="'+esc(latest.date)+'">'+displayDate(latest.date)+'</time>':'')+'</header>'+
+ (latest?'<div class="dashboard-flight-heading"><p class="dashboard-number">'+'<span>'+flightNumber(latest)+'</span></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div></div>'+
+ '<div class="dashboard-route">'+dashboardFlightEndpoint(latest.dep,'Вылет',times.scheduledDeparture,upcoming?NaN:times.actualDeparture,latest.date)+
  dashboardFlightEndpoint(latest.arr,'Прилет',times.scheduledArrival,destinationArrival(latest,times),latest.date)+'</div>'+
  '<div class="dashboard-flight-meter"><div class="dashboard-progress-track" id="dashboardFlightProgress" role="progressbar" aria-label="'+tr('Прогресс рейса')+'" aria-valuenow="'+progress+'" aria-valuetext="'+esc(routeProgressLabel(latest,progress))+'" data-flight-id="'+esc(latest.id)+'" style="--progress:'+progress+'%">'+
  '<span class="dashboard-progress-fill"></span><span class="dashboard-progress-plane" aria-hidden="true">'+planeIcon+'</span></div></div>'+
- dashboardFlightFacts(latest,times)+'<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small><time>'+displayDate(latest.date)+ '</time></p><footer class="dashboard-flight-actions"><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest)+'</footer>':`<p class="muted">${tr("Журнал пуст")}</p>`)+
+ dashboardFlightFacts(latest,times)+'<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small></p><footer class="dashboard-flight-actions"><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest)+'</footer>':`<p class="muted">${tr("Нет запланированных или выполненных рейсов")}</p>`)+
  '</section>'+
  `<section class="panel dashboard-card dashboard-activity" data-tone="journal"><header class="widget-heading"><h2><span class="nav-glyph">${navIcon('journal')}</span>${tr("Активность")}</h2><button data-page="journal">${tr("Журнал полетов")}</button></header><p class="muted">${tr("Последние 30 дней")}</p>`+dashboardActivity(recent)+
  '<p>'+stats.count+` ${tr("выполнено ·")} `+duration(stats.minutes)+'</p></section>'+

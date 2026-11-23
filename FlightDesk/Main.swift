@@ -303,8 +303,9 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           check(!byId('accessGate').hidden && document.querySelector('.shell').hidden, 'initial authorization gate');
           byId('openDemo').click();
           check(data.flights.length > 0 && data.airports.length > 0 && fleet.every(a=>a.tail.startsWith('DEMO')), 'fictional workspace');
-          check(document.querySelector('[data-next-flight]'), 'quick status button');
           const current = workingFlight(summaryFlights());
+          tail=current.tail; selected=current.id; page='center'; render();
+          check(document.querySelector('[data-next-flight]'), 'quick status button');
           const previousStatus = current.status;
           const preparationBefore = JSON.stringify(current.stages);
           document.querySelector('[data-next-flight]').click();
@@ -317,6 +318,16 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           check(Number.isFinite(Date.parse(current.stages.close)), 'preparation button records stage time');
           check(displayDate('2026-11-20') === '20.11.2026' && parseDisplayDate('29.02.2024') === '2024-02-29' &&
                 parseDisplayDate('29.02.2026') === '', 'fixed date format and leap year');
+          const corrected = {status:'Выполнен',date:'2026-11-23',std:'22:00',sta:'00:30',
+            atd:'22:08',ata:'00:38',atdDate:'2026-11-23',ataDate:'2026-11-24',actualMinutes:150};
+          const other = {...corrected,status:'Запланирован',date:'2026-11-25',std:'09:00'};
+          const nearest = {...other,date:'2026-11-24',std:'08:00'};
+          const now = clockOn('2026-11-24','02:00');
+          check(dashboardFlight([other,corrected,nearest],now).flight===nearest, 'closest scheduled flight');
+          check(dashboardFlight([{...nearest,status:'Отменен'},corrected],now).flight===corrected,'completed flight fallback');
+          check(setFlightStatus(corrected,'Запланирован') && journalStatus(corrected)==='Запланирован' &&
+            !corrected.atd && !corrected.ata && !corrected.atdDate && !corrected.ataDate &&
+            corrected.actualMinutes===null && !legFlown(corrected) && !delayBadge(corrected), 'corrected status clears stale completion');
           data.flights.length=0;
           save();
           exitDemoWorkspace();
@@ -353,10 +364,14 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           document.querySelector('[data-action=new]').click();
           check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
           const editor = byId('editForm');
+          check(!editor.elements.atd && !editor.elements.ataDate, 'new flight has no actual times');
+          editor.elements.number.value = 'su1458';
+          editor.elements.number.dispatchEvent(new Event('input', {bubbles:true}));
+          check(editor.elements.number.value === 'SU 1458', 'live flight number formatting');
           editor.elements.std.value = '2335';
           editor.elements.std.dispatchEvent(new Event('input', {bubbles:true}));
           check(editor.elements.std.value === '23:35', 'numeric time entry adds separator');
-          editor.querySelectorAll('[data-action=pick-date]').item(1).click();
+          editor.querySelector('[data-action=pick-date]').click();
           const calendar = document.querySelector('dialog.calendar-popover');
           const bounds = calendar.getBoundingClientRect();
           check(calendar.open && bounds.width > 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight, 'calendar fits viewport above form');
@@ -439,7 +454,10 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           form.elements.arr.value = 'URSS';
           form.elements.std.value = '23:50';
           form.elements.sta.value = '03:45';
+          byId('plannerNext').click();
           form.elements.pax.value = '386';
+          form.elements.pax.dispatchEvent(new Event('input', {bubbles:true}));
+          byId('plannerNext').click();
           form.requestSubmit();
           check(flight()?.tail === 'RA-73132' && flight().pax === 386, 'add 777 flight');
           check(document.querySelector('main').textContent.includes('03:45 +1 UTC'), 'midnight rollover');
