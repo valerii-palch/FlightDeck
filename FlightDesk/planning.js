@@ -246,12 +246,10 @@ function plannerSeatMap(aircraft){
  const layout=cabins.map(({kind,rows,height})=>
   '<div class="seat-section" data-cabin="'+kind+'" style="--cabin-height:'+height+'">'+rows+'</div>').join(seatServiceBay);
  const legend=cabins.map(({kind,label,count})=>
-  '<li data-cabin="'+kind+'"><i aria-hidden="true"></i><span>'+tr(label)+'</span><strong>'+count+'</strong></li>').join('');
+  '<li data-cabin="'+kind+'"><i aria-hidden="true"></i><span>'+tr(label)+'</span><strong data-cabin-count="'+kind+'" data-capacity="'+count+'">0 / '+count+'</strong></li>').join('');
  return '<header class="seat-heading"><h3>'+tr('Схема салона')+'</h3><p class="seat-model">'+esc(aircraftModel(aircraft))+'</p></header>'+
   '<div class="seat-figure" data-airframe="'+aircraft.short+'" aria-hidden="true"><div class="seat-fuselage">'+seatServiceBay+layout+seatServiceBay+'</div></div>'+
-  '<footer class="seat-key"><ul class="seat-legend">'+legend+'</ul><ul class="seat-legend seat-occupancy-legend">'+
-  '<li><i class="seat-key-occupied" aria-hidden="true"></i>'+tr('Занято')+'</li>'+
-  '<li><i class="seat-key-open" aria-hidden="true"></i>'+tr('Свободно')+'</li></ul></footer>';
+  '<footer class="seat-key"><ul class="seat-legend">'+legend+'</ul></footer>';
 }
 
 function orderCabinSeats(seats,random=Math.random){
@@ -266,7 +264,9 @@ function bindPlanningSteps(form){
  const steps=[...form.querySelectorAll('[data-flight-step]')];
  const indicators=[...form.querySelectorAll('[data-step-indicator]')];
  const pending={pax:false,baggageKg:false,cargoKg:false};
- let step=0, routeKey='', payloadKey='';
+ const body=form.querySelector('.flight-editor-body');
+ let step=0, routeKey='', payloadKey='', stepMotion;
+ form.noValidate=true;
  const itinerary=()=>{
   const dep=resolveAirportInput(fields.dep.value),arr=resolveAirportInput(fields.arr.value);
   const date=parseDisplayDate(fields.date.value.trim()),std=parseFlightTime(fields.std.value),sta=parseFlightTime(fields.sta.value);
@@ -276,7 +276,7 @@ function bindPlanningSteps(form){
  };
  const clocks=steps.slice(0,2).map(section=>section.querySelector('[data-planner-clock]'));
  const seatMap=byId('plannerSeatMap'), loadTrack=byId('plannerLoadTrack');
- let drawnAircraft, orderedSeats=[], occupiedSeats=-1;
+ let drawnAircraft, orderedSeats=[], cabinCounters=[], occupiedSeats=-1;
  const updateClocks=()=>{
   const clock=clocks[step];
   if(!clock)return;
@@ -314,10 +314,15 @@ function bindPlanningSteps(form){
    seatMap.innerHTML=plannerSeatMap(aircraft);
    drawnAircraft=aircraft.short;
    orderedSeats=orderCabinSeats(seatMap.querySelectorAll('.cabin-seat'));
+   cabinCounters=[...seatMap.querySelectorAll('[data-cabin-count]')].map(counter=>
+    [counter,seatMap.querySelector('.seat-section[data-cabin="'+counter.dataset.cabinCount+'"]')]);
    occupiedSeats=-1;
   }
   if(occupiedSeats!==occupied){
    orderedSeats.forEach((seat,index)=>seat.classList.toggle('seat-occupied',index<occupied));
+   for(const [counter,cabin] of cabinCounters){
+    counter.textContent=cabin.querySelectorAll('.seat-occupied').length+' / '+counter.dataset.capacity;
+   }
    occupiedSeats=occupied;
   }
   byId('plannerBaggage').textContent=(fields.baggageKg.value||'—')+' '+tr('кг');
@@ -336,7 +341,9 @@ function bindPlanningSteps(form){
   }
   updateClocks();
  };
- function openStep(index){
+ function openStep(index,animate=true){
+  const direction=Math.sign(index-step);
+  stepMotion?.cancel();
   step=index;
   steps.forEach((section,i)=>section.hidden=i!==step);
   indicators.forEach((item,i)=>i===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));
@@ -345,8 +352,42 @@ function bindPlanningSteps(form){
   byId('plannerSave').hidden=step!==steps.length-1;
   const returnButton=byId('plannerReturn');
   if(returnButton)returnButton.hidden=step!==steps.length-1;
-  form.querySelector('.flight-editor-body').scrollTop=0;
+  body.scrollTop=0;
   update();
+  if(animate&&direction&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+   const distance=(isWindowsDesktop?24:72)*direction;
+   stepMotion=steps[step].animate([
+    {transform:`translateX(${distance}px)`,opacity:.2},
+    {transform:'translateX(0)',opacity:1}
+   ],{duration:isWindowsDesktop?180:360,easing:'cubic-bezier(.22,.74,.25,1)'});
+  }
+ }
+ function validateBefore(index){
+  for(let i=0;i<index;i++){
+   const invalid=[...steps[i].querySelectorAll('input,select')].find(field=>field.willValidate&&!field.validity.valid);
+   if(invalid){
+    if(i!==step)openStep(i,false);
+    invalid.reportValidity();
+    return false;
+   }
+   if(i===0){
+    for(const key of ['dep','arr']){
+     const code=resolveAirportInput(fields[key].value);
+     if(!airport(code)){
+      fields[key].setCustomValidity(tr('Выбери ICAO из каталога аэропортов.'));
+      fields[key].reportValidity();
+      return false;
+     }
+     fields[key].value=code;
+    }
+    const values=flightFormValues(form);
+    if(!values||!validateSchedule(form,values))return false;
+   }
+  }
+  return true;
+ }
+ function navigateTo(index){
+  if(index!==step&&(index<step||validateBefore(index)))openStep(index);
  }
  form.addEventListener('input',event=>{
   const name=event.target.name;
@@ -355,31 +396,20 @@ function bindPlanningSteps(form){
  });
  form.addEventListener('invalid',event=>{
   const current=event.target.closest('[data-flight-step]');
-  if(current?.hidden)openStep(steps.indexOf(current));
- },true);
- byId('plannerBack').onclick=()=>openStep(step-1);
- byId('plannerNext').onclick=()=>{
-  if([...steps[step].querySelectorAll('input,select')].some(field=>field.willValidate&&!field.reportValidity()))return;
-  if(step===0){
-   for(const key of ['dep','arr']){
-    const code=resolveAirportInput(fields[key].value);
-    if(!airport(code)){
-     fields[key].setCustomValidity(tr('Выбери ICAO из каталога аэропортов.'));
-     fields[key].reportValidity();
-     return;
-    }
-    fields[key].value=code;
-   }
-   const values=flightFormValues(form);
-   if(!values||!validateSchedule(form,values))return;
+  if(current?.hidden){
+   openStep(steps.indexOf(current),false);
+   event.target.focus();
   }
-  openStep(step+1);
- };
+ },true);
+ indicators.forEach((button,index)=>{button.onclick=()=>navigateTo(index);});
+ byId('plannerBack').onclick=()=>navigateTo(step-1);
+ byId('plannerNext').onclick=()=>navigateTo(step+1);
  form.addEventListener('submit',event=>{
-  if(step===steps.length-1)return;
+  const final=step===steps.length-1;
+  if(final&&validateBefore(step))return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  byId('plannerNext').click();
+  if(!final)navigateTo(step+1);
  },true);
  const timer=setInterval(()=>{if(!form.isConnected)clearInterval(timer);else updateClocks();},1000);
  byId('dialog').addEventListener('close',()=>clearInterval(timer),{once:true});

@@ -763,7 +763,7 @@ dialog[data-layout="flight"] {
  border-color:var(--editor-edge);
 }
 .flight-editor :is(input,textarea)::placeholder { color:#c5d1e4; opacity:1; }
-.flight-editor .planner-steps li { border-color:var(--editor-edge); }
+.flight-editor .planner-steps button { border-color:var(--editor-edge); }
 .flight-editor .planner-steps [aria-current="step"] {
  background:linear-gradient(125deg,rgb(var(--editor-light) / .33),rgb(var(--editor-light) / .12));
  border-color:rgb(var(--editor-light) / .8);
@@ -1102,7 +1102,9 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 }
 .planner-section { display:grid; gap:12px; }
 .planner-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; list-style:none; padding:0; margin:0; }
-.planner-steps li { display:grid; place-items:center; padding:7px; border:1px solid var(--border); border-radius:var(--control-radius); text-align:center; color:var(--muted); }
+.planner-steps li { display:grid; min-width:0; }
+.planner-steps button { padding:7px; background:transparent; text-align:center; color:var(--muted); }
+.planner-steps button:hover { background:var(--control-glass); color:#f2f8ff; }
 .planner-steps [aria-current=step] { color:#f2f8ff; border-color:var(--blue); background:var(--control-glass); }
 .planner-load-values { display:grid; gap:8px; }
 .planner-load-values > div { display:grid; gap:4px; padding:10px; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass); }
@@ -1499,8 +1501,11 @@ select:not(.flight-select select) {
 }
 
 .local-flight-time { display:block; font-size:12px; font-variant-numeric:tabular-nums; }
-dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 32px)); }
-.flight-editor[data-planning] .flight-editor-body { align-content:start; padding-block:12px; gap:9px; }
+dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 32px)); height:min(868px,calc(100dvh - 32px)); }
+dialog[data-layout="flight"]:has([data-planning])[open] { display:grid; grid-template-rows:auto minmax(0,1fr); }
+.flight-editor[data-planning] { grid-template-rows:auto minmax(0,1fr) auto; max-height:none; }
+.flight-editor[data-planning] .planner-steps { padding:12px 22px 0; }
+.flight-editor[data-planning] .flight-editor-body { align-content:start; padding-block:12px; gap:9px; overflow-x:hidden; }
 .flight-editor[data-planning] .planner-section { gap:9px; }
 .flight-editor[data-planning] .flight-editor-section { padding:10px 12px; }
 .flight-editor[data-planning] .flight-editor-fields { margin-top:7px; gap:7px 10px; }
@@ -1610,10 +1615,7 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 .seat-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 9px; list-style:none; padding:0; margin:0; }
 .seat-legend li { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); }
 .seat-legend i { width:8px; height:8px; border-radius:2px; background:var(--seat); }
-.seat-legend strong { color:inherit; font-variant-numeric:tabular-nums; }
-.seat-occupancy-legend { margin-top:5px; }
-.seat-occupancy-legend i { border:1px solid #b7cce4; }
-.seat-occupancy-legend .seat-key-occupied { background:#b7cce4; }
+.seat-legend strong { color:inherit; font-variant-numeric:tabular-nums; white-space:nowrap; }
 @media(max-width:630px) {
  .planner-route-header,.planner-loading-grid { grid-template-columns:1fr; }
  .planner-seat-map { justify-self:center; }

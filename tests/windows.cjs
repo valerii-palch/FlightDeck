@@ -50,6 +50,14 @@ async function testApplication() {
     assert.equal(await page.locator('.pilot-name h2').textContent(), 'Тестовый пилот');
 
     await page.locator('[data-action=new]').click();
+    const tabs = page.locator('[data-step-indicator]');
+    const activeStep = () => page.locator('[data-flight-step]:visible').getAttribute('id');
+    const wizardSize = () => page.locator('#dialog').evaluate(el => [el.offsetWidth, el.offsetHeight]);
+    const initialWizardSize = await wizardSize();
+    for (const tab of [1, 2]) {
+      await tabs.nth(tab).click();
+      assert.equal(await activeStep(), 'planner-route');
+    }
     for (const [name, value] of Object.entries({ flightCode: 'afl', number: '002s', date: '23.11.2026', dep: 'UUEE', arr: 'USPP', std: '2335', localArrival: '0615' })) {
       await page.locator('#editForm [name=' + name + ']').fill(value);
     }
@@ -76,6 +84,8 @@ async function testApplication() {
       await page.locator('#plannerNext').click();
       const seatMap = page.locator('#plannerSeatMap');
       assert.equal(await seatMap.locator('.seat-model').textContent(), model);
+      assert.deepEqual(await wizardSize(), initialWizardSize);
+      assert.equal(await seatMap.locator('.seat-legend').count(), 1);
       const drawn = await seatMap.locator('.seat-section').evaluateAll(sections => Object.fromEntries(sections.map(section =>
         [section.dataset.cabin, section.querySelectorAll('.cabin-seat').length])));
       assert.deepEqual(drawn, classes);
@@ -112,20 +122,40 @@ async function testApplication() {
         assert.equal(await page.locator('#plannerLoadTrack').getAttribute('aria-valuenow'), String(percent));
         assert.match(await page.locator('#plannerLoad').textContent(), new RegExp('^' + occupied + ' / ' + capacity));
         assert.equal(await passengerField.evaluate(field => field.validity.rangeOverflow), count > capacity);
+        const counters = await seatMap.locator('[data-cabin-count]').evaluateAll(labels => Object.fromEntries(labels.map(label => [
+          label.dataset.cabinCount, label.textContent
+        ])));
+        const occupiedByClass = await seatMap.locator('.seat-section').evaluateAll(sections => Object.fromEntries(sections.map(section =>
+          [section.dataset.cabin, section.querySelectorAll('.seat-occupied').length])));
+        assert.deepEqual(counters, Object.fromEntries(Object.entries(classes).map(([kind, total]) =>
+          [kind, occupiedByClass[kind] + ' / ' + total])));
       }
       await passengerField.fill('');
       await page.locator('#plannerBack').click();
     }
-    await page.locator('#plannerNext').click();
+    await tabs.nth(1).click();
+    assert.equal(await activeStep(), 'planner-loading');
     await page.locator('#editForm [name=pax]').fill('42');
+    await page.locator('#editForm [name=baggageKg]').fill('');
+    await tabs.nth(0).click();
+    await tabs.nth(2).click();
+    assert.equal(await activeStep(), 'planner-loading');
+    assert.equal(await page.locator('#editForm [name=baggageKg]').evaluate(field => field === document.activeElement), true);
     await page.locator('#editForm [name=baggageKg]').fill('735');
     await page.locator('#editForm [name=cargoKg]').fill('215');
     assert.equal(await page.locator('#plannerLoadTrack').getAttribute('aria-valuenow'), '10');
     assert.equal(await page.locator('#plannerLoadTrack').evaluate(el => getComputedStyle(el, '::after').content), 'none');
-    await page.locator('#plannerNext').click();
+    await tabs.nth(2).click();
+    assert.equal(await activeStep(), 'planner-review');
+    assert.deepEqual(await wizardSize(), initialWizardSize);
     assert.equal(await page.locator('[data-planner-clock]:visible').count(), 0);
     assert.match(await page.locator('#plannerSummary').textContent(), /42 \/ 402/);
-    await page.locator('#plannerBack').click();
+    await tabs.nth(0).click();
+    assert.equal(await activeStep(), 'planner-route');
+    await tabs.nth(2).click();
+    assert.equal(await activeStep(), 'planner-review');
+    await tabs.nth(1).click();
+    assert.equal(await activeStep(), 'planner-loading');
     assert.equal(await page.locator('#editForm [name=baggageKg]').inputValue(), '735');
     assert.equal(await page.locator('#editForm [name=cargoKg]').inputValue(), '215');
     await page.locator('#plannerNext').click();

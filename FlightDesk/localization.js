@@ -1,7 +1,5 @@
 const english = {
  "Схема салона": "Cabin layout",
- "Занято": "Occupied",
- "Свободно": "Available",
  "Код рейса (ICAO)": "Flight code (ICAO)",
  "Авиакомпания": "Airline",
  "Аэропорт вылета (ICAO)": "Departure airport (ICAO)",

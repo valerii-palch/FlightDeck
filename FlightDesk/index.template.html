@@ -635,22 +635,23 @@ function editFlight(existing,divert=false,prefill=null) {
   .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
  const icao='list="icaoChoices" data-code="airport" pattern="[A-Za-z]{3,4}" maxlength="4" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
  const section=(title,content,kind='')=>`<section class="flight-editor-section ${kind}"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
- const loadFields=field('pax','Пассажиры','number',false,'min="0" step="1"')+
-  field('baggageKg','Загрузка багажа, кг','number',false,'min="0" step="1"')+
-  field('cargoKg','Коммерческий груз, кг','number',false,'min="0" step="1"');
+ const loadFields=field('pax','Пассажиры','number',!existing,'min="0" step="1"')+
+  field('baggageKg','Загрузка багажа, кг','number',!existing,'min="0" step="1"')+
+  field('cargoKg','Коммерческий груз, кг','number',!existing,'min="0" step="1"');
  const actualFields=['atd','ata','atdDate','ataDate','pax','baggageKg','cargoKg','actualMinutes','goArounds','note'];
  const aircraftOptions=fleet.map(a=>option(a.tail,aircraftModel(a)+' · '+a.tail,f.tail)).join('');
  const plannerTime=(name,label,required=false)=>`<label>${tr(label)}${timeField(name,f[name],required,true)}</label>`;
  const plannerDate=(name,label,value)=>`<label>${tr(label)}${dateField(name,value,true)}</label>`;
  const airportEmpty=!airports?`<div class="flight-editor-empty full"><p class="muted">${tr('Сначала добавь аэропорты в каталог.')}</p><button type="button" data-action="add-airport">${tr('Добавить аэропорт')}</button></div>`:'';
+ const plannerTabs=[['route','Маршрут и время'],['loading','Загрузка'],['review','Итоги']];
  const plannerClock=`<time class="planner-utc" data-planner-clock><strong data-utc-time></strong><span data-utc-date></span></time>`;
  const statusOptions=(existing?statuses.map(status=>[status,status]):plannerStatuses).map(([status,label,english])=>option(status,appLanguage()==='en'&&english?english:tr(label),f.status)).join('');
  openDialog(`<header class="flight-editor-header"><h2 id="flightEditorTitle">${tr(existing?'Изменить рейс':'Новый рейс')}</h2><button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
  <form id="editForm" class="editor flight-editor"${existing?'':' data-planning'}>
  <datalist id="icaoChoices">${airports}</datalist>
+ ${!existing?`<ol class="planner-steps">${plannerTabs.map(([id,label])=>`<li><button type="button" data-step-indicator aria-controls="planner-${id}">${tr(label)}</button></li>`).join('')}</ol>`:''}
  <div class="flight-editor-body">
- ${!existing?`<ol class="planner-steps"><li data-step-indicator>${tr('Маршрут и время')}</li><li data-step-indicator>${tr('Загрузка')}</li><li data-step-indicator>${tr('Итоги')}</li></ol>`:''}
- <div data-flight-step class="planner-section planner-route-step">
+ <div id="planner-route" data-flight-step class="planner-section planner-route-step">
  ${existing?
  section('Маршрут',
   `<div class="flight-editor-route full">${field('dep','Аэропорт вылета ICAO','text',true,icao)}${planeIcon}${field('arr','Аэропорт прилета ICAO','text',true,icao)}</div>`+
@@ -678,7 +679,7 @@ function editFlight(existing,divert=false,prefill=null) {
    <div>${select('status','Статус рейса',statusOptions)}</div>
   </section>`}
  </div>
- ${!existing?`<div data-flight-step class="planner-section planner-loading-step" hidden>
+ ${!existing?`<div id="planner-loading" data-flight-step class="planner-section planner-loading-step" hidden>
  <div class="planner-loading-grid">
   <section id="plannerSeatMap" class="panel planner-seat-map"></section>
   <div class="planner-load-content">
@@ -688,7 +689,7 @@ function editFlight(existing,divert=false,prefill=null) {
  <div class="planner-load-values"><div><small>${tr('Загрузка багажа')}</small><strong id="plannerBaggage"></strong></div>
  <div><small>${tr('Коммерческий груз')}</small><strong id="plannerCargo"></strong></div></div></section>
  ${section('Пассажиры и груз',loadFields)}</div></div></div>
- <div data-flight-step class="planner-section" hidden><section class="panel planner-review"><h3>${tr('Проверь данные рейса')}</h3><dl id="plannerSummary"></dl></section></div>`:''}
+ <div id="planner-review" data-flight-step class="planner-section" hidden><section class="panel planner-review"><h3>${tr('Проверь данные рейса')}</h3><dl id="plannerSummary"></dl></section></div>`:''}
  ${existing?`<details class="flight-editor-section flight-editor-extra"${actualFields.some(key=>f[key])?' open':''}>
  <summary>${tr('Фактические данные и примечание')}</summary>
  <div class="flight-editor-fields">
