@@ -13,7 +13,20 @@ ipcMain.handle('window-action', (event, action) => {
   if (!window) return;
   if (action === 'close') window.close();
   if (action === 'minimize') window.minimize();
-  if (action === 'fullscreen') window.setFullScreen(!window.isFullScreen());
+  if (action === 'fullscreen') {
+    if (window.isFullScreen()) {
+      window.setFullScreen(false);
+      return;
+    }
+    const windowedBounds = window.getBounds();
+    window.once('leave-full-screen', () => {
+      // Restore the frameless window's fixed bounds after Electron leaves fullscreen.
+      setImmediate(() => {
+        if (!window.isDestroyed() && !window.isFullScreen()) window.setBounds(windowedBounds);
+      });
+    });
+    window.setFullScreen(true);
+  }
 });
 
 ipcMain.handle('session-store', async (event, operation, value) => {
