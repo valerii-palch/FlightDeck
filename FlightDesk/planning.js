@@ -250,8 +250,8 @@ function plannerSeatMap(aircraft){
  return '<header class="seat-heading"><h3>'+tr('Схема салона')+'</h3><p class="seat-model">'+esc(aircraftModel(aircraft))+'</p></header>'+
   '<div class="seat-figure" data-airframe="'+aircraft.short+'" aria-hidden="true"><div class="seat-fuselage">'+seatServiceBay+layout+seatServiceBay+'</div></div>'+
   '<footer class="seat-key"><ul class="seat-legend">'+legend+'</ul><ul class="seat-legend seat-occupancy-legend">'+
-  '<li><i class="seat-key-occupied" aria-hidden="true"></i>'+tr('Занятые места')+'</li>'+
-  '<li><i class="seat-key-open" aria-hidden="true"></i>'+tr('Свободные места')+'</li></ul></footer>';
+  '<li><i class="seat-key-occupied" aria-hidden="true"></i>'+tr('Занято')+'</li>'+
+  '<li><i class="seat-key-open" aria-hidden="true"></i>'+tr('Свободно')+'</li></ul></footer>';
 }
 
 function orderCabinSeats(seats,random=Math.random){

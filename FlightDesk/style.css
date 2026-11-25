@@ -1520,8 +1520,8 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 .planner-utc strong { font-size:clamp(20px,3vw,32px); font-weight:680; }
 .planner-utc span { color:var(--muted); font-size:14px; }
 .planner-seat-map {
- display:grid; grid-template-rows:auto minmax(325px,1fr) auto; justify-items:center; gap:10px;
- width:190px; max-width:100%; min-width:0; margin:0; padding:13px 10px 12px; background:var(--editor-card);
+ display:grid; grid-template-rows:auto minmax(325px,1fr) auto; justify-items:center; gap:8px;
+ width:190px; max-width:100%; min-width:0; margin:0; padding:11px 10px 10px; background:var(--editor-card);
 }
 .planner-seat-map:has([data-airframe="A321"]) { width:156px; }
 .planner-seat-map:has([data-airframe="A350"]) { width:180px; }
