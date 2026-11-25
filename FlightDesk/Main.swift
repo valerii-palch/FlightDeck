@@ -5,13 +5,14 @@ import UniformTypeIdentifiers
 
 final class WindowDragHandle: NSView {
     override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 { window?.zoom(nil) }
-        else { window?.performDrag(with: event) }
+        if event.clickCount == 1 { window?.performDrag(with: event) }
     }
 }
 
 final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private var window: NSWindow!
+    private var windowedContentSize = NSSize(width: 1400, height: 900)
+    private var unconstrainedContentMaxSize = NSSize.zero
     private var webView: WKWebView!
     private var googleOAuth: GoogleOAuth?
     private let appUpdater = AppUpdater()
@@ -35,6 +36,16 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         applicationMenu.addItem(quit)
         applicationItem.submenu = applicationMenu
         menu.addItem(applicationItem)
+
+        let viewTitle = language == "ru" ? "Вид" : "View"
+        let viewItem = NSMenuItem(title: viewTitle, action: nil, keyEquivalent: "")
+        let viewMenu = NSMenu(title: viewTitle)
+        let fullScreen = NSMenuItem(title: language == "ru" ? "Полноэкранный режим" : "Full Screen",
+                                    action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+        fullScreen.keyEquivalentModifierMask = [.control, .command]
+        viewMenu.addItem(fullScreen)
+        viewItem.submenu = viewMenu
+        menu.addItem(viewItem)
         NSApp.mainMenu = menu
     }
 
@@ -90,19 +101,25 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         }
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 880),
-                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                          backing: .buffered, defer: false)
+        let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        if let screen = NSScreen.main {
+            let available = NSWindow.contentRect(forFrameRect: screen.visibleFrame, styleMask: style).size
+            windowedContentSize.width = min(windowedContentSize.width, available.width)
+            windowedContentSize.height = min(windowedContentSize.height, available.height)
+        }
+        window = NSWindow(contentRect: NSRect(origin: .zero, size: windowedContentSize),
+                          styleMask: style, backing: .buffered, defer: false)
         window.delegate = self
         window.title = "FlightDeck"
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 9.0 / 255, green: 13.0 / 255, blue: 22.0 / 255, alpha: 1)
-        window.contentMinSize = NSSize(width: 1360, height: 860)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.contentView = webView
+        unconstrainedContentMaxSize = window.contentMaxSize
+        lockWindowedSize()
         let dragHandle = WindowDragHandle(frame: .zero)
         dragHandle.translatesAutoresizingMaskIntoConstraints = false
         webView.addSubview(dragHandle)
@@ -256,6 +273,23 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         }
         decisionHandler(.allow)
     }
+
+    private func lockWindowedSize() {
+        window.contentMinSize = windowedContentSize
+        window.contentMaxSize = windowedContentSize
+        window.setContentSize(windowedContentSize)
+    }
+
+    func windowShouldZoom(_ window: NSWindow, toFrame newFrame: NSRect) -> Bool { false }
+
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        window.contentMinSize = .zero
+        window.contentMaxSize = unconstrainedContentMaxSize
+    }
+
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) { lockWindowedSize() }
+
+    func windowDidExitFullScreen(_ notification: Notification) { lockWindowedSize() }
 
     func windowDidResize(_ notification: Notification) {
         alignNativeToolbar()

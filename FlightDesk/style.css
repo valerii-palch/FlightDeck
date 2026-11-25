@@ -754,7 +754,7 @@ dialog[data-layout="flight"] {
 .flight-editor { display:grid; grid-template-rows:minmax(0,1fr) auto; gap:0; max-height:calc(100dvh - 100px); }
 .flight-editor-body { display:grid; gap:12px; padding:16px 22px; overflow:auto; overscroll-behavior:contain; }
 .flight-editor-section { min-width:0; padding:14px; border:1px solid var(--editor-edge); border-radius:15px; background:var(--editor-card); }
-.flight-editor :is(.planner-load,.planner-review,.planner-load-content > .flight-editor-section,.planner-load-values > div) {
+.flight-editor :is(.planner-load,.planner-review .panel,.planner-load-content > .flight-editor-section,.planner-load-values > div) {
  background:var(--editor-card);
  border-color:var(--editor-edge);
 }
@@ -763,11 +763,6 @@ dialog[data-layout="flight"] {
  border-color:var(--editor-edge);
 }
 .flight-editor :is(input,textarea)::placeholder { color:#c5d1e4; opacity:1; }
-.flight-editor .planner-steps button { border-color:var(--editor-edge); }
-.flight-editor .planner-steps [aria-current="step"] {
- background:linear-gradient(125deg,rgb(var(--editor-light) / .33),rgb(var(--editor-light) / .12));
- border-color:rgb(var(--editor-light) / .8);
-}
 .flight-editor .planner-load-track span { background:linear-gradient(90deg,rgb(var(--editor-light) / .44),rgb(var(--editor-light))); }
 .flight-editor-section h3,.flight-editor-extra summary { margin:0; font-size:15px; font-weight:670; }
 .flight-editor-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; margin-top:10px; }
@@ -1103,18 +1098,13 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 .planner-section { display:grid; gap:12px; }
 .planner-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; list-style:none; padding:0; margin:0; }
 .planner-steps li { display:grid; min-width:0; }
-.planner-steps button { padding:7px; background:transparent; text-align:center; color:var(--muted); }
-.planner-steps button:hover { background:var(--control-glass); color:#f2f8ff; }
-.planner-steps [aria-current=step] { color:#f2f8ff; border-color:var(--blue); background:var(--control-glass); }
+.planner-steps button { padding:7px; text-align:center; }
 .planner-load-values { display:grid; gap:8px; }
 .planner-load-values > div { display:grid; gap:4px; padding:10px; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass); }
 .planner-load > strong { display:block; font-size:24px; margin-top:8px; }
 .planner-load-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .planner-load-track { height:9px; margin:14px 0 16px; overflow:hidden; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:#08121e; }
 .planner-load-track span { display:block; width:var(--cabin-load,0%); height:100%; background:linear-gradient(90deg,#224a76,#6eb8f0); transition:width .28s ease; }
-.planner-review dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px 14px; margin-bottom:0; }
-.planner-review dt { color:var(--muted); }
-.planner-review dd { margin:0; overflow-wrap:anywhere; }
 @media(prefers-reduced-motion:reduce) { .planner-load-track span { transition:none; } }
 
 /* Section accents and the shared light across the window. */
@@ -1505,18 +1495,44 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 dialog[data-layout="flight"]:has([data-planning])[open] { display:grid; grid-template-rows:auto minmax(0,1fr); }
 .flight-editor[data-planning] { grid-template-rows:auto minmax(0,1fr) auto; max-height:none; }
 .flight-editor[data-planning] .planner-steps { padding:12px 22px 0; }
-.flight-editor[data-planning] .flight-editor-body { align-content:start; padding-block:12px; gap:9px; overflow-x:hidden; }
+.flight-editor[data-planning] .planner-steps button {
+ color:var(--muted); background:transparent; border-color:var(--editor-edge); box-shadow:none;
+}
+.flight-editor[data-planning] .planner-steps button:hover { background:var(--control-glass); color:#f2f8ff; }
+.flight-editor[data-planning] .planner-steps button[aria-current="step"] {
+ color:#f2f8ff; font-weight:650; border-color:rgb(var(--editor-light) / .84);
+ background:linear-gradient(125deg,rgb(var(--editor-light) / .38),rgb(var(--editor-light) / .13));
+}
+.flight-editor[data-planning] .flight-editor-body { grid-template-rows:minmax(min-content,1fr); padding-block:12px; overflow-x:hidden; }
 .flight-editor[data-planning] .planner-section { gap:9px; }
 .flight-editor[data-planning] .flight-editor-section { padding:10px 12px; }
 .flight-editor[data-planning] .flight-editor-fields { margin-top:7px; gap:7px 10px; }
-.flight-editor[data-planning] .planner-review dl { gap:6px 12px; }
+.flight-editor[data-planning] :is(input:not([type="checkbox"]),.flight-select select) {
+ background:linear-gradient(130deg,rgb(var(--editor-light) / .19),rgb(var(--editor-light) / .08));
+ border-color:rgb(var(--editor-light) / .46);
+ box-shadow:inset 0 1px 0 rgb(var(--editor-light) / .14);
+}
+.flight-editor[data-planning] :is(input:not([type="checkbox"]),.flight-select select):focus {
+ border-color:rgb(var(--editor-light) / .85);
+}
+.flight-editor[data-planning] .planner-route-step { grid-template-rows:auto minmax(min-content,1fr) auto; }
 .planner-route-header,.planner-loading-grid { display:grid; gap:9px; }
 .planner-route-header { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.planner-loading-grid {
- grid-template-columns:auto minmax(0,1fr); align-items:stretch;
- min-height:clamp(454px,calc(100dvh - 248px),690px);
+.flight-editor[data-planning] .planner-route-fields { display:grid; grid-template-rows:auto 1fr; padding:clamp(10px,2vh,18px) 14px; }
+.flight-editor[data-planning] .planner-route-fields .flight-editor-fields { align-content:space-evenly; column-gap:14px; }
+.planner-loading-grid { grid-template-columns:auto minmax(0,1fr); }
+.planner-load-content {
+ min-width:0; display:grid; gap:9px;
+ grid-template-rows:minmax(min-content,1fr) minmax(min-content,1.7fr) minmax(min-content,1.3fr);
 }
-.planner-load-content { min-width:0; display:grid; align-content:start; gap:9px; }
+.planner-load-content .planner-load { display:grid; align-content:center; }
+.flight-editor[data-planning] .planner-load-content > .flight-editor-section {
+ display:grid; grid-template-rows:auto 1fr; padding:clamp(10px,2vh,18px) 14px;
+}
+.planner-load-content .flight-editor-fields { align-content:space-evenly; }
+@media(min-width:800px) {
+ .planner-load-content .flight-editor-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
 .planner-utc {
  display:grid; place-content:center; gap:5px; padding:16px 12px; text-align:center;
  font-variant-numeric:tabular-nums; border:1px solid var(--editor-edge);
@@ -1622,6 +1638,8 @@ dialog[data-layout="flight"]:has([data-planning])[open] { display:grid; grid-tem
 }
 .flight-editor[data-planning] .planner-route-step .flight-editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .flight-editor[data-planning] .planner-route-step :is(input,select) { min-height:33px; padding-block:4px; }
+.flight-editor[data-planning] .planner-route-fields input { min-height:clamp(38px,5vh,46px); }
+.flight-editor[data-planning] .planner-load-content input { min-height:clamp(45px,5.8vh,54px); }
 .flight-editor[data-planning] .planner-route-step .date-editor .icon-button { width:28px; height:28px; min-height:28px; }
 .planner-flight-info { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
 .planner-flight-info > div {
@@ -1631,3 +1649,49 @@ dialog[data-layout="flight"]:has([data-planning])[open] { display:grid; grid-tem
 .planner-flight-info strong { font-size:17px; font-variant-numeric:tabular-nums; }
 .planner-flight-info :is(span,small,label) { font-size:12px; }
 .planner-flight-info small:empty { display:none; }
+
+
+/* Flight review */
+.planner-review {
+ display:grid; gap:9px; min-width:0;
+ grid-template-rows:minmax(min-content,3fr) minmax(min-content,1fr) minmax(min-content,1.25fr);
+}
+.planner-review .panel { margin:0; padding:clamp(12px,2.35vh,22px) clamp(12px,2vw,28px); }
+.planner-review-route { display:grid; grid-template-rows:auto 1fr; gap:12px; }
+.planner-review-header { display:flex; gap:12px; align-items:center; justify-content:space-between; }
+.planner-review-header h3 { margin:3px 0 0; font-size:clamp(23px,3vw,36px); letter-spacing:-.025em; }
+.planner-review-header span,.planner-review-stop > :is(span,small),.planner-review-airport span,
+.planner-review-aircraft h3,.planner-review-load dt { color:var(--muted); font-size:13px; }
+.planner-review-status,.planner-review-aircraft > span {
+ padding:5px 10px; border:1px solid var(--editor-edge); border-radius:999px; background:var(--control-glass);
+}
+.planner-review-itinerary {
+ display:grid; align-items:center; grid-template-columns:minmax(0,1fr) minmax(32px,.8fr) minmax(0,1fr); gap:12px;
+}
+.planner-review-stop { display:grid; gap:4px; font-variant-numeric:tabular-nums; }
+.planner-review-stop:last-child { text-align:right; }
+.planner-review-stop > strong { font-size:clamp(25px,3.6vw,44px); line-height:1.05; }
+.planner-review-airport { display:grid; gap:4px; margin-top:8px; overflow-wrap:anywhere; }
+.planner-review-airport b { font-size:clamp(16px,2.35vw,27px); letter-spacing:.055em; }
+.planner-review-connector { display:flex; align-items:center; gap:6px; color:rgb(var(--editor-light)); }
+.planner-review-connector::before,.planner-review-connector::after {
+ content:""; flex:1; height:1px; background:linear-gradient(90deg,transparent,currentColor);
+}
+.planner-review-connector::after { transform:scaleX(-1); }
+.planner-review-connector svg,.planner-review-aircraft svg { width:22px; height:22px; flex:none; }
+.planner-review-aircraft { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; }
+.planner-review-aircraft > div:first-child {
+ display:grid; place-items:center; width:40px; height:40px; border-radius:12px;
+ background:var(--control-glass); color:rgb(var(--editor-light));
+}
+.planner-review-aircraft h3 { margin:0 0 4px; font-weight:500; }
+.planner-review-aircraft strong { font-size:clamp(16px,2vw,23px); overflow-wrap:anywhere; }
+.planner-review-aircraft > span { font-size:13px; }
+.planner-review-load { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin:0; }
+.planner-review-load > div { display:grid; align-content:center; gap:7px; }
+.planner-review-load dd { margin:0; font-size:clamp(15px,2.2vw,25px); font-weight:680; font-variant-numeric:tabular-nums; }
+@media(max-width:520px) {
+ .planner-review-load { grid-template-columns:1fr; }
+ .planner-review-itinerary { grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr); gap:6px; }
+ .planner-load-content { grid-template-rows:auto; }
+}

@@ -276,6 +276,7 @@ function bindPlanningSteps(form){
  };
  const clocks=steps.slice(0,2).map(section=>section.querySelector('[data-planner-clock]'));
  const seatMap=byId('plannerSeatMap'), loadTrack=byId('plannerLoadTrack');
+ const summaryFields=[...byId('plannerSummary').querySelectorAll('[data-summary]')];
  let drawnAircraft, orderedSeats=[], cabinCounters=[], occupiedSeats=-1;
  const updateClocks=()=>{
   const clock=clocks[step];
@@ -327,17 +328,16 @@ function bindPlanningSteps(form){
   }
   byId('plannerBaggage').textContent=(fields.baggageKg.value||'—')+' '+tr('кг');
   byId('plannerCargo').textContent=(fields.cargoKg.value||'—')+' '+tr('кг');
-  const summary=byId('plannerSummary');
-  summary.replaceChildren();
-  for(const [label,value] of [
-   ['Маршрут',[dep,arr].filter(Boolean).map(code=>airportCity(code)+' ('+code+')').join(' → ')],
-   ['Дата UTC',displayDate(date)],['Расписание',[std,sta].filter(Boolean).join(' → ')+' UTC'],
-   ['Борт',aircraftModel(aircraft)],['Рейс',plannedFlightNumber(fields.flightCode.value,fields.number.value)],['Статус',fields.status.selectedOptions[0]?.textContent],
-   ['Пассажиры',byId('plannerLoad').textContent],['Загрузка багажа',byId('plannerBaggage').textContent],
-   ['Коммерческий груз',byId('plannerCargo').textContent]
-  ]){
-   const dt=document.createElement('dt'),dd=document.createElement('dd');
-   dt.textContent=tr(label);dd.textContent=value||'—';summary.append(dt,dd);
+  if(step===steps.length-1){
+   const summary={
+    flight:plannedFlightNumber(fields.flightCode.value,fields.number.value),
+    status:fields.status.selectedOptions[0]?.textContent,
+    departureTime:std,departureDate:displayDate(date),departureCode:dep,departureCity:dep&&airportCity(dep),
+    arrivalTime:sta,arrivalDate:displayDate(staDate||defaultArrivalDate(date,std,sta)),arrivalCode:arr,arrivalCity:arr&&airportCity(arr),
+    aircraft:aircraftModel(aircraft),tail:aircraft.tail,passengers:byId('plannerLoad').textContent,
+    baggage:byId('plannerBaggage').textContent,cargo:byId('plannerCargo').textContent
+   };
+   for(const field of summaryFields)field.textContent=summary[field.dataset.summary]||'—';
   }
   updateClocks();
  };

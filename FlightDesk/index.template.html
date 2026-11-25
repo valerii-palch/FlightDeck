@@ -689,7 +689,33 @@ function editFlight(existing,divert=false,prefill=null) {
  <div class="planner-load-values"><div><small>${tr('Загрузка багажа')}</small><strong id="plannerBaggage"></strong></div>
  <div><small>${tr('Коммерческий груз')}</small><strong id="plannerCargo"></strong></div></div></section>
  ${section('Пассажиры и груз',loadFields)}</div></div></div>
- <div id="planner-review" data-flight-step class="planner-section" hidden><section class="panel planner-review"><h3>${tr('Проверь данные рейса')}</h3><dl id="plannerSummary"></dl></section></div>`:''}
+ <div id="planner-review" data-flight-step class="planner-section" hidden>
+ <div id="plannerSummary" class="planner-review">
+  <section class="panel planner-review-route" aria-label="${tr('Маршрут')}">
+   <header class="planner-review-header">
+    <div><span>${tr('Рейс')}</span><h3 data-summary="flight"></h3></div>
+    <span class="planner-review-status" data-summary="status"></span>
+   </header>
+   <div class="planner-review-itinerary">
+    ${[['departure','Вылет UTC'],['arrival','Прилет UTC']].map(([key,label],index)=>
+     `${index?'<div class="planner-review-connector" aria-hidden="true">'+planeIcon+'</div>':''}
+     <div class="planner-review-stop"><span>${tr(label)}</span>
+      <strong data-summary="${key}Time"></strong><small data-summary="${key}Date"></small>
+      <div class="planner-review-airport"><b data-summary="${key}Code"></b><span data-summary="${key}City"></span></div>
+     </div>`).join('')}
+   </div>
+  </section>
+  <section class="panel planner-review-aircraft">
+   <div aria-hidden="true">${planeIcon}</div>
+   <div><h3>${tr('Борт')}</h3><strong data-summary="aircraft"></strong></div>
+   <span data-summary="tail"></span>
+  </section>
+  <dl class="planner-review-load">
+   ${[['passengers','Пассажиры'],['baggage','Загрузка багажа'],['cargo','Коммерческий груз']].map(([key,label])=>
+    `<div class="panel"><dt>${tr(label)}</dt><dd data-summary="${key}"></dd></div>`).join('')}
+  </dl>
+ </div>
+ </div>`:''}
  ${existing?`<details class="flight-editor-section flight-editor-extra"${actualFields.some(key=>f[key])?' open':''}>
  <summary>${tr('Фактические данные и примечание')}</summary>
  <div class="flight-editor-fields">

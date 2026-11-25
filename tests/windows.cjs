@@ -180,10 +180,17 @@ async function testApplication() {
     await page.locator('#closeUpdate').click();
 
     const nativeWindow = await app.browserWindow(page);
+    const initialSize = await nativeWindow.evaluate(window => window.getContentSize());
+    const workArea = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);
+    assert.deepEqual(initialSize, [Math.min(1400, workArea.width), Math.min(900, workArea.height)]);
+    assert.equal(await nativeWindow.evaluate(window => window.isResizable()), false);
+    assert.equal(await nativeWindow.evaluate(window => window.isMaximizable()), false);
     await page.locator('[data-window-action=fullscreen]').click();
     await waitFor(() => nativeWindow.evaluate(window => window.isFullScreen()));
     await page.locator('[data-window-action=fullscreen]').click();
-    await waitFor(() => nativeWindow.evaluate(window => !window.isFullScreen()));
+    await waitFor(() => nativeWindow.evaluate((window, size) =>
+      !window.isFullScreen() && window.getContentSize().every((dimension, index) => dimension === size[index]), initialSize));
+    assert.equal(await nativeWindow.evaluate(window => window.isResizable()), false);
     await page.locator('[data-window-action=minimize]').click();
     await waitFor(() => nativeWindow.evaluate(window => window.isMinimized()));
     await nativeWindow.evaluate(window => { window.restore(); window.focus(); });

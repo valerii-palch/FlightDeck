@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, safeStorage, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, safeStorage, screen, session, shell } = require('electron');
 const { readFile, rename, rm, writeFile } = require('node:fs/promises');
 const { join } = require('node:path');
 
@@ -50,13 +50,15 @@ function openExternalLink(url, window) {
 
 async function createWindow() {
   nativeTheme.themeSource = 'dark';
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const window = new BrowserWindow({
     title: 'FlightDeck',
     frame: false,
-    width: 1400,
-    height: 900,
-    minWidth: 1360,
-    minHeight: 860,
+    width: Math.min(1400, width),
+    height: Math.min(900, height),
+    resizable: false,
+    maximizable: false,
+    fullscreenable: true,
     useContentSize: true,
     backgroundColor: '#090d16',
     icon: join(__dirname, 'icon.png'),
