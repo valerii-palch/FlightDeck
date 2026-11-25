@@ -1,4 +1,6 @@
 const english = {
+ "Открыть карточку": "Open airport details",
+ "Карта аэропортов": "Airport map",
  "Схема салона": "Cabin layout",
  "Код рейса (ICAO)": "Flight code (ICAO)",
  "Авиакомпания": "Airline",

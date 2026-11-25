@@ -141,7 +141,7 @@ function boardRows() {
  const needle=journalQuery.trim().toLocaleLowerCase('ru').replace(/\s+/g,'');
  const matching=summaryFlights().filter(f=>{
   const codes=[f.dep,alternate(f),f.arr];
-  const terms=[f.number,f.tail,...codes.flatMap(c=>[c,airport(c)?.iata,airportInfo(c)?.cityRu,airportInfo(c)?.cityEn])];
+  const terms=[f.number,f.tail,...codes.flatMap(c=>[c,airportIata(c),airportInfo(c)?.cityRu,airportInfo(c)?.cityEn])];
   return terms.join(' ').toLocaleLowerCase('ru').replace(/\s+/g,'').includes(needle) &&
    (journalFilter==='all'||f.tail===journalFilter) &&
    (typeFilter==='all'||typeFilter===flightType(f)) &&

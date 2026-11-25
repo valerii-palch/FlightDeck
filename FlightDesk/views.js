@@ -247,6 +247,7 @@ function aircraftPage() {
  `<section class="panel"><h2>${tr("Пассажирский салон")}</h2><div class="strip row"><span>${tr("Всего мест")}</span><strong>`+capacity(a)+'</strong></div>'+
  a.seats.map((n,i)=>'<div class="strip row"><span>'+[tr("Эконом"),tr("Комфорт"),tr("Бизнес")][i]+'</span><strong>'+(n||'—')+'</strong></div>').join('')+
  (a.short==='B777'?`<p class="facts muted">${tr("Стоянки по списку Airbus A350")}</p>`:'')+'</section></div>'+
+ `<section class="panel facts"><h2>${tr("Схема салона")}</h2>`+fleetCabinDiagram(a)+'</section>'+
  `<section class="panel facts"><h2>${tr("Рейсы борта")}</h2>`+(rows.length?flightTable(rows):`<p class="muted">${tr("Рейсов пока нет.")}</p>`)+'</section>';
 }
 function pilot() {

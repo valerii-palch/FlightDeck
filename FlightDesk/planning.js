@@ -186,7 +186,7 @@ function resolveAirportInput(value){
  const search=value.trim().toUpperCase();
  if(!/^[A-Z]{3,4}$/.test(search))return '';
  if(!search||airport(search))return search;
- const matches=data.airports.filter(a=>a.iata===search);
+ const matches=data.airports.filter(a=>airportIata(a.icao)===search);
  return matches.length===1?matches[0].icao:search;
 }
 const randomInteger=(min,max,random=Math.random)=>min+Math.floor(random()*(max-min+1));
@@ -250,6 +250,46 @@ function plannerSeatMap(aircraft){
  return '<header class="seat-heading"><h3>'+tr('Схема салона')+'</h3><p class="seat-model">'+esc(aircraftModel(aircraft))+'</p></header>'+
   '<div class="seat-figure" data-airframe="'+aircraft.short+'" aria-hidden="true"><div class="seat-fuselage">'+seatServiceBay+layout+seatServiceBay+'</div></div>'+
   '<footer class="seat-key"><ul class="seat-legend">'+legend+'</ul></footer>';
+}
+
+// Cabin stations are traced from the supplied layouts, with the nose on the left.
+const fleetCabinStations={
+ A321:{business:[[1,4,211,23]],economy:[[8,10,318,18],[11,22,384,18.3],[23,35,654,19]],
+  wings:[440,603],fixtures:[[143,89,23,23],[614,48,24,28],[614,88,24,28],[899,93,21,24]]},
+ A350:{business:[[1,7,196,20.3]],comfort:[[8,10,393,16.4]],economy:[[11,24,452,13.6],[25,40,683,13.35]],
+  wings:[391,627],fixtures:[[160,50,19,16],[160,104,19,16],[340,66,11,38],[366,60,18,50],[635,45,25,73],[915,50,24,18],[915,101,24,18]]},
+ B777:{business:[[1,5,154,22]],comfort:[[11,16,321,14]],economy:[[17,23,412,13],[24,24,517,0],[25,37,528,13],[38,51,721,12.4]],
+  wings:[430,620],fixtures:[[96,69,25,31],[271,55,34,54],[496,45,13,74],[693,44,19,76],[901,43,18,28],[915,73,22,25],[901,100,18,21]]}
+};
+function fleetCabinDiagram(aircraft){
+ const {short}=aircraft, plan=cabinLayouts[short], stations=fleetCabinStations[short];
+ const [wingStart,wingEnd]=stations.wings;
+ const fixture=(x,y,width,height)=>`<rect class="cabin-fixture" x="${x}" y="${y}" width="${width}" height="${height}" rx="3"/>`;
+ const cabins=cabinClasses.map(([kind])=>{
+  const banks=plan[kind];
+  if(!banks)return '';
+  const economy=kind==='economy', wide=banks.length===3;
+  const width=kind==='business'?13:kind==='comfort'?10:8, height=kind==='business'?12:8;
+  const seat=(number,x,bank,index)=>{
+   if(economy&&plan.rowMasks[number]?.[bank][index]==='0')return '';
+   const middle=wide&&bank===1, right=bank===banks.length-1;
+   const gap=height+2;
+   let y=middle?82-(banks[bank]-1)*gap/2+index*gap:right?115-(banks[bank]-1-index)*gap:49+index*gap;
+   const angle=kind==='business'&&short==='B777'?(right?-12:12):0;
+   if(kind==='business'&&short==='A350'&&number%2===0&&!middle)y+=right?-3:3;
+   return `<rect class="cabin-seat-shape" x="${x-width/2}" y="${y-height/2}" width="${width}" height="${height}" rx="2"${angle?` transform="rotate(${angle} ${x} ${y})"`:''}/>`;
+  };
+  const rows=stations[kind].map(([first,last,start,pitch])=>Array.from({length:last-first+1},(_,index)=>{
+   const number=first+index, x=start+index*pitch;
+   return banks.map((size,bank)=>Array.from({length:size},(_,index)=>seat(number,x,bank,index)).join('')).join('');
+  }).join('')).join('');
+  return '<g data-cabin="'+kind+'">'+rows+'</g>';
+ }).join('');
+ return `<svg class="fleet-cabin-diagram" viewBox="0 0 1000 164" role="img" aria-label="${tr('Схема салона')} · ${esc(aircraftModel(aircraft))}">
+ <path class="cabin-wing" d="M${wingStart} 43l28-41h${wingEnd-wingStart-28}v44z M${wingStart} 121l28 41h${wingEnd-wingStart-28}v-44z"/>
+ <path class="cabin-shell" d="M18 82C48 53 100 39 182 39H887q60 0 89 19 26 24 0 49-32 18-89 18H182C100 125 48 111 18 82Z"/>
+ <path class="cabin-fixture" d="M48 81l14-15 15-6-7 10-11 12 11 12 7 10-15-6-14-15z"/>
+ ${stations.fixtures.map(box=>fixture(...box)).join('')}${cabins}</svg>`;
 }
 
 function orderCabinSeats(seats,random=Math.random){

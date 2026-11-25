@@ -1,8 +1,10 @@
 const airportReference = JSON.parse(byId('airport-reference').textContent);
 const worldwideAirports=JSON.parse(byId('worldwide-airports').textContent);
+const airportIata = code => [airportReference[code]?.iata,worldwideAirports[code]?.iata,airport(code)?.iata]
+ .find(value=>typeof value==='string'&&/^[A-Z]{3}$/.test(value))||'';
 const airportInfo = code => {
  const entry=airport(code), base=airportReference[code], world=worldwideAirports[code];
- return entry||base||world?{...world,...base,...entry}:undefined;
+ return entry||base||world?{...world,...base,...entry,iata:airportIata(code)}:undefined;
 };
 const airportCity = code => {
  const info = airportInfo(code);
@@ -157,4 +159,18 @@ function selectMapAirport(code, pan=true) {
  byId('mapAirportSummary').innerHTML = mapAirportSummary(code);
  if(pan) byId('onlineMap')?.querySelector('iframe')?.contentWindow?.postMessage({select:code},'*');
  document.querySelectorAll('[data-map-airport]').forEach(marker=>marker.classList.toggle('selected',marker.dataset.mapAirport===code));
+}
+
+function catalogAirportMap(){
+ const codes=data.airports.map(a=>a.icao).filter(code=>hasCoordinates(airportInfo(code)));
+ if(!codes.length)return '';
+ const chart=routeProjection(codes.map(airportInfo));
+ return `<section class="panel airport-catalog-map"><div class="row map-heading"><h2>${tr('Карта аэропортов')}</h2><small id="mapProviderStatus"></small></div>
+  <div id="onlineMap" class="online-map" data-catalog-map></div>
+  <svg id="offlineMap" class="map-chart" viewBox="0 0 ${chart.width} ${chart.height}" role="group" aria-label="${tr('Карта аэропортов')}">
+  <g class="map-land">${coastlines(chart)}</g>${codes.map(code=>{
+   const info=airportInfo(code), [x,y]=chart.project({...info,lon:wrapLon(info.lon,chart.centerLon)});
+   return `<g class="catalog-pin" role="button" tabindex="0" data-catalog-pin="${esc(code)}" aria-label="${esc(code+' · '+airportCity(code))}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">
+    <title>${esc(code+' · '+airportCity(code))}</title><path d="M0 0C-2-4-7-7-7-12a7 7 0 1 1 14 0C7-7 2-4 0 0Z"/><circle cy="-12" r="2.5"/></g>`;
+  }).join('')}</svg></section>`;
 }

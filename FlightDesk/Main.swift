@@ -10,6 +10,9 @@ final class WindowDragHandle: NSView {
 }
 
 final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
+    // Match the header height and horizontal inset in style.css.
+    private let toolbarHeight: CGFloat = 56
+    private let toolbarInset: CGFloat = 16
     private var window: NSWindow!
     private var windowedContentSize = NSSize(width: 1400, height: 900)
     private var unconstrainedContentMaxSize = NSSize.zero
@@ -127,7 +130,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
             dragHandle.leadingAnchor.constraint(equalTo: webView.leadingAnchor, constant: 106),
             dragHandle.trailingAnchor.constraint(equalTo: webView.trailingAnchor, constant: -220),
             dragHandle.topAnchor.constraint(equalTo: webView.topAnchor),
-            dragHandle.heightAnchor.constraint(equalToConstant: 56)
+            dragHandle.heightAnchor.constraint(equalToConstant: toolbarHeight)
         ])
         window.center()
         if !testing {
@@ -289,34 +292,34 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     func windowDidFailToEnterFullScreen(_ window: NSWindow) { lockWindowedSize() }
 
-    func windowDidExitFullScreen(_ notification: Notification) { lockWindowedSize() }
+    func windowDidExitFullScreen(_ notification: Notification) {
+        lockWindowedSize()
+        alignNativeToolbar()
+    }
 
     func windowDidResize(_ notification: Notification) {
         alignNativeToolbar()
     }
 
     private func alignNativeToolbar() {
-        guard let button = window?.standardWindowButton(.closeButton), let webView else { return }
-        func topOfCenter(_ control: NSButton) -> CGFloat {
-            let center = NSPoint(x: control.bounds.midX, y: control.bounds.midY)
-            let point = webView.convert(control.convert(center, to: nil), from: nil)
-            return webView.isFlipped ? point.y : webView.bounds.height - point.y
+        guard let window, !window.styleMask.contains(.fullScreen),
+              let button = window.standardWindowButton(.closeButton), let webView,
+              webView.bounds.height >= toolbarHeight else { return }
+        let frame = webView.convert(button.convert(button.bounds, to: nil), from: nil)
+        let centerY = webView.isFlipped ? webView.bounds.minY + toolbarHeight / 2
+                                      : webView.bounds.maxY - toolbarHeight / 2
+        let current = webView.convert(NSPoint(x: frame.minX, y: frame.midY), to: nil)
+        let target = webView.convert(NSPoint(x: webView.bounds.minX + toolbarInset, y: centerY), to: nil)
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let control = window.standardWindowButton(kind), let container = control.superview else { continue }
+            let origin = container.convert(current, from: nil)
+            let destination = container.convert(target, from: nil)
+            var aligned = control.frame
+            aligned.origin.x += destination.x - origin.x
+            aligned.origin.y += destination.y - origin.y
+            control.frame = aligned
         }
-        let top = topOfCenter(button)
-        guard top.isFinite, top > 0 else { return }
-        let inset = max(0, 24 - top)
-        if inset > 0 {
-            for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-                guard let control = window.standardWindowButton(kind), let container = control.superview else { continue }
-                var frame = control.frame
-                frame.origin.y += container.isFlipped ? inset : -inset
-                control.frame = frame
-            }
-        }
-        webView.evaluateJavaScript("""
-            document.documentElement.dataset.nativeToolbar = '';
-            document.documentElement.style.setProperty('--native-toolbar-offset', '\(topOfCenter(button) - 28)px');
-            """)
+        webView.evaluateJavaScript("document.documentElement.dataset.nativeToolbar = '';")
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -400,10 +403,13 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           airportForm.elements.version.value = '1.2';
           airportForm.requestSubmit();
           check(airport('TEST')?.developer === 'Test Studio' && airport('TEST')?.version === '1.2', 'airport scenery details');
-          const version = document.querySelector('[data-airport-scenery=version]');
-          version.value = '1.3';
-          version.dispatchEvent(new Event('change', {bubbles:true}));
-          check(cloudSnapshot().airports[0].version === '1.3', 'airport scenery edit persisted');
+          check(!document.querySelector('.airport-preview :is(input,textarea)'), 'airport preview is read-only');
+          document.querySelector('[data-airport-card="TEST"]').click();
+          const airportCard = byId('airportCardForm');
+          check(airportCard.querySelector('[readonly]'), 'airport card IATA is read-only');
+          airportCard.elements.version.value = '1.3';
+          airportCard.requestSubmit();
+          check(airport('TEST').version === '1.3', 'airport scenery edit persisted');
           document.querySelector('[data-action=new]').click();
           check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
           const editor = byId('editForm');
@@ -415,6 +421,8 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
             const model=document.createElement('div');
             model.innerHTML=plannerSeatMap(aircraft);
             check(model.querySelectorAll('.seat-bank i:not(.seat-gap)').length===capacity(aircraft),'cabin capacity '+aircraft.short);
+            model.innerHTML=fleetCabinDiagram(aircraft);
+            check(model.querySelectorAll('.cabin-seat-shape').length===capacity(aircraft)&&!model.querySelector('text'),'fleet cabin diagram '+aircraft.short);
           }
           check(plannerSeatMap(fleet[0]).includes('data-cabin="business"') && !plannerSeatMap(fleet[0]).includes('data-cabin="comfort"'), 'A321 classes');
 

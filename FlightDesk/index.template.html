@@ -75,7 +75,7 @@ const fleet = [
 const aircraftModel = a => a.type;
 const aircraftDisplayName = a => a.airframeName?.[appLanguage()] || '';
 const aircraftFor = tail => fleet.find(a=>a.tail===tail);
-const appCredit = '<small class="version">v__VERSION__</small>';
+const appCredit = '<small class="app-credit">by Valerii Vakhrushev</small><small class="version">v__VERSION__</small>';
 const statuses = ['Запланирован','Подготовка','Загрузка багажа','Идет посадка','Посадка завершена','Вылетел','Выполнен','Уход на запасной','Отменен','Задержан'];
 const stages = [['fuel','Начало заправки',50],['bags','Начало загрузки багажа',35],['board','Начало посадки',30],['close','Окончание посадки',10]];
 const preparationOffset=(f,key,offset)=>key==='fuel'&&aircraftFor(f.tail)?.short!=='A321'?offset*2:offset;
@@ -181,7 +181,7 @@ const toolbarIcon=kind=>{
 };
 
 const option = (value, label, current) => '<option value="'+esc(value)+'"'+(value === current?' selected':'')+'>'+esc(label)+'</option>';
-const codeLabel = code => '<span class="code">'+esc(code)+(airport(code)?.iata?' <small>/ '+esc(airport(code).iata)+'</small>':'')+'</span>';
+const codeLabel = code => '<span class="code">'+esc(code)+(airportIata(code)?' <small>/ '+esc(airportIata(code))+'</small>':'')+'</span>';
 const duration = minutes => Number.isFinite(minutes) ? Math.floor(minutes/60)+` ${tr("ч")} `+minutes%60+` ${tr("мин")}` : '—';
 const clockOn = (date,time) => Date.parse(date+'T'+time+':00Z');
 const minute = 60000;
@@ -379,7 +379,7 @@ function filteredAirports() {
  const needle = query.trim().toLowerCase().replaceAll('ё','е');
  return data.airports.filter(a=>{
   const info=airportInfo(a.icao);
-  return (!airportCountryFilter||catalogCountry(a)===airportCountryFilter) && [a.icao,a.iata,a.name,a.country,info?.cityRu,info?.cityEn,info?.nameRu,info?.nameEn]
+  return (!airportCountryFilter||catalogCountry(a)===airportCountryFilter) && [a.icao,airportIata(a.icao),a.name,a.country,info?.cityRu,info?.cityEn,info?.nameRu,info?.nameEn]
    .join(' ').toLowerCase().replaceAll('ё','е').includes(needle) &&
    (airportFilter==='all'||airportFilter==='scenery'&&a.scenery||airportFilter==='missing'&&a.scenery&&!a.gsx) &&
    (regionFilter==='all'||(regionFilter==='domestic')===isDomestic(a));
@@ -455,19 +455,27 @@ function airportsPage() {
   airportCode=data.airports.find(a=>catalogCountry(a)===airportCountryFilter)?.icao||'';
  }
  const a=airport(airportCode);
- const info=airportInfo(airportCode);
- return `<div class="grid two airport-grid"><section class="panel stack"><div class="row"><h2>${tr("Каталог")}</h2><button class="primary" data-action="add-airport">${tr("Добавить")}</button></div><label class="catalog-country">${tr("Страна")}<span class="flight-select"><select id="airportCountry">`+countries.map(code=>option(code,catalogCountryName(code),airportCountryFilter)).join('')+`</select></span></label><div class="airport-filters"><input id="airportSearch" aria-label="${tr("Поиск аэропортов")}" type="search" placeholder="${tr("ICAO, IATA или город")}" value="`+esc(query)+'">'+
+ return catalogAirportMap()+`<div class="grid two airport-grid"><section class="panel stack"><div class="row"><h2>${tr("Каталог")}</h2><button class="primary" data-action="add-airport">${tr("Добавить")}</button></div><label class="catalog-country">${tr("Страна")}<span class="flight-select"><select id="airportCountry">`+countries.map(code=>option(code,catalogCountryName(code),airportCountryFilter)).join('')+`</select></span></label><div class="airport-filters"><input id="airportSearch" aria-label="${tr("Поиск аэропортов")}" type="search" placeholder="${tr("ICAO, IATA или город")}" value="`+esc(query)+'">'+
  `<span class="flight-select"><select id="airportFilter" aria-label="${tr("Сценарии аэропортов")}">`+[['all',tr("Все")],['scenery',tr("Установлены")],['missing',tr("Без GSX")]].map(([v,l])=>option(v,l,airportFilter)).join('')+'</select></span>'+
  `<span class="flight-select"><select id="regionFilter" aria-label="${tr("География рейсов")}">`+[['all',tr("Все направления")],['domestic',tr("Внутренние рейсы")],['international',tr("Международные рейсы")]].map(([v,l])=>option(v,l,regionFilter)).join('')+'</select></span></div>'+
  '<div id="airportRows">'+airportRows()+'</div></section>'+
- (a?'<section class="panel"><div class="airport-codes">'+codeLabel(a.icao)+'</div><div class="airport-heading"><h2>'+esc(airportCity(a.icao))+'</h2>'+
- (info?'<p>'+esc(airportName(a.icao))+'</p>':'')+
- (appLanguage()==='ru'&&info?.nameEn?'<p class="muted" lang="en">'+esc(info.nameEn)+'</p>':'')+'</div>'+
- '<div id="airportPhotoSlot" data-code="'+esc(a.icao)+'">'+airportPhoto(a)+'</div><div class="airport-flags">'+[['scenery',tr("Сценарий аэропорта")],['gsx',tr("Профиль GSX")],['python',tr("Расширение Python")]].map(([k,l])=>
- '<label class="switch-row"><span><strong>' +tr(l)+'</strong><small data-flag-label="'+k+'">'+(a[k]?tr("Установлен"):tr("Не установлен"))+'</small></span>'+
- '<input type="checkbox" role="switch" data-flag="'+k+'" '+(a[k]?'checked':'')+'><span class="switch-track" aria-hidden="true"></span></label>').join('')+'</div>'+
- `<label class="facts">${tr("Код IATA")}<input id="airportIata" value="`+esc(a.iata)+'" maxlength="3" placeholder="SVO"></label>'+
- [['narrow',tr("Стоянки Airbus A321")],['wide',tr("Стоянки Airbus A350 и Boeing 777")]].map(([k,l])=>'<label class="facts">' +tr(l)+'<textarea data-parking="'+k+'" rows="4" placeholder="'+tr('Номера стоянок, через запятую')+'">'+esc(a.stands?.[k]||'')+'</textarea></label>').join('')+airportSceneryDetails(a)+'</section>':'')+'</div>';
+ (a?airportPreview(a):'')+'</div>';
+}
+function airportPreview(a){
+ const {icao}=a;
+ const info=airportInfo(icao);
+ const dataRows=[
+  ['Код IATA',info.iata],['Страна',catalogCountry(a)?catalogCountryName(catalogCountry(a)):''],
+  ['Сценарий аэропорта',tr(a.scenery?'Установлен':'Не установлен')],['Профиль GSX',tr(a.gsx?'Установлен':'Не установлен')],
+  ['Расширение Python',tr(a.python?'Установлен':'Не установлен')],['Часовой пояс IANA',info.timezone]
+ ];
+ return `<section class="panel airport-preview"><div class="airport-codes">${codeLabel(icao)}</div>
+  <div class="airport-heading"><h2>${esc(airportCity(icao))}</h2><p>${esc(airportName(icao))}</p>
+  ${appLanguage()==='ru'&&info.nameEn?`<p class="muted" lang="en">${esc(info.nameEn)}</p>`:''}</div>
+  <div id="airportPhotoSlot" data-code="${esc(icao)}">${airportPhoto(a)}</div>
+  <dl class="airport-preview-details">${dataRows.map(([label,value])=>`<div><dt>${tr(label)}</dt><dd>${esc(value||'—')}</dd></div>`).join('')}</dl>
+  <div class="controls"><button class="primary" data-airport-card="${esc(icao)}">${tr('Открыть карточку')}</button></div>
+ </section>`;
 }
 window.addEventListener('languagechange',()=>{
  applyLanguage();
@@ -604,10 +612,11 @@ function openDialog(html, layout = '', anchor = null) {
  d.classList.remove('settings-closing');
  d.innerHTML=html;
  d.dataset.layout=layout;
- const title={flight:'flightEditorTitle',settings:'settingsTitle',update:'updateTitle','photo-crop':'photoCropTitle'}[layout];
+ const title={flight:'flightEditorTitle',settings:'settingsTitle',airport:'airportCardTitle',update:'updateTitle','photo-crop':'photoCropTitle'}[layout];
  if(title)d.setAttribute('aria-labelledby',title);
  else d.removeAttribute('aria-labelledby');
  if(!d.open) d.showModal();
+ if(['flight','settings','airport'].includes(layout))byId(title)?.focus();
  d.classList.remove('dialog-enter');
  d.style.removeProperty('--dialog-x');
  d.style.removeProperty('--dialog-y');
@@ -632,7 +641,7 @@ function editFlight(existing,divert=false,prefill=null) {
  const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}${type==='date'?dateField(name,f[name],required):type==='time'?timeField(name,f[name],required):`<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}>`}</label>`;
  const select=(name,label,options)=>`<label>${tr(label)}<span class="flight-select"><select name="${name}">${options}</select></span></label>`;
  const airports=[...data.airports].sort((a,b)=>Number(b.icao==='UUEE')-Number(a.icao==='UUEE')||a.icao.localeCompare(b.icao,'en'))
-  .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(a.iata?' · '+a.iata:''))}</option>`).join('');
+  .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(airportIata(a.icao)?' · '+airportIata(a.icao):''))}</option>`).join('');
  const icao='list="icaoChoices" data-code="airport" pattern="[A-Za-z]{3,4}" maxlength="4" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
  const section=(title,content,kind='')=>`<section class="flight-editor-section ${kind}"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
  const loadFields=field('pax','Пассажиры','number',!existing,'min="0" step="1"')+
@@ -646,7 +655,7 @@ function editFlight(existing,divert=false,prefill=null) {
  const plannerTabs=[['route','Маршрут и время'],['loading','Загрузка'],['review','Итоги']];
  const plannerClock=`<time class="planner-utc" data-planner-clock><strong data-utc-time></strong><span data-utc-date></span></time>`;
  const statusOptions=(existing?statuses.map(status=>[status,status]):plannerStatuses).map(([status,label,english])=>option(status,appLanguage()==='en'&&english?english:tr(label),f.status)).join('');
- openDialog(`<header class="flight-editor-header"><h2 id="flightEditorTitle">${tr(existing?'Изменить рейс':'Новый рейс')}</h2><button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
+ openDialog(`<header class="flight-editor-header"><h2 id="flightEditorTitle" tabindex="-1" autofocus>${tr(existing?'Изменить рейс':'Новый рейс')}</h2><button type="button" class="icon-button" data-action="close" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
  <form id="editForm" class="editor flight-editor"${existing?'':' data-planning'}>
  <datalist id="icaoChoices">${airports}</datalist>
  ${!existing?`<ol class="planner-steps">${plannerTabs.map(([id,label])=>`<li><button type="button" data-step-indicator aria-controls="planner-${id}">${tr(label)}</button></li>`).join('')}</ol>`:''}
@@ -897,6 +906,8 @@ function pickTail(value) {
  selected=(workingFlight(rows)||newest(rows)[0])?.id;
 }
 document.addEventListener('click',e=>{
+ const pin=e.target.closest('[data-catalog-pin]');
+ if(pin){openAirportCard(pin.dataset.catalogPin);return;}
  const marker=e.target.closest('[data-map-airport]');
  if(marker){selectMapAirport(marker.dataset.mapAirport);return;}
  const b=e.target.closest('button');
@@ -912,7 +923,15 @@ document.addEventListener('click',e=>{
  if(d.aircraft){detailTail=d.aircraft;page='aircraft';render();}
  if(d.tail){explicitAircraft=true;pickTail(d.tail);page='center';render();}
  if(d.airportPage){airportListPage+=Number(d.airportPage);byId('airportRows').innerHTML=airportRows();document.querySelector('[data-airport-page="'+d.airportPage+'"]:not(:disabled)')?.focus();return;}
- if(d.airport){airportCode=d.airport;render();}
+ if(d.airport){
+  airportCode=d.airport;
+  byId('airportRows').innerHTML=airportRows();
+  document.querySelector('.airport-preview')?.remove();
+  document.querySelector('.airport-grid').insertAdjacentHTML('beforeend',airportPreview(airport(airportCode)));
+  if(!airportPhotos[airportCode])fetchAirportPhoto(airportCode);
+  document.querySelector('[data-airport="'+CSS.escape(airportCode)+'"]')?.focus();
+ }
+ if(d.airportCard)openAirportCard(d.airportCard);
  if(d.flight){const f=summaryFlights().find(f=>f.id===d.flight);if(f){explicitAircraft=true;tail=f.tail;selected=f.id;page='center';render();if(Object.hasOwn(d,'showContinuation'))byId('continuationPanel')?.focus();}}
  if(d.nextFlight)advanceFlight(d.nextFlight);
  if(d.nextStage)advanceStage(d.nextStage);
@@ -956,6 +975,8 @@ document.addEventListener('click',e=>{
  if(d.action==='export-backup'&&cloudSession) exportBackup();
 });
 document.addEventListener('keydown',e=>{
+ const pin=e.target.closest('[data-catalog-pin]');
+ if(pin&&['Enter',' '].includes(e.key)){e.preventDefault();openAirportCard(pin.dataset.catalogPin);return;}
  if (!e.target.closest('.fleet-carousel') || !['ArrowLeft','ArrowRight'].includes(e.key)) return;
  const direction = e.key==='ArrowLeft'?'previous':'next';
  e.preventDefault();
@@ -989,16 +1010,7 @@ document.addEventListener('change',e=>{
   if(t.value==='__manual'){t.value=f[d.stand]||'';manualStand(f,d.stand);}
   else {f[d.stand]=t.value;save();}
  }
- if(d.flag){
-  airport(airportCode)[d.flag]=t.checked;
-  save();
-  document.querySelector('[data-flag-label="'+d.flag+'"]').textContent=t.checked?tr("Установлен"):tr("Не установлен");
-  byId('airportRows').innerHTML=airportRows();
- }
- if(d.parking){const a=airport(airportCode);a.stands??={};a.stands[d.parking]=t.value;save();}
- if(d.airportScenery){airport(airportCode)[d.airportScenery]=t.value.trim();save();}
  if(t.id==='profilePhotoInput'){const file=t.files[0];t.value='';setProfilePhoto(file);}
- if(t.id==='airportIata'){const value=t.value.trim().toUpperCase();if(value&&!/^[A-Z]{3}$/.test(value)){notice(tr("Код IATA должен состоять из трех латинских букв."));t.value=airport(airportCode).iata;return;}airport(airportCode).iata=value;save();render();}
 });
 function updateDaylight(now=new Date()){
  const hour=now.getHours();
