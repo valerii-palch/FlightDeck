@@ -649,7 +649,7 @@ function editFlight(existing,divert=false,prefill=null) {
  <datalist id="icaoChoices">${airports}</datalist>
  <div class="flight-editor-body">
  ${!existing?`<ol class="planner-steps"><li data-step-indicator>${tr('Маршрут и время')}</li><li data-step-indicator>${tr('Загрузка')}</li><li data-step-indicator>${tr('Итоги')}</li></ol>`:''}
- ${!existing?`<time class="planner-utc" id="plannerUtc">${utcLabel()}</time>`:''}
+ ${!existing?`<time class="planner-utc" id="plannerUtc">${utcLabel()}</time><div class="planner-clocks" hidden><div><small>UTC</small><strong id="plannerStepUtc"></strong></div><div><small id="plannerDepLabel"></small><strong id="plannerDepNow"></strong><small id="plannerDepPlan"></small></div><div><small id="plannerArrLabel"></small><strong id="plannerArrNow"></strong><small id="plannerArrPlan"></small></div></div>`:''}
  <div data-flight-step class="planner-section planner-route-step">
  ${existing?
  section('Маршрут',

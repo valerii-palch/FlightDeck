@@ -12,7 +12,7 @@ function routeDurationEstimate(dep, arr, aircraftTail, excludeID) {
   };}).filter(s=>Number.isFinite(s.minutes)&&s.minutes>0&&s.minutes<1440);
  const matching=samples.filter(s=>s.type===type);
  const values=(matching.length?matching:samples).map(s=>s.minutes);
- return values.length?{minutes:medianMinutes(values),count:values.length,source:'journal'}:null;
+ return values.length?{minutes:medianMinutes(values),average:Math.round(values.reduce((sum,value)=>sum+value,0)/values.length),count:values.length,source:'journal'}:null;
 }
 function bindDurationEstimate(form) {
  const fields=form.elements, output=byId('durationEstimate'), source=byId('durationSource');
@@ -24,7 +24,7 @@ function bindDurationEstimate(form) {
   lastRoute=route;
   controller?.abort();clearTimeout(timer);
   const show=estimate=>{
-   output.textContent=estimate?duration(estimate.minutes):'—';
+   output.textContent=estimate?duration(estimate.average??estimate.minutes):'—';
    source.textContent=estimate?tr(estimate.source==='journal'?'По журналу':'Реальные рейсы')+' · '+estimate.count:'';
   };
   const local=routeDurationEstimate(dep,arr,fields.tail.value);
@@ -214,7 +214,18 @@ function bindPlanningSteps(form){
   const times=flightTimes({date,std,sta,staDate});
   return {dep,arr,date,std,sta,staDate,times};
  };
- const updateClocks=()=>{byId('plannerUtc').textContent=utcLabel();};
+ const updateClocks=()=>{
+  const instant=new Date();
+  if(!step){byId('plannerUtc').textContent=utcLabel(instant);return;}
+  const {dep,arr,times}=itinerary();
+  byId('plannerStepUtc').textContent=instant.toISOString().slice(11,19)+' UTC';
+  for(const [code,side,stamp] of [[dep,'Dep',times.scheduledDeparture],[arr,'Arr',times.scheduledArrival]]){
+   byId('planner'+side+'Label').textContent=airport(code)?airportCity(code):tr(side==='Dep'?'Вылет':'Прилет');
+   byId('planner'+side+'Now').textContent=localAirportTime(code,instant.getTime())||'—';
+   const local=localAirportTime(code,stamp);
+   byId('planner'+side+'Plan').textContent=local?tr('По плану')+' · '+local:tr('Местное время недоступно');
+  }
+ };
  const update=()=>{
   const {dep,arr,date,std,sta,staDate,times}=itinerary();
   const aircraft=aircraftFor(fields.tail.value), seats=capacity(aircraft), limit=commercialLimit(aircraft);
@@ -257,6 +268,8 @@ function bindPlanningSteps(form){
  };
  function openStep(index){
   step=index;
+  byId('plannerUtc').hidden=step!==0;
+  byId('plannerStepUtc').closest('.planner-clocks').hidden=step===0;
   steps.forEach((section,i)=>section.hidden=i!==step);
   indicators.forEach((item,i)=>i===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));
   byId('plannerBack').hidden=step===0;
