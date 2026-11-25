@@ -373,7 +373,17 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           document.querySelector('[data-action=new]').click();
           check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
           const editor = byId('editForm');
-          check(!editor.elements.atd && !editor.elements.ataDate, 'new flight has no actual times');
+          check(!editor.elements.atd && !editor.elements.ataDate && !editor.elements.note, 'new flight has no actual times or note');
+          const routeHeader=editor.querySelector('.planner-route-header');
+          check(routeHeader.firstElementChild.querySelector('[data-utc-time]').textContent.endsWith(' UTC'), 'route UTC clock line');
+          check(routeHeader.firstElementChild.querySelector('[data-utc-date]').textContent===displayDate(dateUTC()), 'route UTC date line');
+          for(const aircraft of fleet){
+            const model=document.createElement('div');
+            model.innerHTML=plannerSeatMap(aircraft);
+            check(model.querySelectorAll('.seat-bank i:not(.seat-gap)').length===capacity(aircraft),'cabin capacity '+aircraft.short);
+          }
+          check(plannerSeatMap(fleet[0]).includes('data-cabin="business"') && !plannerSeatMap(fleet[0]).includes('data-cabin="comfort"'), 'A321 classes');
+
           const enter = (form, name, value) => {
             form.elements[name].value = value;
             form.elements[name].dispatchEvent(new Event('input', {bubbles:true}));

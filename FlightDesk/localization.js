@@ -1,4 +1,5 @@
 const english = {
+ "Схема салона": "Cabin layout",
  "Код рейса (ICAO)": "Flight code (ICAO)",
  "Авиакомпания": "Airline",
  "Аэропорт вылета (ICAO)": "Departure airport (ICAO)",

@@ -59,11 +59,53 @@ async function testApplication() {
     assert.equal(await page.locator('#editForm [name=localDeparture]').inputValue(), '02:35');
     assert.equal(await page.locator('#editForm [name=sta]').inputValue(), '01:15');
     assert.equal(await page.locator('#editForm [name=staDate]').inputValue(), '24.11.2026');
+    assert.equal(await page.locator('[data-planner-clock]:visible').count(), 1);
+    assert.match(await page.locator('[data-utc-time]:visible').textContent(), /^\d{2}:\d{2}:\d{2} UTC$/);
+    assert.match(await page.locator('[data-utc-date]:visible').textContent(), /^\d{2}\.\d{2}\.\d{4}$/);
+    const identity = await page.locator('.planner-route-header > *').evaluateAll(elements =>
+      elements.map(el => ({ x: el.offsetLeft, y: el.offsetTop, width: el.offsetWidth })));
+    assert.equal(identity[0].y, identity[1].y);
+    assert.ok(identity[0].x < identity[1].x && Math.abs(identity[0].width - identity[1].width) <= 1);
+    assert.equal(await page.locator('#editForm [name=note]').count(), 0);
+    for (const [tail, model, classes] of [
+      ['RA-73709', 'Airbus A321-211', { business: 16, economy: 167 }],
+      ['RA-73155', 'Airbus A350-900', { business: 28, comfort: 24, economy: 264 }],
+      ['RA-73132', 'Boeing 777-300ER', { business: 30, comfort: 48, economy: 324 }]
+    ]) {
+      await page.locator('#editForm [name=tail]').selectOption(tail);
+      await page.locator('#plannerNext').click();
+      const seatMap = page.locator('#plannerSeatMap');
+      assert.equal(await seatMap.locator('.seat-model').textContent(), model);
+      const drawn = await seatMap.locator('.seat-section').evaluateAll(sections => Object.fromEntries(sections.map(section =>
+        [section.dataset.cabin, section.querySelectorAll('i:not(.seat-gap)').length])));
+      assert.deepEqual(drawn, classes);
+      assert.equal(await page.locator('[data-planner-clock]:visible').count(), 1);
+      assert.ok(await page.locator('#editForm [name=pax]').evaluate(field => Number(field.value) > 0 && Number(field.value) <= Number(field.max)));
+      const positions = await page.locator('.planner-loading-grid > *').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().left));
+      assert.ok(positions[0] < positions[1]);
+      await page.locator('#plannerBack').click();
+    }
     await page.locator('#plannerNext').click();
     await page.locator('#editForm [name=pax]').fill('42');
+    await page.locator('#editForm [name=baggageKg]').fill('735');
+    await page.locator('#editForm [name=cargoKg]').fill('215');
+    assert.equal(await page.locator('#plannerLoadTrack').getAttribute('aria-valuenow'), '10');
+    assert.equal(await page.locator('#plannerLoadTrack').evaluate(el => getComputedStyle(el, '::after').content), 'none');
+    await page.locator('#plannerNext').click();
+    assert.equal(await page.locator('[data-planner-clock]:visible').count(), 0);
+    assert.match(await page.locator('#plannerSummary').textContent(), /42 \/ 402/);
+    await page.locator('#plannerBack').click();
+    assert.equal(await page.locator('#editForm [name=baggageKg]').inputValue(), '735');
+    assert.equal(await page.locator('#editForm [name=cargoKg]').inputValue(), '215');
     await page.locator('#plannerNext').click();
     await page.locator('#plannerSave').click();
     await page.locator('#dialog').waitFor({ state: 'hidden' });
+    await page.locator('[data-action=edit]').click();
+    assert.equal(await page.locator('#editForm [name=note]').count(), 1);
+    await page.locator('#editForm [name=note]').fill('Примечание после сохранения');
+    await page.locator('#plannerSave').click();
+    await page.locator('#dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(() => data.flights[0].note), 'Примечание после сохранения');
     await page.locator('#sidebarPages [data-page=journal]').click();
     assert.match(await page.locator('.flight-board tbody').textContent(), /AFL 002S/);
     assert.equal(await page.evaluate(() => data.flights[0].pax), 42);
