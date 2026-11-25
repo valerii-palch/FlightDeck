@@ -201,42 +201,64 @@ function suggestedPayload(pax,seats,limit,random=Math.random){
  const cargoKg=1+Math.floor(Math.pow(random(),1.5-Math.min(1,pax/seats))*limit);
  return {baggageKg,cargoKg};
 }
-// Seat banks per row, in cabin order. Capacities come from the existing fleet records.
-const seatBanks={
- A321:[[2,2],null,[3,3]],
- A350:[[1,2,1],[2,4,2],[3,3,3]],
- B777:[[2,2,2],[2,4,2],[3,4,3]]
+// Row numbers are used only to map the reference layouts, never displayed.
+const cabinLayouts={
+ A321:{business:[2,2],economy:[3,3],first:8,last:35,galleys:[23],
+  rowMasks:{11:['111','011']}},
+ A350:{business:[1,2,1],comfort:[2,4,2],economy:[3,3,3],first:11,last:40,galleys:[25],
+  rowMasks:{40:['000','111','000']}},
+ B777:{business:[2,2,2],comfort:[2,4,2],economy:[3,4,3],first:17,last:51,galleys:[24,38],
+  rowMasks:{
+   17:['101','1111','101'],24:['000','1111','000'],38:['111','0000','111'],
+   47:['101','1111','101'],48:['101','1111','101'],49:['101','1111','101'],50:['101','1111','101'],
+   51:['000','1111','000']
+  }}
 };
+const seatServiceBay='<div class="seat-service-bay"><i></i><i></i></div>';
 const cabinClasses=[['business','Бизнес',2],['comfort','Комфорт',1],['economy','Эконом',0]];
 function plannerSeatMap(aircraft){
- const cabins=cabinClasses.flatMap(([kind,label,index],cabin)=>{
+ const plan=cabinLayouts[aircraft.short];
+ const cabins=cabinClasses.flatMap(([kind,label,index])=>{
   const count=aircraft.seats[index];
   if(!count)return [];
-  const banks=seatBanks[aircraft.short][cabin];
-  const rowSize=banks.reduce((sum,bank)=>sum+bank,0);
-  const rows=Array.from({length:Math.ceil(count/rowSize)},(_,row)=>{
-   let remaining=count-row*rowSize;
-   const occupied=[];
-   const bankOrder=banks.length===3?[1,0,2]:[0,1];
-   for(const column of bankOrder){
-    occupied[column]=Math.min(banks[column],remaining);
-    remaining-=occupied[column];
-   }
+  const banks=plan[kind];
+  const economy=kind==='economy';
+  const rowCount=economy?(plan.last-plan.first+1):count/banks.reduce((sum,bank)=>sum+bank,0);
+  const rows=Array.from({length:rowCount},(_,row)=>{
+   const number=plan.first+row;
+   const rowMask=economy?plan.rowMasks[number]:null;
    const seats=banks.map((bank,column)=>{
-    const seatsHere=occupied[column];
-    return '<span class="seat-bank">'+Array.from({length:bank},(_,seat)=>
-     '<i'+(seat>=seatsHere?' class="seat-gap"':'')+'></i>').join('')+'</span>';
+    const position=column===0?'left':column===banks.length-1?'right':'center';
+    return '<span class="seat-bank" data-bank="'+position+'" style="--seat-count:'+bank+'">'+Array.from({length:bank},(_,seat)=>{
+     if(rowMask?.[column][seat]==='0')return '<i class="seat-gap"></i>';
+     const windowSeat=position==='left'&&seat===0||position==='right'&&seat===bank-1;
+     const aisleSeat=position!=='right'&&seat===bank-1||position!=='left'&&seat===0;
+     const location=windowSeat?'window':aisleSeat?'aisle':'middle';
+     return '<i class="cabin-seat" data-seat-position="'+location+'" data-seat-weight="'+(location==='middle'?1:3)+'"></i>';
+    }).join('')+'</span>';
    }).join('');
-   return '<div class="seat-row">'+seats+'</div>';
+   const galley=economy&&plan.galleys.includes(number)?seatServiceBay:'';
+   return galley+'<div class="seat-row">'+seats+'</div>';
   }).join('');
-  return [{kind,label,count,rows}];
+  const pitch=kind==='business'?1.48:kind==='comfort'?1.16:1;
+  return [{kind,label,count,rows,height:rowCount*pitch}];
  });
- const layout=cabins.map(({kind,rows})=>'<div class="seat-section" data-cabin="'+kind+'">'+rows+'</div>').join('');
+ const layout=cabins.map(({kind,rows,height})=>
+  '<div class="seat-section" data-cabin="'+kind+'" style="--cabin-height:'+height+'">'+rows+'</div>').join(seatServiceBay);
  const legend=cabins.map(({kind,label,count})=>
   '<li data-cabin="'+kind+'"><i aria-hidden="true"></i><span>'+tr(label)+'</span><strong>'+count+'</strong></li>').join('');
- return '<h3>'+tr('Схема салона')+'</h3><p class="seat-model">'+esc(aircraftModel(aircraft))+'</p>'+
-  '<div class="seat-figure" aria-hidden="true"><div class="seat-fuselage">'+layout+'</div></div>'+
-  '<ul class="seat-legend">'+legend+'</ul>';
+ return '<header class="seat-heading"><h3>'+tr('Схема салона')+'</h3><p class="seat-model">'+esc(aircraftModel(aircraft))+'</p></header>'+
+  '<div class="seat-figure" data-airframe="'+aircraft.short+'" aria-hidden="true"><div class="seat-fuselage">'+seatServiceBay+layout+seatServiceBay+'</div></div>'+
+  '<footer class="seat-key"><ul class="seat-legend">'+legend+'</ul><ul class="seat-legend seat-occupancy-legend">'+
+  '<li><i class="seat-key-occupied" aria-hidden="true"></i>'+tr('Занятые места')+'</li>'+
+  '<li><i class="seat-key-open" aria-hidden="true"></i>'+tr('Свободные места')+'</li></ul></footer>';
+}
+
+function orderCabinSeats(seats,random=Math.random){
+ // Exponential sampling gives window and aisle seats an advantage without
+ // making middle seats impossible to take. Reuse the order as loads change.
+ return [...seats].map(seat=>({seat,score:-Math.log1p(-random())/Number(seat.dataset.seatWeight)}))
+  .sort((a,b)=>a.score-b.score).map(item=>item.seat);
 }
 
 function bindPlanningSteps(form){
@@ -254,7 +276,7 @@ function bindPlanningSteps(form){
  };
  const clocks=steps.slice(0,2).map(section=>section.querySelector('[data-planner-clock]'));
  const seatMap=byId('plannerSeatMap'), loadTrack=byId('plannerLoadTrack');
- let drawnAircraft;
+ let drawnAircraft, orderedSeats=[], occupiedSeats=-1;
  const updateClocks=()=>{
   const clock=clocks[step];
   if(!clock)return;
@@ -283,14 +305,20 @@ function bindPlanningSteps(form){
     }
    }
   }
-  const passengers=Number(fields.pax.value);
-  const load=Math.max(0,Math.min(1,passengers/seats));
-  byId('plannerLoad').textContent=passengers+' / '+seats+' · '+Math.round(100*load)+'%';
-  loadTrack.style.setProperty('--cabin-load',Math.round(load*100)+'%');
-  loadTrack.setAttribute('aria-valuenow',Math.round(load*100));
+  const occupied=Math.max(0,Math.min(seats,Math.floor(Number(fields.pax.value))||0));
+  const percent=Math.round(100*occupied/seats);
+  byId('plannerLoad').textContent=occupied+' / '+seats+' · '+percent+'%';
+  loadTrack.style.setProperty('--cabin-load',percent+'%');
+  loadTrack.setAttribute('aria-valuenow',percent);
   if(drawnAircraft!==aircraft.short){
    seatMap.innerHTML=plannerSeatMap(aircraft);
    drawnAircraft=aircraft.short;
+   orderedSeats=orderCabinSeats(seatMap.querySelectorAll('.cabin-seat'));
+   occupiedSeats=-1;
+  }
+  if(occupiedSeats!==occupied){
+   orderedSeats.forEach((seat,index)=>seat.classList.toggle('seat-occupied',index<occupied));
+   occupiedSeats=occupied;
   }
   byId('plannerBaggage').textContent=(fields.baggageKg.value||'—')+' '+tr('кг');
   byId('plannerCargo').textContent=(fields.cargoKg.value||'—')+' '+tr('кг');

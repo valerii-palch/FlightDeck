@@ -1507,7 +1507,10 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 .flight-editor[data-planning] .planner-review dl { gap:6px 12px; }
 .planner-route-header,.planner-loading-grid { display:grid; gap:9px; }
 .planner-route-header { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.planner-loading-grid { grid-template-columns:minmax(0,4fr) minmax(0,6fr); align-items:stretch; }
+.planner-loading-grid {
+ grid-template-columns:auto minmax(0,1fr); align-items:stretch;
+ min-height:clamp(454px,calc(100dvh - 248px),690px);
+}
 .planner-load-content { min-width:0; display:grid; align-content:start; gap:9px; }
 .planner-utc {
  display:grid; place-content:center; gap:5px; padding:16px 12px; text-align:center;
@@ -1516,36 +1519,104 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 }
 .planner-utc strong { font-size:clamp(20px,3vw,32px); font-weight:680; }
 .planner-utc span { color:var(--muted); font-size:14px; }
-.planner-seat-map { display:grid; justify-items:center; align-content:start; gap:7px; background:var(--editor-card); }
-.planner-seat-map h3,.seat-model { text-align:center; }
-.seat-model { color:var(--muted); font-size:13px; }
-.seat-figure { display:grid; place-items:center; isolation:isolate; position:relative; width:min(100%,220px); }
+.planner-seat-map {
+ display:grid; grid-template-rows:auto minmax(325px,1fr) auto; justify-items:center; gap:10px;
+ width:190px; max-width:100%; min-width:0; margin:0; padding:13px 10px 12px; background:var(--editor-card);
+}
+.planner-seat-map:has([data-airframe="A321"]) { width:156px; }
+.planner-seat-map:has([data-airframe="A350"]) { width:180px; }
+.seat-heading { text-align:center; }
+.seat-heading h3 { margin:0 0 3px; font-size:17px; }
+.seat-model { margin:0; color:var(--muted); font-size:13px; }
+.seat-figure {
+ --fuselage-width:134px; --wing-start:43%; --wing-depth:20%; display:grid; justify-items:center; align-items:stretch;
+ isolation:isolate; position:relative; width:100%; max-width:164px;
+}
+.seat-figure[data-airframe="A321"] { --fuselage-width:100px; --wing-start:45%; --wing-depth:16%; max-width:130px; }
+.seat-figure[data-airframe="A350"] { --fuselage-width:124px; --wing-start:37%; --wing-depth:24%; max-width:154px; }
 .seat-figure::before {
- content:""; position:absolute; z-index:-1; inset:31% 0 22%; opacity:.64;
- background:linear-gradient(145deg,rgb(var(--editor-light) / .30),rgb(var(--editor-light) / .05));
- clip-path:polygon(50% 0,100% 87%,100% 100%,50% 62%,0 100%,0 87%);
+ content:""; position:absolute; z-index:-1; top:var(--wing-start); left:0; right:0; height:var(--wing-depth);
+ background:linear-gradient(90deg,transparent,rgb(var(--editor-light) / .44) 16% 84%,transparent);
+ clip-path:polygon(17% 0,83% 0,100% 31%,100% 100%,0 100%,0 31%);
 }
 .seat-fuselage {
- padding:25px 9px 20px; border:1px solid var(--editor-edge); border-radius:48% 48% 27% 27% / 7% 7% 4% 4%;
- background:linear-gradient(90deg,rgb(var(--editor-light) / .13),transparent 22% 78%,rgb(var(--editor-light) / .13)),#1e2d49;
- box-shadow:inset 0 1px 0 #ffffff22,0 8px 26px #050a1940;
+ position:relative; display:flex; flex-direction:column; min-height:0; width:min(var(--fuselage-width),calc(100% - 26px));
+ padding:32px 9px 14px; border:1px solid rgb(var(--editor-light) / .55);
+ border-radius:50% 50% 37% 37% / 11% 11% 6% 6%;
+ background:linear-gradient(90deg,#263954 0%,#18263d 20% 80%,#263954 100%);
+ box-shadow:inset 0 0 0 2px #c7e4ff12,0 8px 20px #050a1933;
 }
-.seat-section { display:grid; gap:2px; padding:3px 0; }
-.seat-section + .seat-section { margin-top:3px; border-top:1px solid #ffffff25; }
-.seat-row { display:flex; justify-content:center; gap:7px; }
-.seat-bank { display:flex; gap:2px; }
+.seat-fuselage::before {
+ content:""; position:absolute; top:15px; left:50%; transform:translateX(-50%);
+ width:28px; height:10px; border-radius:45% 45% 14% 14%;
+ background:linear-gradient(90deg,#9bb5ce72 0 22%,transparent 22% 26%,#b4cbe482 26% 48%,transparent 48% 52%,
+  #b4cbe482 52% 74%,transparent 74% 78%,#9bb5ce72 78%); border-top:1px solid #bfd8f591;
+}
+.seat-fuselage::after {
+ content:""; position:absolute; bottom:8px; left:calc(50% - 16px); width:32px; height:2px;
+ border-radius:2px; background:#9cb2cd43;
+}
+.seat-section {
+ display:flex; flex-direction:column; flex:var(--cabin-height) 1 0; min-height:0;
+ gap:2px; padding:0 0 3px;
+}
+.seat-service-bay {
+ display:flex; justify-content:space-between; flex:0 0 9px; margin:3px 0;
+ border-block:1px solid #aebfda28;
+}
+.seat-service-bay i {
+ width:22%; margin-block:1px; border:1px solid #93abc94a; border-radius:2px; background:#a1b9d91c;
+}
+.seat-fuselage > .seat-service-bay:first-child,.seat-fuselage > .seat-service-bay:last-child {
+ margin-block:2px; border-block:0;
+}
+/* All rows span the interior. The outer banks share the same window lines
+   throughout the cabin, and the center bank stays between both aisles. */
+.seat-row {
+ --outer-bank:28%; --center-bank:28%;
+ display:flex; justify-content:space-between; flex:1 1 0; min-height:0; container-type:size;
+}
+.seat-figure[data-airframe="A321"] .seat-row { --outer-bank:42%; }
+.seat-figure[data-airframe="A321"] [data-cabin="business"] .seat-row { --outer-bank:41%; }
+.seat-figure[data-airframe="A350"] [data-cabin="business"] .seat-row { --outer-bank:20%; --center-bank:32%; }
+.seat-figure[data-airframe="B777"] [data-cabin="business"] .seat-row { --outer-bank:26%; --center-bank:30%; }
+.seat-figure [data-cabin="comfort"] .seat-row { --outer-bank:21%; --center-bank:42%; }
+.seat-figure[data-airframe="B777"] [data-cabin="economy"] .seat-row { --outer-bank:25%; --center-bank:33.33%; }
+.seat-bank {
+ --seat-gap:2px; display:flex; align-items:center; justify-content:space-between;
+ width:var(--outer-bank); gap:var(--seat-gap);
+}
+.seat-bank[data-bank="right"]:has(i:only-child) { justify-content:flex-end; }
+.seat-bank[data-bank="center"] { width:var(--center-bank); }
+.seat-section[data-cabin="business"] .seat-bank { --seat-gap:3px; }
 [data-cabin="business"] { --seat:#c5a3ff; }
 [data-cabin="comfort"] { --seat:#7de2c8; }
 [data-cabin="economy"] { --seat:#88bfff; }
-.seat-bank i { width:7px; height:5px; border-radius:2px; background:var(--seat); box-shadow:inset 0 -1px #182a5066; }
-.seat-section[data-cabin="business"] i { width:8px; height:6px; }
+.seat-bank i {
+ box-sizing:border-box; flex:none;
+ width:min(90cqh,calc((100% - (var(--seat-count) - 1) * var(--seat-gap)) / var(--seat-count)));
+ aspect-ratio:1; border-radius:1px; border:1px solid color-mix(in srgb,var(--seat) 52%,transparent);
+ background:color-mix(in srgb,var(--seat) 11%,transparent);
+}
+.seat-section[data-cabin="business"] .seat-bank i { border-radius:2px; }
+.seat-figure[data-airframe="A350"] [data-cabin="business"] .seat-row:nth-child(even) .seat-bank:is(:first-child,:last-child) {
+ transform:translateY(1px);
+}
+.seat-figure[data-airframe="B777"] [data-cabin="business"] .seat-bank i { transform:rotate(-10deg); }
+.seat-figure[data-airframe="B777"] [data-cabin="business"] .seat-bank:last-child i { transform:rotate(10deg); }
 .seat-bank .seat-gap { visibility:hidden; }
-.seat-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 9px; list-style:none; padding:0; margin:4px 0 0; }
-.seat-legend li { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); }
-.seat-legend i { width:7px; height:7px; border-radius:2px; background:var(--seat); }
+.seat-bank .seat-occupied { background:var(--seat); border-color:var(--seat); box-shadow:inset 0 -1px #162b554f; }
+.seat-key { align-self:end; }
+.seat-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 9px; list-style:none; padding:0; margin:0; }
+.seat-legend li { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); }
+.seat-legend i { width:8px; height:8px; border-radius:2px; background:var(--seat); }
 .seat-legend strong { color:inherit; font-variant-numeric:tabular-nums; }
+.seat-occupancy-legend { margin-top:5px; }
+.seat-occupancy-legend i { border:1px solid #b7cce4; }
+.seat-occupancy-legend .seat-key-occupied { background:#b7cce4; }
 @media(max-width:630px) {
  .planner-route-header,.planner-loading-grid { grid-template-columns:1fr; }
+ .planner-seat-map { justify-self:center; }
 }
 .flight-editor[data-planning] .planner-route-step .flight-editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .flight-editor[data-planning] .planner-route-step :is(input,select) { min-height:33px; padding-block:4px; }

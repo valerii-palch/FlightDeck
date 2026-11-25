@@ -79,10 +79,41 @@ async function testApplication() {
       const drawn = await seatMap.locator('.seat-section').evaluateAll(sections => Object.fromEntries(sections.map(section =>
         [section.dataset.cabin, section.querySelectorAll('i:not(.seat-gap)').length])));
       assert.deepEqual(drawn, classes);
+      const geometry = await seatMap.locator('.seat-row').evaluateAll(rows => rows.every(row => {
+        const bounds = row.getBoundingClientRect();
+        const left = row.querySelector('[data-bank=left]').getBoundingClientRect();
+        const right = row.querySelector('[data-bank=right]').getBoundingClientRect();
+        const center = row.querySelector('[data-bank=center]')?.getBoundingClientRect();
+        return Math.abs(left.left - bounds.left) < 1 && Math.abs(right.right - bounds.right) < 1 &&
+          (center ? Math.abs(center.left + center.right - bounds.left - bounds.right) < 2 &&
+            left.right < center.left && center.right < right.left : left.right < right.left);
+      }));
+      assert.equal(geometry, true, model + ' seat banks must align with windows and aisles');
+      const squareSeats = await seatMap.locator('.cabin-seat').evaluateAll(seats => seats.every(seat => {
+        const { width, height } = seat.getBoundingClientRect();
+        return width > 0 && Math.abs(width - height) < 0.1;
+      }));
+      assert.equal(squareSeats, true, model + ' seats must remain square');
       assert.equal(await page.locator('[data-planner-clock]:visible').count(), 1);
       assert.ok(await page.locator('#editForm [name=pax]').evaluate(field => Number(field.value) > 0 && Number(field.value) <= Number(field.max)));
       const positions = await page.locator('.planner-loading-grid > *').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().left));
       assert.ok(positions[0] < positions[1]);
+      const sideGutter = await seatMap.evaluate(panel =>
+        (panel.getBoundingClientRect().width - panel.querySelector('.seat-figure').getBoundingClientRect().width) / 2);
+      assert.ok(sideGutter <= 15);
+      const passengerField = page.locator('#editForm [name=pax]');
+      const capacity = Object.values(classes).reduce((sum, count) => sum + count, 0);
+      for (const count of [0, 1, Math.floor(capacity / 2), capacity - 1, capacity, capacity + 1, 0]) {
+        await passengerField.fill(String(count));
+        const occupied = Math.min(count, capacity);
+        const percent = Math.round(occupied / capacity * 100);
+        assert.equal(await seatMap.locator('.seat-occupied').count(), occupied);
+        assert.equal(await seatMap.locator('.cabin-seat:not(.seat-occupied)').count(), capacity - occupied);
+        assert.equal(await page.locator('#plannerLoadTrack').getAttribute('aria-valuenow'), String(percent));
+        assert.match(await page.locator('#plannerLoad').textContent(), new RegExp('^' + occupied + ' / ' + capacity));
+        assert.equal(await passengerField.evaluate(field => field.validity.rangeOverflow), count > capacity);
+      }
+      await passengerField.fill('');
       await page.locator('#plannerBack').click();
     }
     await page.locator('#plannerNext').click();
