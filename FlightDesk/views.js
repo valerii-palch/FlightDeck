@@ -1,13 +1,13 @@
 const planeIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M22 12c0-1.1-.9-2-2-2h-4.7L9 2H7l3.5 8H6L3 7H1l1.5 5L1 17h2l3-3h4.5L7 22h2l6.3-8H20c1.1 0 2-.9 2-2Z"/></svg>';
 const statusColors = {
  'Выполнен':'complete', 'Отменен':'cancelled', 'Уход на запасной':'diverted', 'Задержан':'late',
- 'Запланирован':'scheduled', 'Подготовка':'progress', 'Идет посадка':'progress', 'Посадка завершена':'progress', 'Вылетел':'progress'
+ 'Запланирован':'scheduled', 'Подготовка':'progress', 'Загрузка багажа':'progress', 'Идет посадка':'progress', 'Посадка завершена':'progress', 'Вылетел':'progress'
 };
 const day = 86400000;
 function flightTimes(f) {
  const scheduledDeparture = clockOn(f.date,f.std);
- let scheduledArrival = clockOn(f.date,f.sta);
- if (scheduledArrival < scheduledDeparture) scheduledArrival += day;
+ let scheduledArrival = clockOn(f.staDate||f.date,f.sta);
+ if (!f.staDate && scheduledArrival < scheduledDeparture) scheduledArrival += day;
  let actualDeparture = clockOn(f.atdDate || f.date,f.atd);
  if (!f.atdDate && Math.abs(actualDeparture-scheduledDeparture)>day/2)
   actualDeparture += actualDeparture<scheduledDeparture ? day : -day;
@@ -26,7 +26,7 @@ function actualFlightMinutes(f,times=flightTimes(f)) {
  const elapsed=Math.round((times.actualArrival-times.actualDeparture)/minute);
  return Number.isFinite(elapsed)&&elapsed>=0?elapsed:null;
 }
-const preflightStatuses=['Запланирован','Задержан','Подготовка','Идет посадка','Посадка завершена'];
+const preflightStatuses=['Запланирован','Задержан','Подготовка','Загрузка багажа','Идет посадка','Посадка завершена'];
 function resetFlightActuals(f,status){
  if(f.status===status)return;
  if(preflightStatuses.includes(status)){
@@ -111,7 +111,7 @@ function flightStats(rows) {
  return {count:completed.length, minutes:rows.flatMap(physicalLegs).filter(legFlown).reduce((sum,f)=>sum+loggedMinutes(f),0)};
 }
 const newest = rows => [...rows].sort((a,b)=>(b.date+b.std).localeCompare(a.date+a.std));
-const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготовка','Идет посадка','Посадка завершена','Вылетел','Уход на запасной'].includes(f.status)))[0];
+const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготовка','Загрузка багажа','Идет посадка','Посадка завершена','Вылетел','Уход на запасной'].includes(f.status)))[0];
 function workingFlight(rows, now=Date.now()) {
  return activeFlight(rows)||newest(rows.filter(f=>(f.status==='Запланирован'||f.status==='Задержан')&&!flown(f)&&clockOn(f.date,f.std)>=now)).at(-1);
 }
@@ -127,7 +127,7 @@ function dashboardFlight(rows,now=Date.now()){
  return {flight:completed,upcoming:false};
 }
 const nextStatus = {
- 'Запланирован':'Подготовка','Задержан':'Подготовка','Подготовка':'Идет посадка',
+ 'Запланирован':'Подготовка','Задержан':'Подготовка','Подготовка':'Загрузка багажа','Загрузка багажа':'Идет посадка',
  'Идет посадка':'Посадка завершена','Посадка завершена':'Вылетел','Вылетел':'Выполнен'
 };
 function nextFlightButton(f) {
@@ -141,8 +141,8 @@ function advanceFlight(id) {
  if(!next||id!==f.id)return;
  changeFlightStatus(f,next);
 }
-const preparationStatuses=['Подготовка','Идет посадка','Посадка завершена'];
-const stageStatus={fuel:0,bags:0,board:1,close:2};
+const preparationStatuses=['Подготовка','Загрузка багажа','Идет посадка','Посадка завершена'];
+const stageStatus={fuel:0,bags:1,board:2,close:3};
 const canAdvanceStage=f=>preflightStatuses.includes(f.status);
 const pendingStage=f=>canAdvanceStage(f)&&stages.find(([key])=>!Number.isFinite(Date.parse(f.stages?.[key])));
 function recordFlightStage(f,key,stamp){

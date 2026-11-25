@@ -31,8 +31,8 @@ async function testApplication() {
       applyLanguage();
       cloudSession = { user: { id: 'test-account', email: 'test@example.test' }, expiresAt: Date.now() + 3600000 };
       data.airports = [
-        { icao: 'UUEE', name: 'Шереметьево', iata: 'SVO' },
-        { icao: 'USPP', name: 'Большое Савино', iata: 'PEE' }
+        { icao: 'UUEE', name: 'Шереметьево', iata: 'SVO', timezone: 'Europe/Moscow' },
+        { icao: 'USPP', name: 'Большое Савино', iata: 'PEE', timezone: 'Asia/Yekaterinburg' }
       ];
       render();
     });
@@ -50,17 +50,22 @@ async function testApplication() {
     assert.equal(await page.locator('.pilot-name h2').textContent(), 'Тестовый пилот');
 
     await page.locator('[data-action=new]').click();
-    for (const [name, value] of Object.entries({ number: 'su1458', dep: 'UUEE', arr: 'USPP', std: '23:35', sta: '01:15' })) {
+    for (const [name, value] of Object.entries({ flightCode: 'afl', number: '002s', date: '23.11.2026', dep: 'UUEE', arr: 'USPP', std: '2335', localArrival: '0615' })) {
       await page.locator('#editForm [name=' + name + ']').fill(value);
     }
-    assert.equal(await page.locator('#editForm [name=number]').inputValue(), 'SU 1458');
+    assert.equal(await page.locator('#editForm [name=number]').inputValue(), '002S');
+    assert.equal(await page.locator('#editForm [name=airline]').inputValue(), 'Аэрофлот');
+    assert.equal(await page.locator('#editForm [name=std]').inputValue(), '23:35');
+    assert.equal(await page.locator('#editForm [name=localDeparture]').inputValue(), '02:35');
+    assert.equal(await page.locator('#editForm [name=sta]').inputValue(), '01:15');
+    assert.equal(await page.locator('#editForm [name=staDate]').inputValue(), '24.11.2026');
     await page.locator('#plannerNext').click();
     await page.locator('#editForm [name=pax]').fill('42');
     await page.locator('#plannerNext').click();
     await page.locator('#plannerSave').click();
     await page.locator('#dialog').waitFor({ state: 'hidden' });
     await page.locator('#sidebarPages [data-page=journal]').click();
-    assert.match(await page.locator('.flight-board tbody').textContent(), /SU 1458/);
+    assert.match(await page.locator('.flight-board tbody').textContent(), /AFL 002S/);
     assert.equal(await page.evaluate(() => data.flights[0].pax), 42);
     assert.equal(await page.evaluate(() => (flightTimes(data.flights[0]).scheduledArrival - flightTimes(data.flights[0]).scheduledDeparture) / 60000), 100);
 

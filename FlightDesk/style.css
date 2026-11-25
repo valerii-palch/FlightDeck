@@ -754,7 +754,7 @@ dialog[data-layout="flight"] {
 .flight-editor { display:grid; grid-template-rows:minmax(0,1fr) auto; gap:0; max-height:calc(100dvh - 100px); }
 .flight-editor-body { display:grid; gap:12px; padding:16px 22px; overflow:auto; overscroll-behavior:contain; }
 .flight-editor-section { min-width:0; padding:14px; border:1px solid var(--editor-edge); border-radius:15px; background:var(--editor-card); }
-.flight-editor :is(.planner-load,.planner-review,.planner-clocks > div,.planner-load-values > div) {
+.flight-editor :is(.planner-load,.planner-review,.planner-load-values > div) {
  background:var(--editor-card);
  border-color:var(--editor-edge);
 }
@@ -1104,9 +1104,8 @@ dialog[data-layout="photo-crop"] { width:min(460px,calc(100% - 28px)); }
 .planner-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; list-style:none; padding:0; margin:0; }
 .planner-steps li { display:grid; place-items:center; padding:7px; border:1px solid var(--border); border-radius:var(--control-radius); text-align:center; color:var(--muted); }
 .planner-steps [aria-current=step] { color:#f2f8ff; border-color:var(--blue); background:var(--control-glass); }
-.planner-clocks,.planner-load-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-.planner-clocks > div,.planner-load-values > div { display:grid; gap:4px; padding:10px; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass); }
-.planner-clocks strong { font-size:clamp(14px,3vw,22px); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.planner-load-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.planner-load-values > div { display:grid; gap:4px; padding:10px; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass); }
 .planner-load > strong { display:block; font-size:24px; margin-top:8px; }
 .planner-load-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .planner-cabin { position:relative; height:50px; margin:12px 0; overflow:hidden; border:1px solid var(--glass-border); border-radius:var(--control-radius); background:#08121e; }
@@ -1506,13 +1505,22 @@ dialog[data-layout="flight"]:has([data-planning]) { width:min(980px,calc(100% - 
 .flight-editor[data-planning] .planner-section { gap:9px; }
 .flight-editor[data-planning] .flight-editor-section { padding:10px 12px; }
 .flight-editor[data-planning] .flight-editor-fields { margin-top:7px; gap:7px 10px; }
-.flight-editor[data-planning] .planner-clocks > div { padding:6px 10px; gap:2px; }
-.flight-editor[data-planning] .planner-clocks strong { font-size:17px; }
 .flight-editor[data-planning] .planner-note { font-size:13px; }
 .flight-editor[data-planning] .planner-note textarea { min-height:46px; }
 .flight-editor[data-planning] .planner-review dl { gap:6px 12px; }
-@media(min-width:800px) {
- .flight-editor[data-planning] .planner-route-step { grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; }
- .flight-editor[data-planning] .planner-route-fields { grid-column:1/-1; }
- .flight-editor[data-planning] .planner-schedule-fields .flight-editor-fields > label:first-child { grid-column:1/-1; }
+.planner-utc {
+ display:block; padding:8px 12px; text-align:center; font-variant-numeric:tabular-nums;
+ border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass);
+ font-weight:650;
 }
+.flight-editor[data-planning] .planner-route-step .flight-editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.flight-editor[data-planning] .planner-route-step :is(input,select) { min-height:33px; padding-block:4px; }
+.flight-editor[data-planning] .planner-route-step .date-editor .icon-button { width:28px; height:28px; min-height:28px; }
+.planner-flight-info { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.planner-flight-info > div {
+ display:grid; align-content:start; gap:4px; min-width:0; padding:9px 12px;
+ border:1px solid var(--glass-border); border-radius:var(--control-radius); background:var(--control-glass);
+}
+.planner-flight-info strong { font-size:17px; font-variant-numeric:tabular-nums; }
+.planner-flight-info :is(span,small,label) { font-size:12px; }
+.planner-flight-info small:empty { display:none; }

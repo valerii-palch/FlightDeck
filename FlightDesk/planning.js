@@ -15,52 +15,158 @@ function routeDurationEstimate(dep, arr, aircraftTail, excludeID) {
  return values.length?{minutes:medianMinutes(values),count:values.length,source:'journal'}:null;
 }
 function bindDurationEstimate(form) {
- const output=byId('durationEstimate'),apply=byId('applyDurationEstimate');
- let estimate=null,remote=null,generation=0,controller,timer;
- const renderEstimate=()=>{
-  const dep=resolveAirportInput(form.elements.dep.value),arr=resolveAirportInput(form.elements.arr.value);
-  const local=routeDurationEstimate(dep,arr,form.elements.tail.value);
-  estimate=local||remote;
-  output.textContent=estimate?tr('Примерное время')+': '+duration(estimate.minutes)+' · '+tr(estimate.source==='journal'?'По журналу':'Реальные рейсы')+' ('+estimate.count+')':tr('Нет данных для оценки этого маршрута.');
-  if(local&&remote) output.textContent+=' · '+tr('Реальные рейсы')+': '+duration(remote.minutes)+' ('+remote.count+')';
-  apply.disabled=!estimate||!parseFlightTime(form.elements.std.value);
- };
- const update=()=>{
-  generation++;const current=generation;delete form.dataset.estimatedMinutes;
-  controller?.abort();clearTimeout(timer);remote=null;renderEstimate();
-  const dep=resolveAirportInput(form.elements.dep.value),arr=resolveAirportInput(form.elements.arr.value);
-  if(!/^[A-Z]{4}$/.test(dep)||!/^[A-Z]{4}$/.test(arr)||dep===arr) return;
+ const fields=form.elements, output=byId('durationEstimate'), source=byId('durationSource');
+ let controller,timer,lastRoute;
+ function update(){
+  const dep=fields.dep.value,arr=fields.arr.value;
+  const route=[dep,arr,fields.tail.value].join('/');
+  if(route===lastRoute)return;
+  lastRoute=route;
+  controller?.abort();clearTimeout(timer);
+  const show=estimate=>{
+   output.textContent=estimate?duration(estimate.minutes):'—';
+   source.textContent=estimate?tr(estimate.source==='journal'?'По журналу':'Реальные рейсы')+' · '+estimate.count:'';
+  };
+  const local=routeDurationEstimate(dep,arr,fields.tail.value);
+  show(local);
+  if(local||!airport(dep)||!airport(arr)||dep===arr)return;
   timer=setTimeout(async()=>{
-   const requestController=new AbortController();
-   controller=requestController;
-   try{
-    const timeout=setTimeout(()=>requestController.abort(),30000);
-    let result;
-    try { result=await lookupRealRoute(dep,arr,requestController.signal); }
-    finally { clearTimeout(timeout); }
-    if(current!==generation||!form.isConnected) return;
-    if(Number.isFinite(result.minutes)&&result.minutes>0&&result.minutes<1440&&Number.isInteger(result.count)&&result.count>0)
-     remote={minutes:result.minutes,count:result.count,source:'real'};
-    renderEstimate();
-   }catch(error){
-    if(current!==generation||!form.isConnected) return;
-    renderEstimate();output.textContent+=' '+realRouteError(error);
-   }
-  },700);
- };
- for(const key of ['dep','arr','tail']) form.elements[key].addEventListener('input',update);
- form.elements.std.addEventListener('input',renderEstimate);
- apply.onclick=()=>{
-  if(!estimate||!parseFlightTime(form.elements.std.value)) return;
-  const [hours,minutes]=parseFlightTime(form.elements.std.value).split(':').map(Number);
-  const arrival=(hours*60+minutes+estimate.minutes)%1440;
-  form.elements.sta.value=String(Math.floor(arrival/60)).padStart(2,'0')+':'+String(arrival%60).padStart(2,'0');
-  form.elements.sta.dispatchEvent(new Event('input',{bubbles:true}));
-  form.dataset.estimatedMinutes=String(estimate.minutes);
- };
- form.addEventListener('input',e=>{if(e.target.name==='sta')delete form.dataset.estimatedMinutes;});
- byId('dialog').addEventListener('close',()=>{generation++;controller?.abort();clearTimeout(timer);},{once:true});
+   const request=new AbortController();
+   controller=request;
+   try {
+    const result=await lookupRealRoute(dep,arr,AbortSignal.any([request.signal,AbortSignal.timeout(20000)]));
+    if(!request.signal.aborted&&form.isConnected&&route===lastRoute&&
+     Number.isFinite(result.minutes)&&result.minutes>0&&result.minutes<1440&&Number.isInteger(result.count)&&result.count>0)
+     show({...result,source:'real'});
+   }catch {}
+  },600);
+ }
+ form.addEventListener('input',update);
+ byId('dialog').addEventListener('close',()=>{controller?.abort();clearTimeout(timer);},{once:true});
  update();
+}
+
+const plannerStatuses=[
+ ['Запланирован','Запланирован'],['Подготовка','Заправка'],['Загрузка багажа','Загрузка багажа','Baggage loading'],
+ ['Идет посадка','Посадка','Boarding'],['Посадка завершена','Посадка окончена'],['Вылетел','Вылетел'],['Выполнен','Выполнен']
+];
+const plannedFlightNumber=(code,number)=>[code,number].filter(Boolean).join(' ');
+function bindAirline(form){
+ const {flightCode,airline}=form.elements;
+ const directory=JSON.parse(byId('airline-codes').textContent);
+ let previous=flightCode.value;
+ const update=()=>{
+  if(previous===flightCode.value)return;
+  previous=flightCode.value;
+  airline.value=previous==='AFL'&&appLanguage()==='ru'?'Аэрофлот':directory[previous]??'';
+ };
+ flightCode.addEventListener('input',event=>{if(!event.isComposing)update();});
+ flightCode.addEventListener('compositionend',update);
+}
+
+const datePlus=(date,days)=>new Date(clockOn(date,'00:00')+days*day).toISOString().slice(0,10);
+function defaultArrivalDate(date,std,sta){
+ return date&&std&&sta&&sta<std?datePlus(date,1):date;
+}
+function validateSchedule(form,{date,std,sta,staDate}){
+ if(clockOn(staDate||defaultArrivalDate(date,std,sta),sta)>=clockOn(date,std))return true;
+ const field=form.elements.staDate??form.elements.sta;
+ field.setCustomValidity(tr('Прилет должен быть после вылета.'));
+ field.reportValidity();
+ return false;
+}
+
+const localDateFormatters=new Map();
+function airportLocalStamp(code,stamp){
+ const zone=airportInfo(code)?.timezone;
+ if(!Number.isFinite(stamp)||!validAirportTimezone(zone))return '';
+ if(!localDateFormatters.has(zone)){
+  localDateFormatters.set(zone,new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',
+   hour:'2-digit',minute:'2-digit',hourCycle:'h23'}));
+ }
+ const parts=Object.fromEntries(localDateFormatters.get(zone).formatToParts(stamp).map(({type,value})=>[type,value]));
+ return parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
+}
+
+function localToUTC(code,date,time,reference=NaN){
+ const wall=clockOn(date,time);
+ const expected=date+'T'+time;
+ const candidates=new Set();
+ for(const delta of [-day,0,day]){
+  const sample=wall+delta, local=airportLocalStamp(code,sample);
+  if(!local)continue;
+  const candidate=wall+sample-Date.parse(local+':00Z');
+  if(airportLocalStamp(code,candidate)===expected)candidates.add(candidate);
+ }
+ return [...candidates].sort((a,b)=>Number.isFinite(reference)?Math.abs(a-reference)-Math.abs(b-reference)||a-b:a-b);
+}
+
+function bindRouteTimes(form,explicitArrivalDate){
+ const fields=form.elements;
+ const dateOf=key=>parseDisplayDate(fields[key].value.trim());
+ const timeOf=key=>parseFlightTime(fields[key].value);
+ const utc=(date,time)=>clockOn(dateOf(date),timeOf(time));
+ let manualArrival=!!explicitArrivalDate;
+ const refreshArrival=()=>{
+  if(!manualArrival)fields.staDate.value=displayDate(defaultArrivalDate(dateOf('date'),timeOf('std'),timeOf('sta')));
+ };
+ const sync=(event)=>{
+  const changed=event?.target.name;
+  if(changed==='staDate')manualArrival=true;
+  refreshArrival();
+  for(const [airportKey,localKey,dateKey,timeKey] of [
+   ['dep','localDeparture','date','std'],['arr','localArrival','staDate','sta']
+  ]){
+   const local=fields[localKey];
+   if(!local)continue;
+   const code=resolveAirportInput(fields[airportKey].value), reference=utc(dateKey,timeKey);
+   const shown=airportLocalStamp(code,reference);
+   const zone=airportInfo(code)?.timezone;
+   local.disabled=!validAirportTimezone(zone);
+   local.title=local.disabled?tr('Местное время недоступно'):zone;
+   if(changed===localKey){
+    const time=parseFlightTime(local.value);
+    if(!time){
+     if(!local.value)fields[timeKey].value='';
+     continue;
+    }
+    const automaticArrival=localKey==='localArrival'&&!manualArrival;
+    const start=utc('date','std');
+    const localDate=automaticArrival&&Number.isFinite(start)?airportLocalStamp(code,start).slice(0,10):shown.slice(0,10)||dateOf(dateKey);
+    if(!localDate){
+     local.setCustomValidity(tr('Сначала укажи дату UTC.'));
+     continue;
+    }
+    const today=localToUTC(code,localDate,time,reference);
+    const tomorrow=automaticArrival&&Number.isFinite(start)&&today.length&&today.every(candidate=>candidate<start);
+    const stamp=tomorrow?localToUTC(code,datePlus(localDate,1),time)[0]:today.find(candidate=>!automaticArrival||!Number.isFinite(start)||candidate>=start);
+    if(!Number.isFinite(stamp)){
+     local.setCustomValidity(tr('Это местное время недоступно в выбранную дату.'));
+     continue;
+    }
+    const iso=new Date(stamp).toISOString();
+    fields[dateKey].value=displayDate(iso.slice(0,10));
+    fields[timeKey].value=iso.slice(11,16);
+    if(localKey==='localDeparture')refreshArrival();
+   }else if([airportKey,timeKey,dateKey,'date','std','localDeparture'].includes(changed)||!changed){
+    local.value=shown.slice(11);
+    local.setCustomValidity('');
+   }
+   const localDate=airportLocalStamp(code,utc(dateKey,timeKey)).slice(0,10);
+   local.title=[localDate&&displayDate(localDate),local.title].filter(Boolean).join(' · ');
+  }
+  const scheduled=byId('scheduledDuration');
+  if(scheduled){
+   const minutes=(utc('staDate','sta')-utc('date','std'))/minute;
+   scheduled.textContent=Number.isFinite(minutes)&&minutes>=0?duration(minutes):'—';
+  }
+ };
+ form.addEventListener('input',sync);
+ fields.staDate.addEventListener('blur',()=>{
+  if(fields.staDate.value)return;
+  manualArrival=false;sync();
+ });
+ sync();
 }
 
 const zoneFormatters=new Map();
@@ -101,31 +207,20 @@ function bindPlanningSteps(form){
  const indicators=[...form.querySelectorAll('[data-step-indicator]')];
  const pending={pax:false,baggageKg:false,cargoKg:false};
  let step=0, routeKey='', payloadKey='';
- const now=()=>Date.now();
  const itinerary=()=>{
   const dep=resolveAirportInput(fields.dep.value),arr=resolveAirportInput(fields.arr.value);
   const date=parseDisplayDate(fields.date.value.trim()),std=parseFlightTime(fields.std.value),sta=parseFlightTime(fields.sta.value);
-  const times=flightTimes({date,std,sta});
-  return {dep,arr,date,std,sta,times};
+  const staDate=parseDisplayDate(fields.staDate.value.trim());
+  const times=flightTimes({date,std,sta,staDate});
+  return {dep,arr,date,std,sta,staDate,times};
  };
- const updateClocks=()=>{
-  const {dep,arr,times}=itinerary();
-  const instant=now();
-  byId('plannerUtc').textContent=new Date(instant).toISOString().slice(11,19)+' UTC';
-  for(const [code,side,stamp] of [[dep,'Dep',times.scheduledDeparture],[arr,'Arr',times.scheduledArrival]]){
-   byId('planner'+side+'Label').textContent=airport(code)?airportCity(code):tr(side==='Dep'?'Вылет':'Прилет');
-   const local=localAirportTime(code,instant);
-   byId('planner'+side+'Now').textContent=local||'—';
-   const scheduled=localAirportTime(code,stamp);
-   byId('planner'+side+'Plan').textContent=scheduled?tr('По плану')+' · '+scheduled:tr('Местное время недоступно');
-  }
- };
+ const updateClocks=()=>{byId('plannerUtc').textContent=utcLabel();};
  const update=()=>{
-  const {dep,arr,date,std,sta,times}=itinerary();
+  const {dep,arr,date,std,sta,staDate,times}=itinerary();
   const aircraft=aircraftFor(fields.tail.value), seats=capacity(aircraft), limit=commercialLimit(aircraft);
   fields.pax.max=seats;fields.baggageKg.max=seats*20;fields.cargoKg.max=limit;
   if(airport(dep)&&airport(arr)&&date&&std&&sta){
-   const key=[dep,arr,date,std,sta,aircraft.tail].join('|');
+   const key=[dep,arr,date,std,sta,staDate,aircraft.tail].join('|');
    if(key!==routeKey){
     routeKey=key;
     if(!pending.pax)fields.pax.value=suggestedPassengers(seats,localAirportTime(arr,times.scheduledArrival));
@@ -151,7 +246,7 @@ function bindPlanningSteps(form){
   for(const [label,value] of [
    ['Маршрут',[dep,arr].filter(Boolean).map(code=>airportCity(code)+' ('+code+')').join(' → ')],
    ['Дата UTC',displayDate(date)],['Расписание',[std,sta].filter(Boolean).join(' → ')+' UTC'],
-   ['Борт',aircraftModel(aircraft)],['Рейс',formatFlightNumber(fields.number.value)],['Статус',tr(fields.status.value)],
+   ['Борт',aircraftModel(aircraft)],['Рейс',plannedFlightNumber(fields.flightCode.value,fields.number.value)],['Статус',fields.status.selectedOptions[0]?.textContent],
    ['Пассажиры',byId('plannerLoad').textContent],['Загрузка багажа',byId('plannerBaggage').textContent],
    ['Коммерческий груз',byId('plannerCargo').textContent]
   ]){
@@ -194,7 +289,8 @@ function bindPlanningSteps(form){
     }
     fields[key].value=code;
    }
-   if(!flightFormValues(form))return;
+   const values=flightFormValues(form);
+   if(!values||!validateSchedule(form,values))return;
   }
   openStep(step+1);
  };
@@ -205,6 +301,7 @@ function bindPlanningSteps(form){
   byId('plannerNext').click();
  },true);
  const timer=setInterval(()=>{if(!form.isConnected)clearInterval(timer);else updateClocks();},1000);
+ byId('dialog').addEventListener('close',()=>clearInterval(timer),{once:true});
  openStep(0);
 }
 
@@ -223,7 +320,8 @@ function nextFlightNumber(value){
  return parts[1]+' '+number+parts[3];
 }
 const flightCodeText=(value,kind)=>(
- kind==='airport'?value.replace(/[^A-Za-z]/g,'').slice(0,4):value.replace(/[^A-Za-z0-9 -]/g,'')
+ kind==='airport'||kind==='airline'?value.replace(/[^A-Za-z]/g,'').slice(0,kind==='airline'?3:4):
+ kind==='flight-id'?value.replace(/[^A-Za-z0-9]/g,''):value.replace(/[^A-Za-z0-9 -]/g,'')
 ).toUpperCase();
 function normalizeFlightInputs(form){
  for(const input of form.querySelectorAll('[data-code]')){
@@ -252,11 +350,11 @@ function legacyFlightMinutes(previous,current){
 }
 function bindActualDuration(form,previous){
  const fields=form.elements;
- const keys=['date','std','sta','atd','ata','atdDate','ataDate'];
+ const keys=['date','std','sta','staDate','atd','ata','atdDate','ataDate'];
  const update=()=>{
   const values=Object.fromEntries(keys.map(key=>{
    const field=fields[key];
-   return [key,field.matches('[data-flight-date]')?parseDisplayDate(field.value.trim()):parseFlightTime(field.value)];
+   return [key,!field?'':field.matches('[data-flight-date]')?parseDisplayDate(field.value.trim()):parseFlightTime(field.value)];
   }));
   fields.actualMinutes.value=actualFlightMinutes(values)??legacyFlightMinutes(previous,values)??'';
  };
@@ -269,7 +367,7 @@ function bindLocalFlightTimes(form,endpoints){
  const fields=form.elements;
  const outputs=[...form.querySelectorAll('[data-local-time]')];
  const update=()=>{
-  const values=Object.fromEntries(['date','std','sta','atd','ata','atdDate','ataDate'].map(key=>{
+  const values=Object.fromEntries(['date','std','sta','staDate','atd','ata','atdDate','ataDate'].map(key=>{
    const field=fields[key];
    return [key,!field?'':field.matches('[data-flight-date]')?parseDisplayDate(field.value.trim()):parseFlightTime(field.value)];
   }));
