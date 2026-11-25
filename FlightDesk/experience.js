@@ -17,10 +17,12 @@ const preferences=()=>{
 };
 const summaryFlights=()=>data.flights.filter(f=>!f.demo);
 const mapKeyPattern=/^[A-Za-z0-9_-]{20,120}$/;
+const mapConfig=JSON.parse(byId('map-config').textContent);
+const tilesKey=mapConfig.tilesKey;
 const mapsKey=(()=>{
  let legacyKey;
  try {legacyKey=localStorage.getItem('flightdeck.yandexMapsKey');} catch {}
- const bundledKey=JSON.parse(byId('map-config').textContent).yandexKey;
+ const bundledKey=mapConfig.yandexKey;
  return [bundledKey,window.flightDeckMapsKey,legacyKey].find(key=>typeof key==='string'&&mapKeyPattern.test(key));
 })();
 
@@ -419,7 +421,7 @@ function initializeYandexFrame(payload) {
 
 function mountYandexMap() {
  const target=byId('onlineMap');
- if(!target||!mapsKey) return;
+ if(!target||(!tilesKey&&!mapsKey)) return;
  const status=byId('mapProviderStatus'), fallback=byId('offlineMap');
  const catalog=target.hasAttribute('data-catalog-map');
  const routes=catalog?[]:completedRoutes(summaryFlights()).routes;
@@ -432,6 +434,8 @@ function mountYandexMap() {
  }));
  const paths=routes.map(r=>r.codes);
  const curves=paths.map(path=>greatCircle(...path.map(airportInfo)).map(({lon,lat})=>[lon,lat]));
+ const onAirport=code=>catalog?openAirportCard(code):selectMapAirport(code,false);
+ if(tilesKey)return mountYandexTiles(target,fallback,status,{points,curves,catalog,onAirport});
  let frame,timer,version;
  const message=e=>{
   if(e.source!==frame?.contentWindow) return;
@@ -441,10 +445,7 @@ function mountYandexMap() {
    fallback.setAttribute('hidden','');
    status.textContent=tr("Яндекс Карты");
   } else if(e.data==='fd-map-failed') retry();
-  else if(typeof e.data?.airport==='string'&&codes.includes(e.data.airport)){
-   if(catalog)openAirportCard(e.data.airport);
-   else selectMapAirport(e.data.airport,false);
-  }
+  else if(typeof e.data?.airport==='string'&&codes.includes(e.data.airport))onAirport(e.data.airport);
  };
  function clearFrame(){
   clearTimeout(timer);frame?.remove();frame=null;

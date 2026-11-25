@@ -157,7 +157,11 @@ function selectMapAirport(code, pan=true) {
  byId('mapAirport').value = code;
  byId('yandexAirportLink').href=yandexAirportURL(code);
  byId('mapAirportSummary').innerHTML = mapAirportSummary(code);
- if(pan) byId('onlineMap')?.querySelector('iframe')?.contentWindow?.postMessage({select:code},'*');
+ if(pan){
+  const map=byId('onlineMap');
+  map?.dispatchEvent(new CustomEvent('fd-map-select',{detail:code}));
+  map?.querySelector('iframe')?.contentWindow?.postMessage({select:code},'*');
+ }
  document.querySelectorAll('[data-map-airport]').forEach(marker=>marker.classList.toggle('selected',marker.dataset.mapAirport===code));
 }
 

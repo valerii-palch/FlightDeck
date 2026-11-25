@@ -1715,3 +1715,29 @@ dialog[data-layout="airport"] .airport-photo img { max-height:240px; object-fit:
 .fleet-cabin-diagram .cabin-wing { fill:rgb(var(--flight-editor-light,140 166 252) / .18); }
 .fleet-cabin-diagram .cabin-fixture { fill:rgb(var(--flight-editor-light,140 166 252) / .24); }
 .fleet-cabin-diagram .cabin-seat-shape { fill:var(--seat); stroke:#142138; stroke-width:.65; }
+
+.yandex-tile-map {
+ position:relative; height:clamp(280px,46vh,520px); background:#2e4263; overflow:hidden;
+ touch-action:none; cursor:grab; isolation:isolate;
+}
+.airport-catalog-map .yandex-tile-map { height:clamp(235px,36vh,360px); }
+.yandex-tile-map:active { cursor:grabbing; }
+.tile-map-layer,.tile-map-pictures,.tile-map-routes,.tile-map-markers { position:absolute; inset:0; width:100%; height:100%; }
+.tile-map-pictures img { position:absolute; width:256px; height:256px; max-width:none; pointer-events:none; }
+.tile-map-routes { pointer-events:none; fill:none; stroke:#1f71c3; stroke-width:2.5; }
+.tile-map-markers { pointer-events:none; }
+#onlineMap .tile-map-markers button.tile-map-pin {
+ position:absolute; width:15px; height:15px; min-height:0; padding:0;
+ border:2px solid #d2efff; border-radius:50%; background:#287fc6; transform:translate(-50%,-50%);
+ box-shadow:0 1px 5px #14233a; pointer-events:auto;
+}
+#onlineMap .tile-map-markers button.hub { width:18px; height:18px; background:#7bd4e5; }
+.airport-catalog-map #onlineMap .tile-map-markers button.tile-map-pin {
+ width:19px; height:19px; border-color:rgb(var(--flight-editor-light,140 166 252)); border-radius:52% 52% 52% 3px;
+ background:var(--accent-chip); transform:translate(-50%,-85%) rotate(-45deg);
+}
+.airport-catalog-map .tile-map-pin::after { content:""; position:absolute; inset:4px; border-radius:50%; background:#eef6ff; }
+.tile-map-zoom { position:absolute; top:10px; left:10px; display:grid; gap:4px; }
+#onlineMap .tile-map-zoom button,#onlineMap .tile-map-zoom button:hover { width:32px; height:32px; min-height:0; padding:0; background:#172843; color:#edf7ff; font-size:19px; }
+.tile-map-credit { position:absolute; right:0; bottom:0; }
+.tile-map-credit img { display:block; width:88px; height:auto; }

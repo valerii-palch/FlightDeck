@@ -36,6 +36,8 @@ html = html.replace('__GOOGLE_AUTH__', (root / 'google-auth.js').read_text(encod
 html = html.replace('__CLOUD__', (root / 'cloud.js').read_text(encoding='utf-8'))
 html = html.replace('__ACCESS__', (root / 'access.js').read_text(encoding='utf-8'))
 html = html.replace('__ROUTE_MAP__', (root / 'route-map.js').read_text(encoding='utf-8'))
+tiles_logo = (root / 'yandex-tiles-logo.b64').read_text(encoding='ascii').strip()
+html = html.replace('__TILE_MAP__', (root / 'tile-map.js').read_text(encoding='utf-8').replace('__YANDEX_TILE_LOGO__', tiles_logo))
 airlines = (root / 'airlines-icao.json').read_text(encoding='utf-8').replace('<', r'\u003c')
 html = html.replace('__AIRLINES__', airlines)
 html = html.replace('__AIRLINES_LICENSE__', (root / 'airlines-license.txt').read_text(encoding='utf-8'))
@@ -47,6 +49,9 @@ html = html.replace('__AIRPORT_PHOTOS__', (root / 'airport-photos.json').read_te
 map_key = os.environ.get('FLIGHTDECK_YANDEX_MAPS_KEY', '').strip()
 if map_key and not re.fullmatch(r'[A-Za-z0-9_-]{20,120}', map_key):
     parser.error('FLIGHTDECK_YANDEX_MAPS_KEY has an invalid format')
-html = html.replace('__MAP_CONFIG__', json.dumps({'yandexKey': map_key}))
+tiles_key = os.environ.get('FLIGHTDECK_YANDEX_TILES_KEY', '').strip()
+if tiles_key and not re.fullmatch(r'[A-Za-z0-9_-]{20,120}', tiles_key):
+    parser.error('FLIGHTDECK_YANDEX_TILES_KEY has an invalid format')
+html = html.replace('__MAP_CONFIG__', json.dumps({'yandexKey': map_key, 'tilesKey': tiles_key}))
 html = html.replace('__LOGO__', logo)
 args.output.write_text(html, encoding='utf-8')
