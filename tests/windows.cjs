@@ -77,7 +77,7 @@ async function testApplication() {
       const seatMap = page.locator('#plannerSeatMap');
       assert.equal(await seatMap.locator('.seat-model').textContent(), model);
       const drawn = await seatMap.locator('.seat-section').evaluateAll(sections => Object.fromEntries(sections.map(section =>
-        [section.dataset.cabin, section.querySelectorAll('i:not(.seat-gap)').length])));
+        [section.dataset.cabin, section.querySelectorAll('.cabin-seat').length])));
       assert.deepEqual(drawn, classes);
       const geometry = await seatMap.locator('.seat-row').evaluateAll(rows => rows.every(row => {
         const bounds = row.getBoundingClientRect();
