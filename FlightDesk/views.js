@@ -211,7 +211,7 @@ function home() {
  (upcoming?tr("Ближайший рейс"):latest&&!flown(latest)?tr("Рейс в работе"):tr("Недавний рейс"))+'</h2>'+
  (latest?'<time class="muted" datetime="'+esc(latest.date)+'">'+displayDate(latest.date)+'</time>':'')+'</header>'+
  (latest?'<div class="dashboard-flight-heading"><p class="dashboard-number">'+'<span>'+flightNumber(latest)+'</span></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div></div>'+
- mobileRoute(latest)+
+ flightRouteSummary(latest)+
  '<div class="dashboard-flight-meter"><div class="dashboard-progress-track" id="dashboardFlightProgress" role="progressbar" aria-label="'+tr('Прогресс рейса')+'" aria-valuenow="'+progress+'" aria-valuetext="'+esc(routeProgressLabel(latest,progress))+'" data-flight-id="'+esc(latest.id)+'" style="--progress:'+progress+'%">'+
  '<span class="dashboard-progress-fill"></span><span class="dashboard-progress-plane" aria-hidden="true">'+planeIcon+'</span></div></div>'+
  dashboardFlightFacts(latest,times)+'<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small></p><footer class="dashboard-flight-actions"><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest)+'</footer>':`<p class="muted">${tr("Нет запланированных или выполненных рейсов")}</p>`)+
@@ -282,19 +282,19 @@ function displayRouteLeg(f) {
  if(next&&alternateLanded(f)&&next.status!=='Отменен')return next;
  return isDiversion(f)?{...f,arr:alternate(f)||f.arr}:f;
 }
-function mobileRoute(f) {
+function flightRouteSummary(f) {
  const leg=displayRouteLeg(f), times=flightTimes(leg);
  const estimated=!Number.isFinite(times.actualArrival)&&Number.isFinite(times.estimatedArrival);
  const endpoint=(code,label,planned,actual,estimate=false)=>{
   const stamp=Number.isFinite(actual)?actual:planned;
   const local=airportLocalStamp(code,stamp);
-  return '<div class="mobile-route-endpoint"><small>'+tr(label)+' · UTC</small>'+
+  return '<div class="route-summary-endpoint"><small>'+tr(label)+' · UTC</small>'+
    flightTimeStack(planned,actual,leg.date,false,estimate)+
-   '<small class="mobile-local">'+(local?tr('Местное время')+' · '+formatTime(Date.parse(local+':00Z'),leg.date):'&nbsp;')+'</small>'+
-   '<span class="mobile-city">'+esc(airportCity(code))+'</span>'+codeLabel(code)+
+   '<small class="route-local">'+(local?tr('Местное время')+' · '+formatTime(Date.parse(local+':00Z'),leg.date):'&nbsp;')+'</small>'+
+   '<span class="route-city">'+esc(airportCity(code))+'</span>'+codeLabel(code)+
    '<small>'+esc(airportName(code))+'</small></div>';
  };
- return '<div class="mobile-flight-route">'+
+ return '<div class="flight-route-summary">'+
   endpoint(leg.dep,'Вылет',times.scheduledDeparture,preflightStatuses.includes(leg.status)?NaN:times.actualDeparture)+
   endpoint(leg.arr,'Прилет',isDiversion(leg)?NaN:times.scheduledArrival,
    estimated?times.estimatedArrival:times.actualArrival,estimated)+'</div>'+

@@ -173,7 +173,7 @@ async function testApplication() {
     assert.equal(await page.evaluate(() => (flightTimes(data.flights[0]).scheduledArrival - flightTimes(data.flights[0]).scheduledDeparture) / 60000), 100);
 
     await page.evaluate(() => {
-      window.flightDeckUpdateAvailable('0.4.6', '<ul><li>Первое &amp; второе</li></ul>');
+      window.flightDeckUpdateAvailable('0.5.0', '<ul><li>Первое &amp; второе</li></ul>');
       openApplicationUpdate();
     });
     assert.equal(await page.locator('#releaseNotes li').textContent(), 'Первое & второе');
@@ -185,8 +185,8 @@ async function testApplication() {
       Object.assign(f,{status:'Вылетел',date:'2026-11-27',std:'23:00',sta:'01:00',staDate:'2026-11-28',atd:'23:45',atdDate:'2026-11-27'});
       page='home'; render();
     });
-    assert.equal(await page.locator('.mobile-flight-route .day-offset').first().textContent(), '+1');
-    assert.match(await page.locator('.mobile-flight-route').textContent(), /01:45/);
+    assert.equal(await page.locator('.flight-route-summary .day-offset').first().textContent(), '+1');
+    assert.match(await page.locator('.flight-route-summary').textContent(), /01:45/);
     for(const theme of ['morning','day','evening','night']){
       await page.evaluate(theme=>{
         updateDaylight=()=>{document.body.dataset.daylight=theme;};

@@ -30,7 +30,7 @@ http://127.0.0.1:*/auth/**
 
 ## Статистика реальных рейсов
 
-В настольной версии 0.22.0 клиент запрашивает статистику через Supabase Edge Function `route-duration`. Для запроса нужен действующий сеанс FlightDeck. Ключ Aviationstack хранится в секрете Supabase `AVIATIONSTACK_KEY`.
+Настольный клиент запрашивает статистику через Supabase Edge Function `route-duration`. Для запроса нужен действующий сеанс FlightDeck. Ключ Aviationstack хранится в секрете Supabase `AVIATIONSTACK_KEY`.
 
 Для настройки добавь секрет в **Supabase → Edge Functions → Secrets**, разверни функцию `route-duration` из `supabase/functions/route-duration/index.ts` с включенной проверкой JWT и проверь расчет после входа в настольном приложении.
 

@@ -314,7 +314,7 @@ function center() {
   (Number.isFinite(actual)?formatTime(actual,f.date):'—')+'</td><td><button data-stage="'+key+'">'+(times[key]?tr("Изменить"):tr("Отметить"))+'</button></td></tr>';
  }).join('');
  return '<div class="panel flight-hero"><div class="row flight-hero-header"><div class="controls"><strong>'+flightNumber(f)+'</strong>'+'<span class="muted">'+displayDate(f.date)+'</span><span class="badge">'+esc(f.tail)+'</span></div>'+
- '<div class="controls">'+(!isDiversion(f)?`<button data-action="divert">${tr("Уход на запасной")}</button>`:'')+`<button class="primary" data-action="edit">${tr("Редактировать рейс")}</button></div></div>`+mobileRoute(f)+routeOverview(f)+'<div class="flight-details">'+routeSide(f,'dep',tr("Стоянка вылета"))+routeSide(f,'arr',tr("Стоянка прилета"))+'</div>'+
+ '<div class="controls">'+(!isDiversion(f)?`<button data-action="divert">${tr("Уход на запасной")}</button>`:'')+`<button class="primary" data-action="edit">${tr("Редактировать рейс")}</button></div></div>`+flightRouteSummary(f)+routeOverview(f)+'<div class="flight-details">'+routeSide(f,'dep',tr("Стоянка вылета"))+routeSide(f,'arr',tr("Стоянка прилета"))+'</div>'+
  (f.note?'<p class="facts muted">'+esc(f.note)+'</p>':'')+
  `<div class="flight-status-bar facts"><label>${tr("Статус рейса")}<span class="flight-select status-select `+(statusColors[f.status]||'scheduled')+'"><select id="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></span></label>'+nextFlightButton(f)+'</div></div>'+continuationPanel(f)+
  `<div class="grid two facts"><section class="panel preparation-panel"><div class="preparation-heading"><h2 id="preparationTitle" tabindex="-1">${tr("Подготовка рейса")}</h2>`+nextStageButton(nextStage)+'</div>'+

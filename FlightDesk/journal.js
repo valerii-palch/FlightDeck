@@ -117,7 +117,7 @@ function boardRow(f, kind, date, groupDate) {
  const t=flightTimes(f);
  const city=code=>esc(airportCity(code));
  const stop=kind==='diverted';
- const place=(code,label,original='')=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span>'+
+ const place=(code,label,original='')=>'<td class="board-place"><span class="board-compact-label">'+label+'</span>'+
   (original?'<del class="board-original" title="'+city(original)+'">'+city(original)+'</del>':'')+
   '<strong class="board-city" title="'+city(code)+'">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
  const time=(planned,actual,estimated=false)=>{
@@ -128,7 +128,7 @@ function boardRow(f, kind, date, groupDate) {
  };
  const actualArrival=t.actualArrival;
  const estimated=!Number.isFinite(actualArrival)&&Number.isFinite(t.estimatedArrival);
- const arrival=`<td class="board-arrival"><span class="board-mobile-label">${tr("Прилет UTC")}</span>`+
+ const arrival=`<td class="board-arrival"><span class="board-compact-label">${tr("Прилет UTC")}</span>`+
   time(stop?NaN:t.scheduledArrival,estimated?t.estimatedArrival:actualArrival,estimated)+'</td>';
  const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
  const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
