@@ -41,12 +41,14 @@ jobs:
       - name: Build universal macOS app and installer
         env:
           UNIVERSAL_BUILD: '1'
+          FLIGHTDECK_EXPECT_MAPS: '1'
           FLIGHTDECK_YANDEX_MAPS_KEY: ${{ secrets.FLIGHTDECK_YANDEX_MAPS_KEY }}
           FLIGHTDECK_YANDEX_TILES_KEY: ${{ secrets.FLIGHTDECK_YANDEX_TILES_KEY }}
         run: |
           python3 FlightDesk/build-web.py
           bash FlightDesk/build-mac.sh
           bash FlightDesk/build-installer.sh
+          FlightDesk/FlightDeck.app/Contents/MacOS/FlightDesk --self-test
       - name: Verify macOS installation over the legacy version
         run: |
           plist=FlightDesk/Info.plist
@@ -125,6 +127,11 @@ jobs:
           $installed = (Get-Item $exe).VersionInfo
           $installedVersion = "$($installed.ProductMajorPart).$($installed.ProductMinorPart).$($installed.ProductBuildPart)"
           if ($installedVersion -ne $version) { throw "Expected FlightDeck $version, found $installedVersion" }
+          npm install --no-save --no-audit --no-fund playwright-core@1.62.1
+          $env:FLIGHTDECK_TEST_EXE = $exe
+          $env:FLIGHTDECK_EXPECT_MAPS = '1'
+          node ../tests/windows.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Installed Windows application verification failed" }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release

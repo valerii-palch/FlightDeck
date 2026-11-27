@@ -139,7 +139,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         }
         guard let html = Bundle.main.url(forResource: "FlightDesk", withExtension: "html") else { exit(1) }
         webView.loadFileURL(html, allowingReadAccessTo: html.deletingLastPathComponent())
-        if testing { DispatchQueue.main.asyncAfter(deadline: .now() + 20) { exit(2) } }
+        if testing { DispatchQueue.main.asyncAfter(deadline: .now() + (ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" ? 90 : 20)) { exit(2) } }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -600,9 +600,42 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         """) { result, error in
             if let error { fputs("\(error)\n", stderr); exit(1) }
             print(result ?? "No test result")
+            if result != nil && ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" {
+                self.verifyBuiltMaps()
+                return
+            }
             exit(result == nil ? 1 : 0)
         }
     }
+    private func verifyBuiltMaps() {
+        webView.callAsyncJavaScript("""
+        if (!tilesKey) throw new Error('Missing map configuration in the built application');
+        data.airports=[{icao:'UUEE',name:'Test departure',hubLevel:1},{icao:'USPP',name:'Test arrival',hubLevel:2}];
+        data.flights=[{id:'map-check',tail:fleet[0].tail,number:'TEST',dep:'UUEE',arr:'USPP',
+          date:'2026-11-27',std:'09:00',sta:'11:00',atd:'09:00',ata:'11:00',status:'Выполнен'}];
+        for (const section of ['pilot','airports']) {
+          page=section;airportCode='UUEE';airportCountryFilter='RU';render();
+          const deadline=Date.now()+30000;
+          while (!document.querySelector('#onlineMap.loaded .tile-map-pictures img')?.naturalWidth) {
+            if (Date.now()>deadline) throw new Error('Basemap did not load in '+section);
+            await new Promise(resolve=>setTimeout(resolve,100));
+          }
+          const pictures=document.querySelector('.tile-map-pictures');
+          if (!getComputedStyle(pictures).filter.includes('invert')) throw new Error('Basemap is not dark');
+          if (getComputedStyle(document.querySelector('.tile-map-credit')).filter!=='none') throw new Error('Map credit was altered');
+          document.querySelector('[data-tile-airport="UUEE"]').click();
+          if (section==='airports' && !document.querySelector('#airportCardForm')) throw new Error('Airport marker did not open its card');
+          if (byId('dialog').open)byId('dialog').close();
+        }
+        return 'PASS: live dark basemaps and marker actions in the built macOS application';
+        """, arguments: [:], in: nil, in: .page) { result in
+            switch result {
+            case .success(let value): print(value); exit(0)
+            case .failure(let error): fputs("\(error)\n", stderr); exit(1)
+            }
+        }
+    }
+
 }
 
 @main

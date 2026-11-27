@@ -116,7 +116,7 @@ function routeMap() {
  const {routes,unmapped} = completedRoutes(summaryFlights());
  if (!routes.length) return `<section class="panel facts route-map"><h2>${tr("Карта перелетов")}</h2><p class="muted">${tr("Пока нет выполненных перелетов с известными аэропортами.")}</p></section>`;
  const codes = [...new Set(routes.flatMap(r=>r.codes))].sort(compareAirports);
- if (!codes.includes(selectedMapAirport)) selectedMapAirport = codes.includes('UUEE')?'UUEE':codes[0];
+ if (!codes.includes(selectedMapAirport)) selectedMapAirport = codes[0];
  const paths = routes.map(r=>greatCircle(...r.codes.map(airportInfo)));
  const chart = routeProjection(paths.flat());
  const point = p => chart.project({...p,lon:wrapLon(p.lon,chart.centerLon)});

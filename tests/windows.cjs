@@ -14,8 +14,8 @@ async function testApplication() {
   try {
     app = await electron.launch({
       cwd: windows,
-      executablePath: requireWindows('electron'),
-      args: ['.', '--user-data-dir=' + profile],
+      executablePath: process.env.FLIGHTDECK_TEST_EXE || requireWindows('electron'),
+      args: [...(process.env.FLIGHTDECK_TEST_EXE?[]:['.']), '--user-data-dir=' + profile],
       timeout: 30000
     });
     const page = await app.firstWindow();
@@ -304,6 +304,26 @@ async function testApplication() {
     assert.equal(await page.evaluate(()=>airport('USPP').hubLevel),0);
     assert.equal(await page.locator('.airport-list button').first().getAttribute('data-airport'),'UUEE');
     assert.equal(await page.locator('.airport-list .hub-badge').count(),1);
+    if(process.env.FLIGHTDECK_EXPECT_MAPS==='1'){
+      assert.equal(await page.evaluate(()=>!!tilesKey),true);
+      await page.route('https://tiles.api-maps.yandex.ru/**',route=>route.continue());
+      for(const section of ['pilot','airports']){
+        await page.evaluate(section=>{
+          data.flights=[{...data.flights[0],status:'Выполнен',atd:'09:00',ata:'11:00',diversionAirport:'',continuation:undefined}];
+          page=section;airportCode='UUEE';airportCountryFilter='RU';render();
+        },section);
+        await page.waitForFunction(()=>document.querySelector('#onlineMap.loaded .tile-map-pictures img')?.naturalWidth>0,{},{timeout:30000});
+        assert.match(await page.locator('.tile-map-pictures').evaluate(el=>getComputedStyle(el).filter),/invert/);
+        assert.equal(await page.locator('.tile-map-credit').evaluate(el=>getComputedStyle(el).filter),'none');
+        await page.locator('[data-tile-airport=UUEE]').click();
+        if(section==='airports'){
+          await page.locator('#airportCardForm').waitFor();
+          await page.locator('#dialog [data-action=close]').first().click();
+        }
+      }
+      console.log('PASS: live dark basemaps in the installed Windows application');
+    }
+
     const nativeWindow = await app.browserWindow(page);
     const initialSize = await nativeWindow.evaluate(window => window.getContentSize());
     const workArea = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);
