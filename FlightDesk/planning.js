@@ -548,8 +548,10 @@ function editActualFlight(existing,divert=false,parent=null) {
  const side=(key,code,title)=>{
   const dateKey=key+'Date', stamp=key==='atd'?times.actualDeparture:times.actualArrival;
   const local=airportLocalStamp(code,stamp);
+  const dateStamp=Number.isFinite(stamp)?stamp:key==='ata'?(Number.isFinite(times.estimatedArrival)?times.estimatedArrival:times.scheduledArrival):times.scheduledDeparture;
+  const defaultDate=Number.isFinite(dateStamp)?new Date(dateStamp).toISOString().slice(0,10):f.date;
   return '<section class="flight-editor-section"><h3>'+tr(title)+' · '+esc(code)+'</h3><div class="flight-editor-fields">'+
-   '<label>'+tr('Дата UTC')+dateInput(dateKey,f[dateKey]||(Number.isFinite(stamp)?new Date(stamp).toISOString().slice(0,10):f.date))+'</label>'+
+   '<label>'+tr('Дата UTC')+dateInput(dateKey,f[key]&&f[dateKey]?f[dateKey]:defaultDate)+'</label>'+
    '<label>UTC'+timeInput(key,f[key])+'</label>'+
    '<label>'+tr('Местная дата')+dateInput(key+'LocalDate',local.slice(0,10))+'</label>'+
    '<label>'+tr('Местное время')+timeInput(key+'Local',local.slice(11))+'</label></div></section>';
@@ -559,7 +561,7 @@ function editActualFlight(existing,divert=false,parent=null) {
   '<button type="button" class="icon-button" data-action="close" aria-label="'+tr('Закрыть')+'">'+toolbarIcon('close')+'</button></header>'+
   '<form id="editForm" class="editor flight-editor actual-editor"><div class="flight-editor-body">'+
   '<section class="flight-editor-section"><div class="flight-editor-fields"><label>'+tr('Статус')+
-  '<select name="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></label>'+
+  '<select name="status">'+(parent?statuses.filter(s=>s!=='Уход на запасной'):statuses).map(s=>option(s,tr(s),f.status)).join('')+'</select></label>'+
   '<label id="actualAlternate">'+tr('Фактический запасной ICAO')+'<input name="diversionAirport" data-code="airport" maxlength="4" value="'+esc(alternate(f))+'"></label></div></section>'+
   side('atd',f.dep,'Вылет')+side('ata',isDiversion(f)?alternate(f)||f.arr:f.arr,'Прилет')+
   '<section class="flight-editor-section"><div id="actualArrivalPreview"></div><label>'+tr('Примечание')+
@@ -583,6 +585,7 @@ function editActualFlight(existing,divert=false,parent=null) {
   for(const key of ['atd','ata']){
    const code=key==='atd'?f.dep:fields.status.value==='Уход на запасной'?arrivalCode():f.arr;
    const local=fields[key+'Local'],localDate=fields[key+'LocalDate'];
+   fields[key+'Date'].required=!!fields[key].value;
    const valid=validAirportTimezone(airportInfo(code)?.timezone);
    local.disabled=localDate.disabled=!valid;
    if(name===key+'Local'||name===key+'LocalDate'){

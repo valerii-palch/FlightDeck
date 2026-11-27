@@ -290,7 +290,7 @@ function mobileRoute(f) {
   const local=airportLocalStamp(code,stamp);
   return '<div class="mobile-route-endpoint"><small>'+tr(label)+' · UTC</small>'+
    flightTimeStack(planned,actual,leg.date,false,estimate)+
-   (local?'<small>'+tr('Местное время')+' · '+formatTime(Date.parse(local+':00Z'),leg.date)+'</small>':'')+
+   '<small class="mobile-local">'+(local?tr('Местное время')+' · '+formatTime(Date.parse(local+':00Z'),leg.date):'&nbsp;')+'</small>'+
    '<span class="mobile-city">'+esc(airportCity(code))+'</span>'+codeLabel(code)+
    '<small>'+esc(airportName(code))+'</small></div>';
  };
