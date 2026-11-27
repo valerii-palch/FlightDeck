@@ -110,13 +110,15 @@ function flightStats(rows) {
  const completed = rows.filter(flown);
  return {count:completed.length, minutes:rows.flatMap(physicalLegs).filter(legFlown).reduce((sum,f)=>sum+loggedMinutes(f),0)};
 }
-const newest = rows => [...rows].sort((a,b)=>(b.date+b.std).localeCompare(a.date+a.std));
-const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготовка','Загрузка багажа','Идет посадка','Посадка завершена','Вылетел','Уход на запасной'].includes(f.status)))[0];
+const newest = rows => [...rows].sort((a,b)=>(b.date+b.std).localeCompare(a.date+a.std)||String(b.id||'').localeCompare(String(a.id||'')));
+const activeFlight = rows => newest(rows.filter(f=>!flown(f)&&['Подготовка','Загрузка багажа','Идет посадка','Посадка завершена','Вылетел','Уход на запасной','Задержан'].includes(f.status)))[0];
 function workingFlight(rows, now=Date.now()) {
- return activeFlight(rows)||newest(rows.filter(f=>(f.status==='Запланирован'||f.status==='Задержан')&&!flown(f)&&clockOn(f.date,f.std)>=now)).at(-1);
+ return activeFlight(rows)||newest(rows.filter(f=>(f.status==='Запланирован'||f.status==='Задержан')&&!flown(f))).at(-1);
 }
 function dashboardFlight(rows,now=Date.now()){
- const upcoming=newest(rows.filter(f=>f.status==='Запланирован'&&clockOn(f.date,f.std)>=now)).at(-1);
+ const active=activeFlight(rows);
+ if(active)return {flight:active,upcoming:false};
+ const upcoming=workingFlight(rows,now);
  if(upcoming)return {flight:upcoming,upcoming:true};
  const completion=f=>{
   const times=flightTimes(f);
@@ -202,7 +204,7 @@ function home() {
  const times=latest?flightTimes(latest):null;
  return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><header class="dashboard-card-heading"><h2>'+
- (upcoming?tr("Ближайший рейс"):tr("Недавний рейс"))+'</h2>'+
+ (upcoming?tr("Ближайший рейс"):latest&&!flown(latest)?tr("Рейс в работе"):tr("Недавний рейс"))+'</h2>'+
  (latest?'<time class="muted" datetime="'+esc(latest.date)+'">'+displayDate(latest.date)+'</time>':'')+'</header>'+
  (latest?'<div class="dashboard-flight-heading"><p class="dashboard-number">'+'<span>'+flightNumber(latest)+'</span></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div></div>'+
  '<div class="dashboard-route">'+dashboardFlightEndpoint(latest.dep,'Вылет',times.scheduledDeparture,upcoming?NaN:times.actualDeparture,latest.date)+

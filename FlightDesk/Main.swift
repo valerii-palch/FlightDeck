@@ -369,6 +369,15 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           const nearest = {...other,date:'2026-11-24',std:'08:00'};
           const now = clockOn('2026-11-24','02:00');
           check(dashboardFlight([other,corrected,nearest],now).flight===nearest, 'closest scheduled flight');
+          check(dashboardFlight([other,corrected,current],now).flight===current, 'active flight takes priority');
+          data.flights.push({...other,id:'next-test',date:'2099-01-01'});
+          page='home'; render();
+          check(document.querySelector('.dashboard-number').textContent.includes('FD 100'), 'dashboard displays active flight');
+          changeFlightStatus(current,'Выполнен');
+          check(document.querySelector('#dashboardFlightProgress').dataset.flightId==='next-test', 'dashboard switches after completion');
+          changeFlightStatus(current,'Подготовка');
+          check(document.querySelector('#dashboardFlightProgress').dataset.flightId===current.id, 'dashboard switches after status rollback');
+
           check(dashboardFlight([{...nearest,status:'Отменен'},corrected],now).flight===corrected,'completed flight fallback');
           check(setFlightStatus(corrected,'Запланирован') && journalStatus(corrected)==='Запланирован' &&
             !corrected.atd && !corrected.ata && !corrected.atdDate && !corrected.ataDate &&
