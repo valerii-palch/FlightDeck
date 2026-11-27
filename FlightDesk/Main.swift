@@ -441,8 +441,9 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           const airportCard = byId('airportCardForm');
           check(airportCard.querySelector('[readonly]'), 'airport card IATA is read-only');
           airportCard.elements.version.value = '1.3';
+          airportCard.elements.hubLevel.value='1';
           airportCard.requestSubmit();
-          check(airport('TEST').version === '1.3', 'airport scenery edit persisted');
+          check(airport('TEST').version === '1.3' && airport('TEST').hubLevel===1, 'airport details and hub persisted');
           document.querySelector('[data-action=new]').click();
           check(document.querySelector('dialog[data-layout=flight] .flight-editor-footer button[type=submit]'), 'flight editor');
           const editor = byId('editForm');

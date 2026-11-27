@@ -39,7 +39,7 @@ async function testApplication() {
     await page.locator('[data-action=settings]').click();
     assert.equal(await page.locator('#dialog input').count(), 0);
     assert.equal(await page.locator('#dialog fieldset').filter({ has: page.locator('[data-action=update]') }).locator('legend').textContent(), 'Обновления');
-    await page.locator('#dialog [data-action=close]').click();
+    await page.locator('#dialog [data-action=close]').first().click();
     await page.locator('#dialog').waitFor({ state: 'hidden' });
 
     await page.locator('#sidebarPages [data-page=pilot]').click();
@@ -231,24 +231,24 @@ async function testApplication() {
     assert.deepEqual(await page.locator('#icaoChoices option').evaluateAll(options=>options.map(o=>o.value)),['USPP','UUEE']);
     const order=await page.locator('#editForm input').evaluateAll(inputs=>inputs.map(i=>i.name));
     assert.ok(order.indexOf('localDeparture')<order.indexOf('std'));
-    await page.locator('#dialog [data-action=close]').click();
+    await page.locator('#dialog [data-action=close]').first().click();
     await page.locator('[data-action=settings]').click();
     assert.equal(await page.locator('#settingsTitle').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(()=>document.body.dataset.inputMode),'keyboard');
     assert.notEqual(await page.locator('#dialog :focus').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
-    await page.locator('#dialog [data-action=close]').click();
+    await page.locator('#dialog [data-action=close]').first().click();
     assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).userSelect),'none');
     await page.evaluate(()=>editFlight(data.flights[0]));
     assert.equal(await page.locator('#editForm textarea').evaluate(el=>getComputedStyle(el).userSelect),'text');
-    await page.locator('#dialog [data-action=close]').click();
+    await page.locator('#dialog [data-action=close]').first().click();
     for(const kind of ['flights','airports']){
       const before=await page.evaluate(()=>JSON.stringify(cloudSnapshot()));
       await page.evaluate(kind=>confirmCollectionClear(kind),kind);
       assert.equal(await page.locator('#confirmCollectionClear').isDisabled(),true);
       assert.equal(await page.locator('#clearConsent').isChecked(),false);
       await page.screenshot({path:resolve(__dirname,'ui-artifacts/clear-'+kind+'.png')});
-      await page.locator('#dialog [data-action=close]').click();
+      await page.locator('#dialog [data-action=close]').first().click();
       assert.equal(await page.evaluate(()=>JSON.stringify(cloudSnapshot())),before);
     }
     const beforeClear=await page.evaluate(()=>JSON.parse(JSON.stringify(data)));
@@ -278,6 +278,32 @@ async function testApplication() {
     await page.evaluate(()=>{page='pilot';render();});
     assert.equal(await page.locator('.achievement-mark svg').count(),7);
     await page.screenshot({path:resolve(__dirname,'ui-artifacts/achievements.png')});
+    await page.evaluate(()=>{
+      const base=data.flights[0];
+      data.flights=['Выполнен','Выполнен','Вылетел','Подготовка','Запланирован','Задержан','Отменен','Уход на запасной'].map((status,index)=>({
+        ...base,id:'color-'+index,status,date:'2026-11-27',std:'09:00',sta:'11:00',staDate:'2026-11-27',
+        atd:['Выполнен','Вылетел','Уход на запасной'].includes(status)?'09:05':'',atdDate:'2026-11-27',
+        ata:status==='Выполнен'?(index===0?'10:55':'11:30'):'',ataDate:'2026-11-27',
+        diversionAirport:status==='Уход на запасной'?'UUWW':'',continuation:undefined
+      }));
+      page='journal';render();
+    });
+    const fills=await page.locator('.flight-board tbody tr').evaluateAll(rows=>rows.map(row=>({
+      image:getComputedStyle(row).backgroundImage,
+      color:getComputedStyle(row).backgroundColor
+    })));
+    assert.ok(fills.length>=8);
+    assert.ok(fills.every(fill=>fill.image.includes('linear-gradient')&&fill.color==='rgba(0, 0, 0, 0)'));
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/journal-statuses.png')});
+    await page.evaluate(()=>{page='airports';airportCountryFilter='RU';render();});
+    assert.equal(await page.locator('.airport-list button').first().getAttribute('data-airport'),'USPP');
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/airport-hubs.png')});
+    await page.evaluate(()=>openAirportCard('USPP'));
+    await page.locator('#airportCardForm [name=hubLevel]').selectOption('0');
+    await page.locator('#airportCardForm button[type=submit]').click();
+    assert.equal(await page.evaluate(()=>airport('USPP').hubLevel),0);
+    assert.equal(await page.locator('.airport-list button').first().getAttribute('data-airport'),'UUEE');
+    assert.equal(await page.locator('.airport-list .hub-badge').count(),1);
     const nativeWindow = await app.browserWindow(page);
     const initialSize = await nativeWindow.evaluate(window => window.getContentSize());
     const workArea = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);

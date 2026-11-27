@@ -181,7 +181,7 @@ const toolbarIcon=kind=>{
 };
 
 const option = (value, label, current) => '<option value="'+esc(value)+'"'+(value === current?' selected':'')+'>'+esc(label)+'</option>';
-const codeLabel = code => '<span class="code">'+esc(code)+(airportIata(code)?' <small>/ '+esc(airportIata(code))+'</small>':'')+'</span>'+hubBadge(airport(code));
+const codeLabel = code => '<span class="code">'+esc(code)+(airportIata(code)?' <small>/ '+esc(airportIata(code))+'</small>':'')+'</span>';
 const duration = minutes => Number.isFinite(minutes) ? Math.floor(minutes/60)+` ${tr("ч")} `+minutes%60+` ${tr("мин")}` : '—';
 const clockOn = (date,time) => Date.parse(date+'T'+time+':00Z');
 const minute = 60000;
@@ -394,7 +394,7 @@ function airportRows() {
  return '<div class="airport-list">'+matches.slice(start,start+airportPageSize).map(a=>{
   const info=airportInfo(a.icao);
   return '<button data-airport="'+esc(a.icao)+'" class="'+(a.icao===airportCode?'active':'')+'"><span class="row">'+codeLabel(a.icao)+
-   '<span class="airport-list-name">'+esc(airportCity(a.icao))+(appLanguage()==='ru'&&info?.cityEn?'<small lang="en">'+esc(info.cityEn)+'</small>':'')+'</span></span></button>';
+   hubBadge(a)+'<span class="airport-list-name">'+esc(airportCity(a.icao))+(appLanguage()==='ru'&&info?.cityEn?'<small lang="en">'+esc(info.cityEn)+'</small>':'')+'</span></span></button>';
  }).join('')+`</div><div class="airport-pagination"><button data-airport-page="-1" aria-label="${tr("Предыдущая страница")}" `+(airportListPage===0?'disabled':'')+'>←</button>'+
  '<small>'+(start+1)+'–'+Math.min(matches.length,start+airportPageSize)+` ${tr("из")} `+matches.length+'</small>'+
  `<button data-airport-page="1" aria-label="${tr("Следующая страница")}" `+(airportListPage===total-1?'disabled':'')+'>→</button></div>';
@@ -469,7 +469,7 @@ function airportPreview(a){
   ['Сценарий аэропорта',tr(a.scenery?'Установлен':'Не установлен')],['Профиль GSX',tr(a.gsx?'Установлен':'Не установлен')],
   ['Расширение Python',tr(a.python?'Установлен':'Не установлен')],['Часовой пояс IANA',info.timezone]
  ];
- return `<section class="panel airport-preview"><div class="airport-codes">${codeLabel(icao)}</div>
+ return `<section class="panel airport-preview"><div class="airport-codes">${codeLabel(icao)}${hubBadge(a)}</div>
   <div class="airport-heading"><h2>${esc(airportCity(icao))}</h2><p>${esc(airportName(icao))}</p>
   ${appLanguage()==='ru'&&info.nameEn?`<p class="muted" lang="en">${esc(info.nameEn)}</p>`:''}</div>
   <div id="airportPhotoSlot" data-code="${esc(icao)}">${airportPhoto(a)}</div>
