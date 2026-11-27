@@ -370,7 +370,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           const now = clockOn('2026-11-24','02:00');
           check(dashboardFlight([other,corrected,nearest],now).flight===nearest, 'closest scheduled flight');
           check(dashboardFlight([other,corrected,current],now).flight===current, 'active flight takes priority');
-          data.flights.push({...other,id:'next-test',date:'2099-01-01'});
+          data.flights.push({...current,...other,id:'next-test',date:'2099-01-01'});
           page='home'; render();
           check(document.querySelector('.dashboard-number').textContent.includes('FD 100'), 'dashboard displays active flight');
           changeFlightStatus(current,'Выполнен');
