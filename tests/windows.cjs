@@ -188,8 +188,12 @@ async function testApplication() {
     assert.equal(await page.locator('.mobile-flight-route .day-offset').first().textContent(), '+1');
     assert.match(await page.locator('.mobile-flight-route').textContent(), /01:45/);
     for(const theme of ['morning','day','evening','night']){
-      await page.evaluate(theme=>{document.body.dataset.daylight=theme;},theme);
+      await page.evaluate(theme=>{
+        updateDaylight=()=>{document.body.dataset.daylight=theme;};
+        updateDaylight();
+      },theme);
       await page.waitForTimeout(2600);
+      assert.equal(await page.evaluate(()=>document.body.dataset.daylight),theme);
       await page.screenshot({path:resolve(__dirname,'ui-artifacts/home-'+theme+'.png')});
       const colors=await page.locator('.dashboard-card').evaluateAll(cards=>cards.map(card=>getComputedStyle(card).getPropertyValue('--section-rgb').trim()));
       assert.equal(new Set(colors).size,1);
