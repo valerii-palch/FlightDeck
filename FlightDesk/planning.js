@@ -538,3 +538,108 @@ function bindLocalFlightTimes(form,endpoints){
  form.addEventListener('input',update);
  update();
 }
+
+// Actual data is edited separately so the original schedule and payload remain intact.
+function editActualFlight(existing,divert=false,parent=null) {
+ const f={...existing,status:divert?'Уход на запасной':existing.status};
+ const times=flightTimes(f);
+ const dateInput=(name,value)=>dateField(name,value||'',false);
+ const timeInput=(name,value)=>timeField(name,value||'',false,true);
+ const side=(key,code,title)=>{
+  const dateKey=key+'Date', stamp=key==='atd'?times.actualDeparture:times.actualArrival;
+  const local=airportLocalStamp(code,stamp);
+  return '<section class="flight-editor-section"><h3>'+tr(title)+' · '+esc(code)+'</h3><div class="flight-editor-fields">'+
+   '<label>'+tr('Дата UTC')+dateInput(dateKey,f[dateKey]||(Number.isFinite(stamp)?new Date(stamp).toISOString().slice(0,10):f.date))+'</label>'+
+   '<label>UTC'+timeInput(key,f[key])+'</label>'+
+   '<label>'+tr('Местная дата')+dateInput(key+'LocalDate',local.slice(0,10))+'</label>'+
+   '<label>'+tr('Местное время')+timeInput(key+'Local',local.slice(11))+'</label></div></section>';
+ };
+ const arrivalCode=()=>form.elements.diversionAirport?.value.trim().toUpperCase()||f.arr;
+ openDialog('<header class="flight-editor-header"><h2 id="flightEditorTitle">'+tr('Фактические данные')+' · '+flightNumber(f)+'</h2>'+
+  '<button type="button" class="icon-button" data-action="close" aria-label="'+tr('Закрыть')+'">'+toolbarIcon('close')+'</button></header>'+
+  '<form id="editForm" class="editor flight-editor actual-editor"><div class="flight-editor-body">'+
+  '<section class="flight-editor-section"><div class="flight-editor-fields"><label>'+tr('Статус')+
+  '<select name="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></label>'+
+  '<label id="actualAlternate">'+tr('Фактический запасной ICAO')+'<input name="diversionAirport" data-code="airport" maxlength="4" value="'+esc(alternate(f))+'"></label></div></section>'+
+  side('atd',f.dep,'Вылет')+side('ata',isDiversion(f)?alternate(f)||f.arr:f.arr,'Прилет')+
+  '<section class="flight-editor-section"><div id="actualArrivalPreview"></div><label>'+tr('Примечание')+
+  '<textarea name="note" rows="2">'+esc(f.note||'')+'</textarea></label></section></div>'+
+  '<footer class="flight-editor-footer"><button type="button" data-action="close">'+tr('Отмена')+'</button>'+
+  '<button type="submit" id="plannerSave" class="primary">'+tr('Сохранить')+'</button></footer></form>','flight');
+ const form=byId('editForm'), fields=form.elements;
+ if(parent){
+  const button=document.createElement('button');
+  button.type='button';button.id='removeContinuation';button.textContent=tr('Удалить продолжение');
+  form.querySelector('footer').prepend(button);
+  button.onclick=()=>{
+   if(button.dataset.confirmed!=='true'){button.dataset.confirmed='true';button.textContent=tr('Подтвердить удаление');return;}
+   delete parent.continuation;save();byId('dialog').close();render();
+  };
+ }
+ normalizeFlightInputs(form);
+ const value=(name)=>fields[name].matches('[data-flight-date]')?parseDisplayDate(fields[name].value.trim()):parseFlightTime(fields[name].value);
+ const sync=event=>{
+  const name=event?.target.name;
+  for(const key of ['atd','ata']){
+   const code=key==='atd'?f.dep:fields.status.value==='Уход на запасной'?arrivalCode():f.arr;
+   const local=fields[key+'Local'],localDate=fields[key+'LocalDate'];
+   const valid=validAirportTimezone(airportInfo(code)?.timezone);
+   local.disabled=localDate.disabled=!valid;
+   if(name===key+'Local'||name===key+'LocalDate'){
+    const date=value(key+'LocalDate'),time=value(key+'Local');
+    local.setCustomValidity('');
+    if(!time){fields[key].value='';continue;}
+    const candidate=localToUTC(code,date,time,clockOn(value(key+'Date'),value(key)))[0];
+    if(!Number.isFinite(candidate)){local.setCustomValidity(tr('Не удалось определить время. Проверь дату и часовой пояс.'));continue;}
+    const utc=new Date(candidate).toISOString();
+    fields[key].value=utc.slice(11,16);fields[key+'Date'].value=displayDate(utc.slice(0,10));
+   }else{
+    const stamp=clockOn(value(key+'Date'),value(key));
+    const shown=airportLocalStamp(code,stamp);
+    local.value=shown.slice(11);localDate.value=shown?displayDate(shown.slice(0,10)):'';
+    local.setCustomValidity('');
+   }
+  }
+  byId('actualAlternate').hidden=fields.status.value!=='Уход на запасной';
+  fields.diversionAirport.required=fields.status.value==='Уход на запасной';
+  const t=flightTimes({...f,status:fields.status.value,atd:value('atd'),ata:value('ata'),atdDate:value('atdDate'),ataDate:value('ataDate')});
+  const estimate=!Number.isFinite(t.actualArrival)&&Number.isFinite(t.estimatedArrival);
+  byId('actualArrivalPreview').innerHTML='<p class="muted">'+tr('Прилет')+' · UTC</p>'+
+   flightTimeStack(t.scheduledArrival,estimate?t.estimatedArrival:t.actualArrival,f.date,false,estimate);
+ };
+ form.addEventListener('input',event=>{event.target.setCustomValidity?.('');sync(event);});
+ form.addEventListener('change',sync);
+ sync();
+ form.onsubmit=event=>{
+  event.preventDefault();
+  const values=flightFormValues(form);
+  if(!values||!form.reportValidity())return;
+  const patch=Object.fromEntries(['atd','ata','atdDate','ataDate','note'].map(k=>[k,values[k]]));
+  if(patch.atd&&!patch.atdDate||patch.ata&&!patch.ataDate)return;
+  const result={...f,...patch};
+  if(!parent){
+   result.diversionAirport=values.status==='Уход на запасной'?values.diversionAirport.trim().toUpperCase():'';
+   if(values.status==='Уход на запасной'&&(!airport(result.diversionAirport)||result.diversionAirport===f.arr)){
+    fields.diversionAirport.setCustomValidity(tr('Выбери запасной аэропорт из каталога.'));form.reportValidity();return;
+   }
+   if(f.continuation&&values.status!=='Уход на запасной'){
+    fields.status.setCustomValidity(tr('Сначала удали продолжение в карточке рейса, чтобы снять отметку об уходе на запасной.'));form.reportValidity();return;
+   }
+  }
+  if(!setFlightStatus(result,values.status)){
+   fields.ata.setCustomValidity(tr('Прилет должен быть после вылета.'));form.reportValidity();return;
+  }
+  const t=flightTimes(result);
+  const next=f.continuation?flightTimes(f.continuation):null;
+  const inbound=parent?flightTimes(parent).actualArrival:NaN;
+  if(t.actualArrival<t.actualDeparture||Number.isFinite(inbound)&&(t.actualDeparture||t.scheduledDeparture)<inbound||
+   next&&(t.actualArrival>next.actualDeparture||t.actualArrival>next.actualArrival)){
+   fields.ata.setCustomValidity(tr('Проверь порядок времени участков рейса.'));form.reportValidity();return;
+  }
+  result.actualMinutes=actualFlightMinutes(result)??legacyFlightMinutes(existing,result);
+  if(parent)Object.assign(parent.continuation,{...patch,status:result.status,atd:result.atd,ata:result.ata,
+   atdDate:result.atdDate,ataDate:result.ataDate,actualMinutes:result.actualMinutes});
+  else Object.assign(existing,result);
+  save();render();byId('dialog').close();
+ };
+}

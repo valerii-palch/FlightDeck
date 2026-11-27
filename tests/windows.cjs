@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, rm } = require('node:fs/promises');
+const { mkdtemp, rm, mkdir } = require('node:fs/promises');
 const { createRequire } = require('node:module');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
@@ -178,6 +178,34 @@ async function testApplication() {
     });
     assert.equal(await page.locator('#releaseNotes li').textContent(), 'Первое & второе');
     await page.locator('#closeUpdate').click();
+
+    await mkdir(resolve(__dirname, 'ui-artifacts'), {recursive:true});
+    await page.evaluate(() => {
+      const f=data.flights[0];
+      Object.assign(f,{status:'Вылетел',date:'2026-11-27',std:'23:00',sta:'01:00',staDate:'2026-11-28',atd:'23:45',atdDate:'2026-11-27'});
+      page='home'; render();
+    });
+    assert.equal(await page.locator('.mobile-flight-route .day-offset').first().textContent(), '+1');
+    assert.match(await page.locator('.mobile-flight-route').textContent(), /01:45/);
+    for(const theme of ['morning','day','evening','night']){
+      await page.evaluate(theme=>{document.body.dataset.daylight=theme;},theme);
+      await page.screenshot({path:resolve(__dirname,'ui-artifacts/home-'+theme+'.png')});
+      const colors=await page.locator('.dashboard-card').evaluateAll(cards=>cards.map(card=>getComputedStyle(card).getPropertyValue('--section-rgb').trim()));
+      assert.equal(new Set(colors).size,1);
+    }
+    await page.locator('.flight-open').click();
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/card.png')});
+    await page.locator('[data-action=edit]').click();
+    assert.equal(await page.locator('#editForm [name=pax]').count(),0);
+    assert.equal(await page.locator('#editForm [name=std]').count(),0);
+    await page.locator('#editForm [name=atdLocal]').fill('03:45');
+    assert.equal(await page.locator('#editForm [name=atd]').inputValue(),'00:45');
+    assert.equal(await page.locator('#editForm [name=atdDate]').inputValue(),'28.11.2026');
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/editor.png')});
+    await page.locator('#plannerSave').click();
+    await page.locator('#dialog').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>data.flights[0].std),'23:00');
+    assert.equal(await page.evaluate(()=>data.flights[0].pax),42);
 
     const nativeWindow = await app.browserWindow(page);
     const initialSize = await nativeWindow.evaluate(window => window.getContentSize());

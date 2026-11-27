@@ -115,3 +115,10 @@ byId('dialog').addEventListener('close',maybeOfferUpdate);
 byId('dialog').addEventListener('cancel',event=>{
  if(event.currentTarget.dataset.layout==='update'&&updateState==='installing')event.preventDefault();
 });
+
+let applicationUpdateTimer;
+function startApplicationUpdates(){
+ if(applicationUpdateTimer||!updateBridge&&!window.flightDeckUpdates)return;
+ checkApplicationUpdate(true);
+ applicationUpdateTimer=setInterval(()=>checkApplicationUpdate(true),30*60*1000);
+}

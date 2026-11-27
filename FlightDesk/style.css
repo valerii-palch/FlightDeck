@@ -1741,3 +1741,68 @@ dialog[data-layout="airport"] .airport-photo img { max-height:240px; object-fit:
 #onlineMap .tile-map-zoom button,#onlineMap .tile-map-zoom button:hover { width:32px; height:32px; min-height:0; padding:0; background:#172843; color:#edf7ff; font-size:19px; }
 .tile-map-credit { position:absolute; right:0; bottom:0; }
 .tile-map-credit img { display:block; width:88px; height:auto; }
+
+/* A single palette follows the selected time of day across every page and dialog. */
+body { --theme-rgb:140,166,252; --theme-glow:100,90,190; --settings-surface:#29314f; --flight-editor-light:140 166 252; }
+body[data-daylight="morning"] { --theme-rgb:255,184,132; --theme-glow:170,112,142; }
+body[data-daylight="day"] { --theme-rgb:125,201,255; --theme-glow:80,140,200; }
+body[data-daylight="evening"] { --theme-rgb:248,158,141; --theme-glow:170,100,160; }
+body,body [data-tone] {
+ --section-rgb:var(--theme-rgb); --section-glow:var(--theme-glow);
+ --glass-fill:linear-gradient(145deg,rgba(var(--theme-rgb),.13),rgba(12,18,32,.58)),var(--settings-surface);
+ --control-glass:linear-gradient(145deg,rgba(var(--theme-rgb),.17),rgba(var(--theme-glow),.08));
+ --border:rgba(var(--theme-rgb),.23); --glass-border:rgba(var(--theme-rgb),.27);
+ --blue:rgb(var(--theme-rgb));
+}
+body :is(.panel,.metric,.fleet-group,.catalog-country,.route-detail,.flight-editor-section,.settings-section,.release-details,.planner-review-load>div,.achievement) {
+ background:var(--glass-fill); border-color:var(--glass-border);
+}
+body :is(dialog,.tour-card,.calendar-popover) {
+ background-color:var(--settings-surface);
+ background-image:linear-gradient(145deg,rgba(var(--theme-rgb),.14),#0a102180);
+ border-color:var(--glass-border);
+}
+body :is(.flight-hero,.dashboard-latest,.fleet-slide,.pilot-identity) {
+ background:radial-gradient(ellipse at 90% 0,rgba(var(--theme-rgb),.16),transparent 65%),var(--glass-fill);
+ border-color:var(--glass-border);
+}
+body :is(input:not([type="checkbox"],[type="radio"],[type="range"]),textarea,select,.board-date) {
+ background-color:var(--settings-surface); border-color:var(--glass-border);
+}
+body .primary,body .preparation-next { background:linear-gradient(140deg,rgba(var(--theme-rgb),.27),rgba(var(--theme-glow),.24)); border-color:var(--glass-border); }
+body :is(.flight-marker,.dashboard-progress-plane) { background:var(--settings-surface); color:rgb(var(--theme-rgb)); }
+body :is(.flight-track-fill,.dashboard-progress-fill,.planner-load-track span) { background:linear-gradient(90deg,rgba(var(--theme-rgb),.55),rgb(var(--theme-rgb))); }
+body .badge.complete,body .badge.good { background:#173b33; color:#9de6c4; }
+body .badge.cancelled { background:#4b2635; color:#ffc0cc; }
+body .badge.diverted { background:#392d58; color:#d7c3ff; }
+body .badge.progress { background:#233e60; color:#bfdcff; }
+body .badge.late { background:#47351f; color:#ffdc9b; }
+body .badge.scheduled { background:var(--control-glass); color:rgb(var(--theme-rgb)); }
+.clock-stamp { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.day-offset { display:inline-block; font:600 10px/1.1 system-ui,sans-serif; padding:3px 5px; border:1px solid var(--glass-border); border-radius:6px; background:var(--control-glass); color:inherit; vertical-align:middle; }
+.mobile-flight-route { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; padding:20px 0 8px; }
+.mobile-route-endpoint { display:flex; min-width:0; flex-direction:column; gap:7px; }
+.mobile-route-endpoint:last-child { text-align:right; align-items:flex-end; }
+.mobile-route-endpoint:last-child .flight-time-stack { justify-items:end; }
+.mobile-route-endpoint>small { color:var(--muted); font-size:11px; }
+.mobile-route-endpoint .flight-time-stack strong { font-size:clamp(25px,3vw,42px); font-weight:680; letter-spacing:-.04em; }
+.mobile-route-endpoint .flight-time-stack del { font-size:15px; }
+.mobile-route-endpoint .mobile-city { font-size:19px; font-weight:650; margin-top:9px; }
+.mobile-route-endpoint .code { font-size:clamp(21px,2.5vw,32px); color:rgb(var(--theme-rgb)); }
+.mobile-route-endpoint .time.good { color:#9de6c4; }
+.mobile-route-endpoint .time.late { color:#ffc0cc; }
+.route-stop-label { color:var(--muted); font-size:12px; text-align:center; }
+.flight-hero .flight-route .flight-endpoint { display:none; }
+.flight-hero .flight-route { display:block; margin-block:8px 20px; }
+.flight-hero .flight-path { width:100%; }
+.flight-hero-header .controls>strong { font-size:30px; letter-spacing:-.035em; }
+.flight-hero .flight-details { margin-top:14px; }
+.actual-editor .flight-editor-body { display:grid; gap:12px; padding:18px 22px; overflow-y:auto; }
+.actual-editor .flight-editor-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.actual-editor .flight-editor-section { padding:14px; border:1px solid var(--glass-border); border-radius:18px; }
+.actual-editor .flight-editor-fields input { min-height:42px; }
+.actual-editor .flight-editor-fields label { min-width:0; }
+.actual-editor #actualArrivalPreview { margin-bottom:14px; }
+dialog[data-layout="update"] { padding:26px; border-radius:24px; }
+dialog[data-layout="update"] .release-details { padding:18px; border:1px solid var(--glass-border); border-radius:16px; }
+@media(max-width:600px) { .mobile-flight-route { gap:14px; }.actual-editor .flight-editor-fields { grid-template-columns:1fr; } }

@@ -382,6 +382,15 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           check(setFlightStatus(corrected,'Запланирован') && journalStatus(corrected)==='Запланирован' &&
             !corrected.atd && !corrected.ata && !corrected.atdDate && !corrected.ataDate &&
             corrected.actualMinutes===null && !legFlown(corrected) && !delayBadge(corrected), 'corrected status clears stale completion');
+          Object.assign(current,{status:'Вылетел',date:'2026-11-27',std:'23:00',sta:'01:00',atd:'23:45',atdDate:'2026-11-27',ata:'',ataDate:''});
+          editFlight(current);
+          const actualEditor=byId('editForm');
+          check(!actualEditor.elements.pax && !actualEditor.elements.std, 'actual editor keeps schedule and loading read-only');
+          actualEditor.elements.atdLocal.value='03:45';
+          actualEditor.elements.atdLocal.dispatchEvent(new Event('input',{bubbles:true}));
+          check(actualEditor.elements.atd.value==='00:45' && actualEditor.elements.atdDate.value==='28.11.2026','actual local/UTC date rollover');
+          actualEditor.requestSubmit();
+          check(current.std==='23:00' && current.atd==='00:45','actual editing preserves original schedule');
           data.flights.length=0;
           check(validBackup(data), 'empty backup');
           applyCloudCopy({airports: [], flights: [], profileName: ''});
@@ -545,7 +554,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           byId('plannerNext').click();
           form.requestSubmit();
           check(flight()?.tail === 'RA-73132' && flight().pax === 386, 'add 777 flight');
-          check(document.querySelector('main').textContent.includes('03:45 +1 UTC'), 'midnight rollover');
+          check(document.querySelector('main .day-offset')?.textContent==='+1', 'midnight rollover');
           const parking = document.querySelector('[data-stand=depStand]');
           check(parking.options.length > 1, '777 parking');
           parking.selectedIndex = 1;

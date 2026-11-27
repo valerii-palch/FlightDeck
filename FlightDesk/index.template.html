@@ -188,7 +188,7 @@ const minute = 60000;
 const formatTime = (time,date) => {
  const value = new Date(time).toISOString();
  const delta = Math.round((Date.parse(value.slice(0,10))-Date.parse(date))/86400000);
- return value.slice(11,16)+(delta?' '+(delta>0?'+':'')+delta:'');
+ return '<span class="clock-stamp">'+value.slice(11,16)+(delta?'<small class="day-offset">'+(delta>0?'+':'')+delta+'</small>':'')+'</span>';
 };
 function forecast(f) {
  if (!f.std || ['Вылетел','Выполнен','Отменен','Уход на запасной'].includes(f.status)) return '';
@@ -253,8 +253,7 @@ function routeSide(f,key,title) {
  const destination=airport(code);
  const flags=destination?[[tr("Сценарий"),destination.scenery],['GSX',destination.gsx],['Python',destination.python]]
   .map(([label,enabled])=>'<span class="badge '+(enabled?'good':'muted')+'">'+label+' '+(enabled?'✓':'—')+'</span>').join(''):'';
- return '<div class="route-detail"><p class="muted">'+tr(arriving?'Прилет':'Вылет')+' UTC</p>'+
-  flightTimeStack(planned,actual,f.date,true)+(arriving?delayBadge(f):'')+
+ return '<div class="route-detail">'+
   '<div class="controls facts">'+flags+'</div>'+standSelect(f,key+'Stand',code,title)+'</div>';
 }
 function segmentProgress(leg,now) {
@@ -315,12 +314,12 @@ function center() {
   (Number.isFinite(actual)?formatTime(actual,f.date):'—')+'</td><td><button data-stage="'+key+'">'+(times[key]?tr("Изменить"):tr("Отметить"))+'</button></td></tr>';
  }).join('');
  return '<div class="panel flight-hero"><div class="row flight-hero-header"><div class="controls"><strong>'+flightNumber(f)+'</strong>'+'<span class="muted">'+displayDate(f.date)+'</span><span class="badge">'+esc(f.tail)+'</span></div>'+
- '<div class="controls">'+(!isDiversion(f)?`<button data-action="divert">${tr("Уход на запасной")}</button>`:'')+`<button class="primary" data-action="edit">${tr("Редактировать рейс")}</button></div></div>`+routeOverview(f)+'<div class="flight-details">'+routeSide(f,'dep',tr("Стоянка вылета"))+routeSide(f,'arr',tr("Стоянка прилета"))+'</div>'+
+ '<div class="controls">'+(!isDiversion(f)?`<button data-action="divert">${tr("Уход на запасной")}</button>`:'')+`<button class="primary" data-action="edit">${tr("Редактировать рейс")}</button></div></div>`+mobileRoute(f)+routeOverview(f)+'<div class="flight-details">'+routeSide(f,'dep',tr("Стоянка вылета"))+routeSide(f,'arr',tr("Стоянка прилета"))+'</div>'+
  (f.note?'<p class="facts muted">'+esc(f.note)+'</p>':'')+
  `<div class="flight-status-bar facts"><label>${tr("Статус рейса")}<span class="flight-select status-select `+(statusColors[f.status]||'scheduled')+'"><select id="status">'+statuses.map(s=>option(s,tr(s),f.status)).join('')+'</select></span></label>'+nextFlightButton(f)+'</div></div>'+continuationPanel(f)+
  `<div class="grid two facts"><section class="panel preparation-panel"><div class="preparation-heading"><h2 id="preparationTitle" tabindex="-1">${tr("Подготовка рейса")}</h2>`+nextStageButton(nextStage)+'</div>'+
  (`<table><thead><tr><th>${tr("Этап")}</th><th>${tr("План UTC")}</th><th>${tr("Факт UTC")}</th><th></th></tr></thead><tbody>`+stageRows+'</tbody></table>'+forecast(f))+
- `</section><section class="panel"><h2>${tr("Рейс")}</h2><div class="strip row"><span>${tr("Тип рейса")}</span><strong>`+tr(flightType(f))+'</strong></div>'+(f.goArounds?`<div class="strip row"><span>${tr("Уходы на второй круг")}</span><strong>`+esc(f.goArounds)+'</strong></div>':'')+`<div class="strip row"><span>${tr("Пассажиры")}</span><strong>`+paxText(f)+'</strong></div>'+[['baggageKg','Загрузка багажа'],['cargoKg','Коммерческий груз']].map(([key,label])=>f[key]==null?'':'<div class="strip row"><span>'+tr(label)+'</span><strong>'+Number(f[key])+' '+tr('кг')+'</strong></div>').join('')+`<div class="strip row"><span>${tr("Время полета по журналу")}</span><strong>`+duration(physicalLegs(f).length>1?flightStats([f]).minutes:actualFlightMinutes(f)??f.actualMinutes)+'</strong></div>'+
+ `</section><section class="panel"><h2>${tr("Рейс")}</h2><div class="strip row"><span>${tr("Тип рейса")}</span><strong>`+tr(flightType(f))+'</strong></div>'+`<div class="strip row"><span>${tr("Пассажиры")}</span><strong>`+paxText(f)+'</strong></div>'+[['baggageKg','Загрузка багажа'],['cargoKg','Коммерческий груз']].map(([key,label])=>f[key]==null?'':'<div class="strip row"><span>'+tr(label)+'</span><strong>'+Number(f[key])+' '+tr('кг')+'</strong></div>').join('')+`<div class="strip row"><span>${tr("Время полета по журналу")}</span><strong>`+duration(physicalLegs(f).length>1?flightStats([f]).minutes:actualFlightMinutes(f)??f.actualMinutes)+'</strong></div>'+
  (Number.isFinite(f.scheduledBlockMinutes)?`<div class="strip row"><span>${tr("Блок-время по плану")}</span><strong>`+duration(f.scheduledBlockMinutes)+'</strong></div>':'')+
  (f.sourceStatus?`<p class="muted">${tr("Статус в маршрутном листе:")} `+esc(f.sourceStatus)+'</p>':'')+
  `<label class="facts">${tr("Другой рейс борта")}<select id="flightPicker">`+list.map(x=>option(x.id,displayDate(x.date)+' · '+(x.number?formatFlightNumber(x.number):tr("Без номера"))+' · '+x.dep+' → '+x.arr,f.id)).join('')+'</select></label>'+
@@ -636,6 +635,7 @@ function openDialog(html, layout = '', anchor = null) {
 }
 byId('dialog').addEventListener('close',()=>closeCalendar());
 function editFlight(existing,divert=false,prefill=null) {
+ if(existing)return editActualFlight(existing,divert);
  const f=existing?{...existing,diversionAirport:alternate(existing),status:divert?'Уход на запасной':existing.status}:{type:flightTypes[0],tail,dep:'',arr:'',date:dateUTC(),std:'',sta:'',status:statuses[0],stages:{},...prefill};
  const number=existing?formatFlightNumber(f.number??''):f.number??'';
  f.number=number;
@@ -648,7 +648,7 @@ function editFlight(existing,divert=false,prefill=null) {
  const loadFields=field('pax','Пассажиры','number',!existing,'min="0" step="1"')+
   field('baggageKg','Загрузка багажа, кг','number',!existing,'min="0" step="1"')+
   field('cargoKg','Коммерческий груз, кг','number',!existing,'min="0" step="1"');
- const actualFields=['atd','ata','atdDate','ataDate','pax','baggageKg','cargoKg','actualMinutes','goArounds','note'];
+ const actualFields=['atd','ata','atdDate','ataDate','pax','baggageKg','cargoKg','actualMinutes','note'];
  const aircraftOptions=fleet.map(a=>option(a.tail,aircraftModel(a)+' · '+a.tail,f.tail)).join('');
  const plannerTime=(name,label,required=false)=>`<label>${tr(label)}${timeField(name,f[name],required,true)}</label>`;
  const plannerDate=(name,label,value)=>`<label>${tr(label)}${dateField(name,value,true)}</label>`;
@@ -734,7 +734,7 @@ function editFlight(existing,divert=false,prefill=null) {
   field('atdDate','Дата фактического вылета UTC','date')+field('ataDate','Дата фактического прилета UTC','date')+
   loadFields+
   field('actualMinutes','Фактическое время полета, мин','number',false,'readonly')+
-  field('goArounds','Уходы на второй круг','number',false,'min="0" max="99" step="1"')}
+  ''}
  <label class="full">${tr('Примечание')}<textarea name="note" rows="2">${esc(f.note)}</textarea></label>
  </div></details>`:''}</div>
  <footer class="flight-editor-footer"><button type="button" data-action="close">${tr('Отмена')}</button><div class="controls">
@@ -817,7 +817,6 @@ function editFlight(existing,divert=false,prefill=null) {
    form.elements[key].setCustomValidity(tr("Выбери ICAO из каталога аэропортов."));
    form.reportValidity(); return;
   }
-  values.goArounds=Number(values.goArounds)||0;
   for (const key of ['pax','baggageKg','cargoKg']) values[key]=values[key]===''?null:Number(values[key]);
   if(form.dataset.estimatedMinutes) values.estimatedMinutes=Number(form.dataset.estimatedMinutes);
   const result={...f,...values,status:f.status,id:f.id||'flight-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)};
@@ -1035,7 +1034,7 @@ setTimeout(() => {
  splash.setAttribute('aria-hidden','true');
  shell.inert = false;
  if(cloudSession&&!tourCompleted()&&!byId('dialog').open)startTour();
- if(updateBridge||window.flightDeckUpdates)checkApplicationUpdate(true);
+ startApplicationUpdates();
 }, 2000);
 if(!storageAvailable) notice(tr("Хранилище недоступно. Выгрузи резервную копию после работы."));
 setInterval(()=>queueCloudSync(0),45000);

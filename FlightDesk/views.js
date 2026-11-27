@@ -20,7 +20,10 @@ function flightTimes(f) {
    actualArrival += Math.round((scheduledArrival-actualArrival)/day)*day;
   }
  }
- return {scheduledDeparture,scheduledArrival,actualDeparture,actualArrival};
+ const duration=scheduledArrival-scheduledDeparture;
+ const estimatedArrival=!preflightStatuses.includes(f.status)&&f.status!=='Отменен'&&
+  Number.isFinite(actualDeparture)&&duration>=0?actualDeparture+duration:NaN;
+ return {scheduledDeparture,scheduledArrival,actualDeparture,actualArrival,estimatedArrival};
 }
 function actualFlightMinutes(f,times=flightTimes(f)) {
  const elapsed=Math.round((times.actualArrival-times.actualDeparture)/minute);
@@ -170,11 +173,11 @@ function advanceStage(key){
 }
 const aircraftImage = a => '<div class="aircraft-art '+a.short.toLowerCase()+'" role="img" aria-label="'+tr('Иллюстрация')+' '+a.type+` ${tr("в ливрее Аэрофлота")}"></div>`;
 const metric = (label,value) => '<div class="metric"><small>'+label+'</small><strong>'+value+'</strong></div>';
-function flightTimeStack(planned,actual,date,utc=false) {
+function flightTimeStack(planned,actual,date,utc=false,estimated=false) {
  const label=value=>utc?stampLabel(value,date):Number.isFinite(value)?formatTime(value,date):'—';
- const changed=Number.isFinite(planned)&&Number.isFinite(actual)&&planned!==actual;
+ const changed=Number.isFinite(planned)&&Number.isFinite(actual)&&(estimated||planned!==actual);
  return '<span class="flight-time-stack">'+(changed?'<del>'+label(planned)+'</del>':'')+
-  '<strong class="time">'+label(Number.isFinite(actual)?actual:planned)+'</strong></span>';
+  '<strong class="time '+(Number.isFinite(actual)?actual>planned?'late':'good':'')+'">'+label(Number.isFinite(actual)?actual:planned)+'</strong>'+(estimated?'<small>'+tr('Расчётное')+'</small>':'')+'</span>';
 }
 function dashboardFlightEndpoint(code,label,planned,actual,date) {
  const city=airportCity(code), name=airportName(code);
@@ -201,14 +204,14 @@ function home() {
  const {flight:latest,upcoming}=dashboardFlight(rows);
  const progress=latest?Math.round(routeProgress(latest)):0;
  const name=preferences().profileName.trim().split(/\s+/)[0];
- const times=latest?flightTimes(latest):null;
+ const leg=latest?displayRouteLeg(latest):null;
+ const times=leg?flightTimes(leg):null;
  return `<header class="dashboard-heading section-heading"><div><h1>${tr("Главная")}</h1>`+(name?`<p class="muted">${tr("Привет,")} ${esc(name)}!</p>`:'')+'</div></header>'+
  '<div class="dashboard-grid"><section class="panel dashboard-card dashboard-latest"><header class="dashboard-card-heading"><h2>'+
  (upcoming?tr("Ближайший рейс"):latest&&!flown(latest)?tr("Рейс в работе"):tr("Недавний рейс"))+'</h2>'+
  (latest?'<time class="muted" datetime="'+esc(latest.date)+'">'+displayDate(latest.date)+'</time>':'')+'</header>'+
  (latest?'<div class="dashboard-flight-heading"><p class="dashboard-number">'+'<span>'+flightNumber(latest)+'</span></p><div class="flight-badges">'+statusBadge(latest)+delayBadge(latest)+'</div></div>'+
- '<div class="dashboard-route">'+dashboardFlightEndpoint(latest.dep,'Вылет',times.scheduledDeparture,upcoming?NaN:times.actualDeparture,latest.date)+
- dashboardFlightEndpoint(latest.arr,'Прилет',times.scheduledArrival,destinationArrival(latest,times),latest.date)+'</div>'+
+ mobileRoute(latest)+
  '<div class="dashboard-flight-meter"><div class="dashboard-progress-track" id="dashboardFlightProgress" role="progressbar" aria-label="'+tr('Прогресс рейса')+'" aria-valuenow="'+progress+'" aria-valuetext="'+esc(routeProgressLabel(latest,progress))+'" data-flight-id="'+esc(latest.id)+'" style="--progress:'+progress+'%">'+
  '<span class="dashboard-progress-fill"></span><span class="dashboard-progress-plane" aria-hidden="true">'+planeIcon+'</span></div></div>'+
  dashboardFlightFacts(latest,times)+'<p class="latest-meta muted"><span>'+esc(aircraftModel(aircraftFor(latest.tail)))+'</span><small>'+esc(latest.tail)+'</small></p><footer class="dashboard-flight-actions"><button class="flight-open" data-flight="'+esc(latest.id)+'">'+`${tr("Открыть данные рейса")}</button>`+nextFlightButton(latest)+'</footer>':`<p class="muted">${tr("Нет запланированных или выполненных рейсов")}</p>`)+
@@ -272,4 +275,29 @@ function pilot() {
  `<div class="strip row"><span>${tr("Внутренние перелеты")}</span><strong>`+domestic+'</strong></div>'+
  `<div class="strip row"><span>${tr("Международные перелеты")}</span><strong>`+international+'</strong></div>'+
  `<p class="facts muted">${tr("При отсутствии записанного времени используется интервал между фактическим вылетом и прилетом.")}</p></section></div>`+routeMap()+achievementPanel()+cloudProfilePanel();
+}
+
+function displayRouteLeg(f) {
+ const next=continuationLeg(f);
+ if(next&&alternateLanded(f)&&next.status!=='Отменен')return next;
+ return isDiversion(f)?{...f,arr:alternate(f)||f.arr}:f;
+}
+function mobileRoute(f) {
+ const leg=displayRouteLeg(f), times=flightTimes(leg);
+ const estimated=!Number.isFinite(times.actualArrival)&&Number.isFinite(times.estimatedArrival);
+ const endpoint=(code,label,planned,actual,estimate=false)=>{
+  const stamp=Number.isFinite(actual)?actual:planned;
+  const local=airportLocalStamp(code,stamp);
+  return '<div class="mobile-route-endpoint"><small>'+tr(label)+' · UTC</small>'+
+   flightTimeStack(planned,actual,leg.date,false,estimate)+
+   (local?'<small>'+tr('Местное время')+' · '+formatTime(Date.parse(local+':00Z'),leg.date)+'</small>':'')+
+   '<span class="mobile-city">'+esc(airportCity(code))+'</span>'+codeLabel(code)+
+   '<small>'+esc(airportName(code))+'</small></div>';
+ };
+ return '<div class="mobile-flight-route">'+
+  endpoint(leg.dep,'Вылет',times.scheduledDeparture,preflightStatuses.includes(leg.status)?NaN:times.actualDeparture)+
+  endpoint(leg.arr,'Прилет',isDiversion(leg)?NaN:times.scheduledArrival,
+   estimated?times.estimatedArrival:times.actualArrival,estimated)+'</div>'+
+  (isDiversion(f)?'<p class="route-stop-label">'+tr('Уход на запасной')+' · '+esc(alternate(f))+
+   (leg!==f&&leg.dep===alternate(f)?' → '+esc(f.arr):'')+'</p>':'');
 }

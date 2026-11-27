@@ -57,6 +57,8 @@ function continuationDefaults(f,inbound) {
  return {date:departure.slice(0,10),std:departure.slice(11,16),sta:arrival.slice(11,16),status:'Запланирован'};
 }
 function editContinuation(f) {
+ const current=continuationLeg(f);
+ if(current)return editActualFlight(current,false,f);
  const inbound=flightTimes(f).actualArrival;
  const next=continuationLeg(f);
  const leg=next||continuationDefaults(f,inbound);
@@ -118,22 +120,23 @@ function boardRow(f, kind, date, groupDate) {
  const place=(code,label,original='')=>'<td class="board-place"><span class="board-mobile-label">'+label+'</span>'+
   (original?'<del class="board-original" title="'+city(original)+'">'+city(original)+'</del>':'')+
   '<strong class="board-city" title="'+city(code)+'">'+city(code)+'</strong><span class="board-route">'+codeLabel(code)+'</span></td>';
- const time=(planned,actual)=>{
-  const changed=Number.isFinite(planned)&&Number.isFinite(actual)&&planned!==actual;
+ const time=(planned,actual,estimated=false)=>{
+  const changed=Number.isFinite(planned)&&Number.isFinite(actual)&&(estimated||planned!==actual);
   const clock=stamp=>Number.isFinite(stamp)?formatTime(stamp,date):'—';
   return '<span class="board-time">'+(changed?'<del>'+clock(planned)+'</del>':'')+
-   '<strong>'+clock(Number.isFinite(actual)?actual:planned)+'</strong></span>';
+   '<strong>'+clock(Number.isFinite(actual)?actual:planned)+'</strong>'+(estimated?'<small>'+tr('Расчётное')+'</small>':'')+'</span>';
  };
- const actualArrival=stop?t.actualArrival:destinationArrival(f,t);
+ const actualArrival=t.actualArrival;
+ const estimated=!Number.isFinite(actualArrival)&&Number.isFinite(t.estimatedArrival);
  const arrival=`<td class="board-arrival"><span class="board-mobile-label">${tr("Прилет UTC")}</span>`+
-  time(stop?NaN:t.scheduledArrival,actualArrival)+'</td>';
+  time(stop?NaN:t.scheduledArrival,estimated?t.estimatedArrival:actualArrival,estimated)+'</td>';
  const status=stop?'<span class="badge diverted">'+tr('Уход на запасной')+'</span>':statusBadge(f)+delayBadge(f);
  const color=stop?'diverted':arrivalDelay(f)>0?'arrival-late':statusColors[journalStatus(f)]||'';
  return '<tr class="'+color+(kind==='continuation'?' board-continuation':'')+'">'+
  '<td>'+time(t.scheduledDeparture,preflightStatuses.includes(f.status)?NaN:t.actualDeparture)+(date!==groupDate?'<small>'+displayDate(date)+'</small>':'')+'</td>'+
  place(f.dep,tr("Отправление"))+place(stop?alternate(f):f.arr,tr("Назначение"),stop?f.arr:'')+arrival+
  '<td><strong>'+flightNumber(f)+'</strong><small class="flight-kind">'+tr(kind==='continuation'?'Продолжение рейса':flightType(f))+'</small></td>'+
- '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+(f.goArounds?`<small>${tr("Уходов на второй круг:")} `+esc(f.goArounds)+'</small>':'')+'</td>'+
+ '<td class="board-aircraft"><span class="aircraft-model">'+esc(aircraftModel(aircraftFor(f.tail)))+'</span><small>'+esc(f.tail)+'</small></td><td><div class="flight-badges">'+status+'</div>'+'</td>'+
  '<td><button data-flight="'+esc(f.id)+'"'+(kind==='continuation'?' data-show-continuation':'')+' aria-label="'+tr('Открыть рейс')+' '+flightNumber(f)+'">→</button></td></tr>';
 }
 
