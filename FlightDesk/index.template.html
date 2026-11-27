@@ -181,7 +181,7 @@ const toolbarIcon=kind=>{
 };
 
 const option = (value, label, current) => '<option value="'+esc(value)+'"'+(value === current?' selected':'')+'>'+esc(label)+'</option>';
-const codeLabel = code => '<span class="code">'+esc(code)+(airportIata(code)?' <small>/ '+esc(airportIata(code))+'</small>':'')+'</span>';
+const codeLabel = code => '<span class="code">'+esc(code)+(airportIata(code)?' <small>/ '+esc(airportIata(code))+'</small>':'')+'</span>'+hubBadge(airport(code));
 const duration = minutes => Number.isFinite(minutes) ? Math.floor(minutes/60)+` ${tr("ч")} `+minutes%60+` ${tr("мин")}` : '—';
 const clockOn = (date,time) => Date.parse(date+'T'+time+':00Z');
 const minute = 60000;
@@ -377,7 +377,7 @@ function catalogCountries() {
 }
 function filteredAirports() {
  const needle = query.trim().toLowerCase().replaceAll('ё','е');
- return data.airports.filter(a=>{
+ return orderedAirports().filter(a=>{
   const info=airportInfo(a.icao);
   return (!airportCountryFilter||catalogCountry(a)===airportCountryFilter) && [a.icao,airportIata(a.icao),a.name,a.country,info?.cityRu,info?.cityEn,info?.nameRu,info?.nameEn]
    .join(' ').toLowerCase().replaceAll('ё','е').includes(needle) &&
@@ -641,8 +641,8 @@ function editFlight(existing,divert=false,prefill=null) {
  f.number=number;
  const field=(name,label,type='text',required=false,attrs='')=>`<label>${tr(label)}${type==='date'?dateField(name,f[name],required):type==='time'?timeField(name,f[name],required):`<input name="${name}" type="${type}" value="${esc(f[name])}" ${required?'required ':''}${attrs}>`}</label>`;
  const select=(name,label,options)=>`<label>${tr(label)}<span class="flight-select"><select name="${name}">${options}</select></span></label>`;
- const airports=[...data.airports].sort((a,b)=>Number(b.icao==='UUEE')-Number(a.icao==='UUEE')||a.icao.localeCompare(b.icao,'en'))
-  .map(a=>`<option value="${esc(a.icao)}">${esc(airportCity(a.icao)+' · '+airportName(a.icao)+(airportIata(a.icao)?' · '+airportIata(a.icao):''))}</option>`).join('');
+ const airports=orderedAirports()
+  .map(a=>`<option value="${esc(a.icao)}">${esc((hubLabel(a)?hubLabel(a)+' · ':'')+airportCity(a.icao)+' · '+airportName(a.icao)+(airportIata(a.icao)?' · '+airportIata(a.icao):''))}</option>`).join('');
  const icao='list="icaoChoices" data-code="airport" pattern="[A-Za-z]{3,4}" maxlength="4" placeholder="ICAO / IATA" autocomplete="off" spellcheck="false"';
  const section=(title,content,kind='')=>`<section class="flight-editor-section ${kind}"><h3>${tr(title)}</h3><div class="flight-editor-fields">${content}</div></section>`;
  const loadFields=field('pax','Пассажиры','number',!existing,'min="0" step="1"')+
@@ -680,8 +680,8 @@ function editFlight(existing,divert=false,prefill=null) {
  section('Маршрут',
   field('dep','Аэропорт вылета (ICAO)','text',true,icao.replace('[A-Za-z]{3,4}','[A-Z]{4}').replace('ICAO / IATA','UUEE'))+
   field('arr','Аэропорт прилета (ICAO)','text',true,icao.replace('[A-Za-z]{3,4}','[A-Z]{4}').replace('ICAO / IATA','ULLI'))+
-  plannerTime('std','Время вылета UTC',true)+plannerTime('sta','Время прилета UTC',true)+
   plannerTime('localDeparture','Время вылета (Local)')+plannerTime('localArrival','Время прилета (Local)')+
+  plannerTime('std','Время вылета UTC',true)+plannerTime('sta','Время прилета UTC',true)+
   plannerDate('date','Дата вылета UTC',f.date)+plannerDate('staDate','Дата прилета UTC',f.staDate||f.date)+airportEmpty,'planner-route-fields')+
   `<section class="planner-flight-info" aria-label="${tr('Информация о перелете')}">
    <div><span>${tr('Время в полете (расчетное)')}</span><strong id="scheduledDuration">—</strong></div>
@@ -856,14 +856,16 @@ function editStage(key) {
  `<div class="stage-plan"><span>${tr("По плану")}</span><strong>`+stampLabel(planned,f.date)+'</strong></div>'+
  `<form id="stageForm" class="editor two facts"><label>${tr("Дата UTC")}${dateField('date',initial.slice(0,10),true)}</label>`+
  `<label>${tr("Фактическое время UTC")}${timeField('time',initial.slice(11,16),true)}</label>`+
+ `<label>${tr('Местная дата')}${dateField('localDate','',false)}</label><label>${tr('Местное время')}${timeField('localTime','',false,true)}</label>`+
  `<div class="full controls"><button class="primary">${tr("Сохранить")}</button><button type="button" id="stageNow">${tr("Подставить текущее время")}</button>`+
  (saved?`<button type="button" id="clearStage">${tr("Снять отметку")}</button>`:'')+'</div></form>');
  const form=byId('stageForm');
+ const syncLocal=bindStageLocalTimes(form,f.dep);
  const commit=value=>{recordFlightStage(f,key,value);save();byId('dialog').close();render();};
  form.onsubmit=e=>{e.preventDefault();const values=flightFormValues(form);if(values)commit(values.date+'T'+values.time+':00Z');};
  byId('stageNow').onclick=()=>{
   const now=new Date().toISOString();
-  form.elements.date.setCustomValidity('');form.elements.time.setCustomValidity('');form.elements.date.value=displayDate(now.slice(0,10));form.elements.time.value=now.slice(11,16);
+  form.elements.date.setCustomValidity('');form.elements.time.setCustomValidity('');form.elements.date.value=displayDate(now.slice(0,10));form.elements.time.value=now.slice(11,16);syncLocal();
  };
  if(saved) byId('clearStage').onclick=()=>commit('');
 }
@@ -957,7 +959,8 @@ document.addEventListener('click',e=>{
   explicitAircraft=false;page='pilot';render();
   byId('cloudHeading')?.focus();
  }
- if(d.action==='reset-profile'&&cloudSession) confirmProfileReset();
+ if(d.action==='clear-journal')confirmCollectionClear('flights');
+ if(d.action==='clear-airports')confirmCollectionClear('airports');
  if(d.action==='pick-profile-photo')byId('profilePhotoInput')?.click();
  if(d.action==='remove-profile-photo')removeProfilePhoto();
  if(d.action==='profile-name')editProfileName();
@@ -1026,6 +1029,8 @@ render();
 resumeGoogleSignIn().then(restoreCloudSession);
 window.addEventListener('focus',()=>{updateDaylight();queueCloudSync(0);});
 const splash = byId('splash');
+document.addEventListener('pointerdown',()=>document.body.dataset.inputMode='pointer',true);
+document.addEventListener('keydown',event=>{if(['Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))document.body.dataset.inputMode='keyboard';},true);
 const shell = document.querySelector('.shell');
 shell.inert = true;
 splash.classList.add('loading');

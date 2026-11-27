@@ -213,6 +213,71 @@ async function testApplication() {
     assert.equal(await page.evaluate(()=>data.flights[0].std),'23:00');
     assert.equal(await page.evaluate(()=>data.flights[0].pax),42);
 
+    for(const key of ['fuel','bags','board','close']){
+      await page.evaluate(key=>editStage(key),key);
+      await page.locator('#stageForm [name=localDate]').fill('28.11.2026');
+      await page.locator('#stageForm [name=localTime]').fill('02:30');
+      assert.equal(await page.locator('#stageForm [name=date]').inputValue(),'27.11.2026');
+      assert.equal(await page.locator('#stageForm [name=time]').inputValue(),'23:30');
+      await page.screenshot({path:resolve(__dirname,'ui-artifacts/stage-'+key+'.png')});
+      await page.locator('#stageForm button[type=submit],#stageForm button:not([type])').first().click();
+      await page.locator('#dialog').waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(key=>data.flights[0].stages[key],key),'2026-11-27T23:30:00Z');
+    }
+    await page.evaluate(()=>{
+      data.airports[0].hubLevel=2; data.airports[1].hubLevel=1;
+      editFlight();
+    });
+    assert.deepEqual(await page.locator('#icaoChoices option').evaluateAll(options=>options.map(o=>o.value)),['USPP','UUEE']);
+    const order=await page.locator('#editForm input').evaluateAll(inputs=>inputs.map(i=>i.name));
+    assert.ok(order.indexOf('localDeparture')<order.indexOf('std'));
+    await page.locator('#dialog [data-action=close]').click();
+    await page.locator('[data-action=settings]').click();
+    assert.equal(await page.locator('#settingsTitle').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(()=>document.body.dataset.inputMode),'keyboard');
+    assert.notEqual(await page.locator('#dialog :focus').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
+    await page.locator('#dialog [data-action=close]').click();
+    assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).userSelect),'none');
+    await page.evaluate(()=>editFlight(data.flights[0]));
+    assert.equal(await page.locator('#editForm textarea').evaluate(el=>getComputedStyle(el).userSelect),'text');
+    await page.locator('#dialog [data-action=close]').click();
+    for(const kind of ['flights','airports']){
+      const before=await page.evaluate(()=>JSON.stringify(cloudSnapshot()));
+      await page.evaluate(kind=>confirmCollectionClear(kind),kind);
+      assert.equal(await page.locator('#confirmCollectionClear').isDisabled(),true);
+      assert.equal(await page.locator('#clearConsent').isChecked(),false);
+      await page.screenshot({path:resolve(__dirname,'ui-artifacts/clear-'+kind+'.png')});
+      await page.locator('#dialog [data-action=close]').click();
+      assert.equal(await page.evaluate(()=>JSON.stringify(cloudSnapshot())),before);
+    }
+    const beforeClear=await page.evaluate(()=>JSON.parse(JSON.stringify(data)));
+    await page.evaluate(()=>{
+      window.originalClearCollection=clearCloudCollection;
+      clearCloudCollection=async kind=>{
+        if(kind==='flights')data.flights=[];
+        else {data.airportHistory=archiveFlightAirports(cloudSnapshot());data.airports=[];}
+      };
+    });
+    for(const kind of ['flights','airports']){
+      await page.evaluate(({fixture,kind})=>{data=structuredClone(fixture);confirmCollectionClear(kind);},{fixture:beforeClear,kind});
+      await page.locator('#clearConsent').check();
+      assert.equal(await page.locator('#confirmCollectionClear').isDisabled(),false);
+      await page.locator('#confirmCollectionClear').click();
+      await page.locator('#dialog').waitFor({state:'hidden'});
+      const cleared=await page.evaluate(()=>JSON.parse(JSON.stringify(data)));
+      assert.equal(cleared[kind].length,0);
+      assert.deepEqual(cleared[kind==='flights'?'airports':'flights'],beforeClear[kind==='flights'?'airports':'flights']);
+      assert.deepEqual(cleared.preferences,beforeClear.preferences);
+    }
+    await page.evaluate(fixture=>{clearCloudCollection=window.originalClearCollection;data=fixture;},beforeClear);
+    await page.evaluate(()=>{
+      page='fleet';render();
+    });
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/fleet.png')});
+    await page.evaluate(()=>{page='pilot';render();});
+    assert.equal(await page.locator('.achievement-mark svg').count(),7);
+    await page.screenshot({path:resolve(__dirname,'ui-artifacts/achievements.png')});
     const nativeWindow = await app.browserWindow(page);
     const initialSize = await nativeWindow.evaluate(window => window.getContentSize());
     const workArea = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);

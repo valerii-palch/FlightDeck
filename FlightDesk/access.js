@@ -29,29 +29,36 @@ function unlockWorkspace() {
  return 'Вход выполнен. Проверяем облачную копию.';
 }
 
-function confirmProfileReset() {
- const signedIn=!!cloudSession;
- openDialog(`<h2>${tr('Сбросить рейсы и профиль?')}</h2>
-  <p>${tr(signedIn?'Все рейсы и имя профиля будут удалены с этого устройства и из облака. Аэропорты сохранятся.':'Войди в аккаунт перед сбросом. Это позволит очистить и облачную копию.')}</p>
-  <p id="resetStatus" role="status"></p>
-  <div class="controls"><button data-action="close" autofocus>${tr('Отмена')}</button><button id="confirmProfileReset" class="${signedIn?'danger':'primary'}">${tr(signedIn?'Удалить все рейсы':'Войти')}</button></div>`);
- byId('confirmProfileReset').onclick=async()=>{
-  if(!signedIn){byId('dialog').close();page='pilot';render();byId('cloudLoginForm')?.elements.email.focus();return;}
-  const dialog=byId('dialog'), buttons=[...dialog.querySelectorAll('button')];
-  if(cloudBusy){byId('resetStatus').textContent=tr('Дождись завершения синхронизации.');return;}
-  buttons.forEach(b=>b.disabled=true);
+function confirmCollectionClear(kind) {
+ const flights=kind==='flights';
+ const title=flights?'Очистить журнал?':'Очистить аэропорты?';
+ const warning=flights?
+  'Все записи рейсов будут безвозвратно удалены с этого компьютера и из облака. После синхронизации они исчезнут на других устройствах. Профиль, аэропорты и настройки сохранятся.':
+  'Все добавленные аэропорты и их статусы хабов будут безвозвратно удалены с этого компьютера и из облака. После синхронизации каталог очистится на других устройствах. Рейсы, профиль и настройки сохранятся. Названия аэропортов в старых рейсах останутся доступны.';
+ openDialog('<h2>'+tr(title)+'</h2><p>'+tr(warning)+'</p><p>'+tr('Перед очисткой можно сохранить резервную копию. Отменить действие будет невозможно.')+'</p>'+
+  '<label class="clear-confirm"><input type="checkbox" id="clearConsent">'+tr('Я понимаю последствия и подтверждаю удаление.')+'</label>'+
+  '<p id="clearStatus" role="status" aria-live="polite"></p><div class="controls"><button data-action="close" autofocus>'+tr('Отмена')+'</button>'+
+  '<button type="button" class="danger" id="confirmCollectionClear" disabled>'+tr(flights?'Удалить все рейсы':'Удалить все аэропорты')+'</button></div>');
+ const button=byId('confirmCollectionClear'),consent=byId('clearConsent');
+ consent.onchange=()=>button.disabled=!consent.checked;
+ button.onclick=async()=>{
+  if(!consent.checked)return;
+  const dialog=byId('dialog'),controls=[...dialog.querySelectorAll('button,input')];
+  if(!cloudSession||cloudBusy){byId('clearStatus').textContent=tr('Дождись завершения синхронизации.');return;}
+  controls.forEach(control=>control.disabled=true);
   const preventClose=event=>event.preventDefault();
   dialog.addEventListener('cancel',preventClose);
-  try {
-   await resetCloudProfile();
-   data.flights=[];data.preferences={...preferences(),profileName:''};storeProfilePhoto('');
-   pickTail(tail);save(false);dialog.close();render();
-   notice(tr('Рейсы и профиль очищены.'));
-  } catch(error) {
-   byId('resetStatus').textContent=cloudMessage(error.message);
-  } finally {
+  try{
+   await clearCloudCollection(kind);
+   if(flights)pickTail(tail);
+   else {airportCode='';airportListPage=0;airportCountryFilter='';query='';}
+   save(false);dialog.close();render();
+   notice(tr(flights?'Журнал очищен.':'Аэропорты очищены.'));
+  }catch(error){byId('clearStatus').textContent=cloudMessage(error.message);}
+  finally{
    dialog.removeEventListener('cancel',preventClose);
-   buttons.forEach(b=>b.disabled=false);
+   controls.forEach(control=>control.disabled=false);
+   button.disabled=!consent.checked;
   }
  };
 }

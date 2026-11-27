@@ -391,14 +391,29 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
           check(actualEditor.elements.atd.value==='00:45' && actualEditor.elements.atdDate.value==='28.11.2026','actual local/UTC date rollover');
           actualEditor.requestSubmit();
           check(current.std==='23:00' && current.atd==='00:45','actual editing preserves original schedule');
+          for(const [key] of stages){
+            editStage(key);
+            const stageEditor=byId('stageForm');
+            stageEditor.elements.localDate.value='28.11.2026';
+            stageEditor.elements.localTime.value='02:30';
+            stageEditor.elements.localTime.dispatchEvent(new Event('input',{bubbles:true}));
+            check(stageEditor.elements.date.value==='27.11.2026' && stageEditor.elements.time.value==='23:30','stage local to UTC rollover');
+            stageEditor.requestSubmit();
+            check(current.stages[key]==='2026-11-27T23:30:00Z','stage remains UTC in journal');
+          }
+          confirmCollectionClear('flights');
+          check(byId('confirmCollectionClear').disabled && !byId('clearConsent').checked,'clearing requires explicit consent');
+          byId('confirmCollectionClear').click();
+          check(data.flights.includes(current),'unconfirmed clearing leaves flights');
+          byId('dialog').close();
           data.flights.length=0;
           check(validBackup(data), 'empty backup');
           applyCloudCopy({airports: [], flights: [], profileName: ''});
           document.querySelector('[data-page=pilot]').click();
-          check(byId('cloudLogout') && !document.querySelector('[data-action=reset-profile]'), 'profile actions');
+          check(byId('cloudLogout') && !document.querySelector('[data-action=clear-journal]'), 'profile actions');
           document.querySelector('[data-action=settings]').click();
           const settings = byId('dialog');
-          check(!settings.querySelector('input') && settings.querySelector('[data-action=reset-profile]'), 'settings actions');
+          check(!settings.querySelector('input') && settings.querySelector('[data-action=clear-journal]'), 'settings actions');
           check(settings.querySelector('[data-action=update]')?.closest('fieldset')?.querySelector('legend')?.textContent==='Обновления', 'separate update settings');
           settings.close();
           document.querySelector('[data-action=profile-name]').click();

@@ -646,3 +646,30 @@ function editActualFlight(existing,divert=false,parent=null) {
   save();render();byId('dialog').close();
  };
 }
+
+function bindStageLocalTimes(form,code) {
+ const fields=form.elements;
+ const read=name=>fields[name].matches('[data-flight-date]')?parseDisplayDate(fields[name].value.trim()):parseFlightTime(fields[name].value);
+ const sync=event=>{
+  const supported=validAirportTimezone(airportInfo(code)?.timezone);
+  fields.localDate.disabled=fields.localTime.disabled=!supported;
+  fields.localTime.setCustomValidity('');
+  if(['localDate','localTime'].includes(event?.target.name)){
+   const stamp=localToUTC(code,read('localDate'),read('localTime'),clockOn(read('date'),read('time')))[0];
+   if(!Number.isFinite(stamp)){
+    fields.localTime.setCustomValidity(tr('Не удалось определить время. Проверь дату и часовой пояс.'));
+    return;
+   }
+   const utc=new Date(stamp).toISOString();
+   fields.date.value=displayDate(utc.slice(0,10));fields.time.value=utc.slice(11,16);
+  }else{
+   const local=airportLocalStamp(code,clockOn(read('date'),read('time')));
+   fields.localDate.value=local?displayDate(local.slice(0,10)):'';
+   fields.localTime.value=local.slice(11);
+  }
+ };
+ form.addEventListener('input',sync);
+ form.addEventListener('change',sync);
+ sync();
+ return sync;
+}

@@ -301,3 +301,22 @@ function flightRouteSummary(f) {
   (isDiversion(f)?'<p class="route-stop-label">'+tr('Уход на запасной')+' · '+esc(alternate(f))+
    (leg!==f&&leg.dep===alternate(f)?' → '+esc(f.arr):'')+'</p>':'');
 }
+
+function hubLevel(a) {
+ const level=Number(a?.hubLevel);
+ return level===1||level===2?level:0;
+}
+function hubLabel(a) {
+ const level=hubLevel(a);
+ return level?tr(level===1?'Хаб первого уровня':'Хаб второго уровня'):'';
+}
+function compareAirports(left,right) {
+ const a=typeof left==='string'?airport(left)||{icao:left}:left;
+ const b=typeof right==='string'?airport(right)||{icao:right}:right;
+ return (hubLevel(a)||3)-(hubLevel(b)||3)||a.icao.localeCompare(b.icao,'en');
+}
+function orderedAirports(rows=data.airports) { return [...rows].sort(compareAirports); }
+function hubBadge(a) {
+ const level=hubLevel(a);
+ return level?'<span class="hub-badge hub-'+level+'" title="'+hubLabel(a)+'">'+tr('Хаб')+' '+level+'</span>':'';
+}

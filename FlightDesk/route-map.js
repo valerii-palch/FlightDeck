@@ -1,18 +1,18 @@
 const airportReference = JSON.parse(byId('airport-reference').textContent);
 const worldwideAirports=JSON.parse(byId('worldwide-airports').textContent);
-const airportIata = code => [airportReference[code]?.iata,worldwideAirports[code]?.iata,airport(code)?.iata]
+const airportIata = code => [airportReference[code]?.iata,worldwideAirports[code]?.iata,airport(code)?.iata,data.airportHistory?.[code]?.iata]
  .find(value=>typeof value==='string'&&/^[A-Z]{3}$/.test(value))||'';
 const airportInfo = code => {
- const entry=airport(code), base=airportReference[code], world=worldwideAirports[code];
+ const entry=airport(code)||data.airportHistory?.[code], base=airportReference[code], world=worldwideAirports[code];
  return entry||base||world?{...world,...base,...entry,iata:airportIata(code)}:undefined;
 };
 const airportCity = code => {
  const info = airportInfo(code);
- return (appLanguage()==='en'?info?.cityEn:info?.cityRu)||info?.cityRu||info?.cityEn||airport(code)?.name||code;
+ return (appLanguage()==='en'?info?.cityEn:info?.cityRu)||info?.cityRu||info?.cityEn||info?.name||code;
 };
 const airportName = code => {
  const info = airportInfo(code);
- return (appLanguage()==='en'?info?.nameEn:info?.nameRu)||info?.nameRu||info?.nameEn||airport(code)?.name||code;
+ return (appLanguage()==='en'?info?.nameEn:info?.nameRu)||info?.nameRu||info?.nameEn||info?.name||code;
 };
 const hasCoordinates = info => Number.isFinite(info?.lat)&&Math.abs(info.lat)<=90&&Number.isFinite(info.lon)&&Math.abs(info.lon)<=180;
 let selectedMapAirport = '';
@@ -115,7 +115,7 @@ function mapAirportSummary(code) {
 function routeMap() {
  const {routes,unmapped} = completedRoutes(summaryFlights());
  if (!routes.length) return `<section class="panel facts route-map"><h2>${tr("Карта перелетов")}</h2><p class="muted">${tr("Пока нет выполненных перелетов с известными аэропортами.")}</p></section>`;
- const codes = [...new Set(routes.flatMap(r=>r.codes))].sort();
+ const codes = [...new Set(routes.flatMap(r=>r.codes))].sort(compareAirports);
  if (!codes.includes(selectedMapAirport)) selectedMapAirport = codes.includes('UUEE')?'UUEE':codes[0];
  const paths = routes.map(r=>greatCircle(...r.codes.map(airportInfo)));
  const chart = routeProjection(paths.flat());
@@ -138,11 +138,11 @@ function routeMap() {
  const markers = codes.map(code=>{
   const info = airportInfo(code);
   const [x,y] = point(info);
-  return '<g data-map-airport="'+code+'" class="map-airport'+(code===selectedMapAirport?' selected':'')+'" transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+')"><title>'+code+' · '+esc(airportCity(code))+'</title><circle r="10" class="map-hit"/><circle r="'+(code==='UUEE'?5:3.3)+'" class="map-point"/></g>';
+  return '<g data-map-airport="'+code+'" class="map-airport hub-'+hubLevel(airport(code))+(code===selectedMapAirport?' selected':'')+'" transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+')"><title>'+code+' · '+esc(airportCity(code))+'</title><circle r="10" class="map-hit"/><circle r="'+(hubLevel(airport(code))?5:3.3)+'" class="map-point"/></g>';
  }).join('');
  return `<section class="panel facts route-map"><div class="row map-heading"><h2>${tr("Карта перелетов")}</h2><small>`+codes.length+` ${tr("аэродромов ·")} `+routes.length+` ${tr("направлений")}</small></div>`+
  '<p id="mapProviderStatus" class="map-provider muted"></p><div id="onlineMap" class="online-map"></div><svg id="offlineMap" class="map-chart" viewBox="0 0 '+chart.width+' '+chart.height+`" role="img" aria-label="${tr("Карта аэропортов и выполненных перелетов")}"><g class="map-land">`+coastlines(chart)+'</g><g class="map-grid">'+grid.map(g=>'<polyline points="'+g+'"/>').join('')+'</g><g class="map-lines">'+lines+'</g>'+markers+'</svg>'+
- `<div class="map-footer"><label>${tr("Аэропорт")}<select id="mapAirport">`+codes.map(code=>option(code,code+' · '+airportCity(code),selectedMapAirport)).join('')+'</select></label><p class="map-airport-summary" id="mapAirportSummary">'+mapAirportSummary(selectedMapAirport)+'</p><a class="map-link" id="yandexAirportLink" href="'+esc(yandexAirportURL(selectedMapAirport))+`" target="_blank" rel="noopener noreferrer">${tr("Открыть в Яндекс Картах ↗")}</a></div>`+
+ `<div class="map-footer"><label>${tr("Аэропорт")}<select id="mapAirport">`+codes.map(code=>option(code,(hubLabel(airport(code))?hubLabel(airport(code))+' · ':'')+code+' · '+airportCity(code),selectedMapAirport)).join('')+'</select></label><p class="map-airport-summary" id="mapAirportSummary">'+mapAirportSummary(selectedMapAirport)+'</p><a class="map-link" id="yandexAirportLink" href="'+esc(yandexAirportURL(selectedMapAirport))+`" target="_blank" rel="noopener noreferrer">${tr("Открыть в Яндекс Картах ↗")}</a></div>`+
  `<small class="map-note">${tr("Дуги соединяют аэропорты по журналу. Фактические траектории не записываются.")}`+(unmapped?` ${tr("Перелетов без подтвержденных аэропортов:")} `+unmapped+'.':'')+'</small></section>';
 }
 
@@ -166,7 +166,7 @@ function selectMapAirport(code, pan=true) {
 }
 
 function catalogAirportMap(){
- const codes=data.airports.map(a=>a.icao).filter(code=>hasCoordinates(airportInfo(code)));
+ const codes=orderedAirports().map(a=>a.icao).filter(code=>hasCoordinates(airportInfo(code)));
  if(!codes.length)return '';
  const chart=routeProjection(codes.map(airportInfo));
  return `<section class="panel airport-catalog-map"><div class="row map-heading"><h2>${tr('Карта аэропортов')}</h2><small id="mapProviderStatus"></small></div>
@@ -174,7 +174,7 @@ function catalogAirportMap(){
   <svg id="offlineMap" class="map-chart" viewBox="0 0 ${chart.width} ${chart.height}" role="group" aria-label="${tr('Карта аэропортов')}">
   <g class="map-land">${coastlines(chart)}</g>${codes.map(code=>{
    const info=airportInfo(code), [x,y]=chart.project({...info,lon:wrapLon(info.lon,chart.centerLon)});
-   return `<g class="catalog-pin" role="button" tabindex="0" data-catalog-pin="${esc(code)}" aria-label="${esc(code+' · '+airportCity(code))}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">
+   return `<g class="catalog-pin hub-${hubLevel(airport(code))}" role="button" tabindex="0" data-catalog-pin="${esc(code)}" aria-label="${esc(code+' · '+airportCity(code))}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">
     <title>${esc(code+' · '+airportCity(code))}</title><path d="M0 0C-2-4-7-7-7-12a7 7 0 1 1 14 0C7-7 2-4 0 0Z"/><circle cy="-12" r="2.5"/></g>`;
   }).join('')}</svg></section>`;
 }

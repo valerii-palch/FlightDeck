@@ -32,7 +32,7 @@ function editSettings(anchor = null) {
  openDialog(`<header class="settings-header"><h2 id="settingsTitle" tabindex="-1" autofocus>${tr("Настройки")}</h2><button class="icon-button" data-action="close" aria-label="${tr("Закрыть настройки")}">`+toolbarIcon('close')+'</button></header>'+
  '<div class="settings-layout settings-flyout">'+
  section('Приложение',[['tour','Повторить обучение'],['feedback','Обратная связь']])+
- section('Журнал',[['backup','Резервная копия'],['reset-profile','Сбросить рейсы и профиль']])+
+ section('Журнал',[['backup','Резервная копия'],['clear-journal','Очистить журнал'],['clear-airports','Очистить аэропорты']])+
  section('Обновления',[['update','Обновить приложение']])+'</div>','settings',anchor);
 }
 
@@ -66,6 +66,7 @@ function openAirportCard(code){
   <button type="button" data-action="close" class="icon-button" aria-label="${tr('Закрыть')}">${toolbarIcon('close')}</button></header>
  <p class="muted">${esc(airportName(code))}</p>
  <form id="airportCardForm" class="editor stack">
+  <label>${tr('Статус хаба')}<select name="hubLevel">${[[0,'Не является хабом'],[1,'Хаб первого уровня'],[2,'Хаб второго уровня']].map(([level,label])=>option(String(level),tr(label),String(hubLevel(a)))).join('')}</select></label>
   <label>${tr('Код IATA')}<input value="${esc(airportIata(code))}" placeholder="—" readonly></label>
   ${flags.map(([key,label])=>`<label class="switch-row"><span><strong>${tr(label)}</strong></span>
    <input type="checkbox" role="switch" name="${key}"${a[key]?' checked':''}><span class="switch-track" aria-hidden="true"></span></label>`).join('')}
@@ -78,6 +79,7 @@ function openAirportCard(code){
   event.preventDefault();
   const current=airport(code);
   if(!current){byId('dialog').close();return;}
+  current.hubLevel=Number(form.elements.hubLevel.value)||0;
   for(const [key] of flags)current[key]=form.elements[key].checked;
   current.stands??={};
   for(const [key] of parking)current.stands[key]=form.elements[key].value.trim();
@@ -100,7 +102,7 @@ function addAirport() {
  <label class="airport-directory">${tr('Мировой справочник')}<input id="airportDirectoryQuery" type="search" autocomplete="off" placeholder="${tr('ICAO, IATA или город')}"></label>
  <div class="airport-directory-results" id="airportDirectoryResults"></div><form id="airportForm" class="editor two">`+
  '<label>ICAO<input name="icao" required minlength="4" maxlength="4" pattern="[A-Za-z]{4}"></label>'+
- '<label>IATA<input name="iata" readonly placeholder="—"></label>'+
+ '<label>IATA<input name="iata" readonly placeholder="—"></label><label>'+tr('Статус хаба')+'<select name="hubLevel">'+[[0,'Не является хабом'],[1,'Хаб первого уровня'],[2,'Хаб второго уровня']].map(([level,label])=>option(String(level),tr(label),'0')).join('')+'</select></label>'+
  `<label>${tr("Город на русском")}<input name="cityRu" required maxlength="100"></label><label>${tr("Город на английском")}<input name="cityEn" maxlength="100"></label>`+
  `<label>${tr("Название на русском")}<input name="nameRu" required maxlength="160"></label><label>${tr("Название на английском")}<input name="nameEn" maxlength="160"></label>`+
  `<label>${tr("Страна или территория")}<select name="countryCode" required>`+countries.map(code=>option(code,countryName(code),airportCountryFilter)).join('')+'</select></label>'+
@@ -125,7 +127,7 @@ function addAirport() {
    if(score<3)matches.push({code,info,score});
   }
   results.replaceChildren();
-  for(const {code,info} of matches.sort((a,b)=>a.score-b.score).slice(0,12)){
+  for(const {code,info} of matches.sort((a,b)=>(hubLevel(airport(a.code))||3)-(hubLevel(airport(b.code))||3)||a.score-b.score).slice(0,12)){
    const button=document.createElement('button');
    button.type='button';
    button.textContent=[code,airportIata(code),airportCity(code),airportName(code)].filter(Boolean).join(' · ');
@@ -163,10 +165,10 @@ function addAirport() {
   const invalid=Object.keys(errors).find(k=>errors[k]);
   if(invalid){form.elements[invalid].setCustomValidity(errors[invalid]);form.reportValidity();return;}
   const {cityRu,cityEn,nameRu,nameEn,countryCode,continent,developer,version,timezone}=values;
-  data.airports.push({icao,iata,name:nameRu,country:displayCountries.ru.of(countryCode),countryCode,continent,
+  data.airports.push({icao,iata,hubLevel:Number(values.hubLevel)||0,name:nameRu,country:displayCountries.ru.of(countryCode),countryCode,continent,
    cityRu,cityEn,nameRu,nameEn,lat:values.lat===''?null:Number(values.lat),lon:values.lon===''?null:Number(values.lon),
    developer,version,timezone:timezone||undefined,custom:true,scenery:false,gsx:false,python:false,stands:{narrow:'',wide:''}});
-  airportCode=icao;airportCountryFilter=countryCode;query='';airportFilter='all';regionFilter='all';airportListPage=Math.ceil(filteredAirports().length/airportPageSize)-1;
+  airportCode=icao;airportCountryFilter=countryCode;query='';airportFilter='all';regionFilter='all';airportListPage=Math.max(0,Math.floor(filteredAirports().findIndex(a=>a.icao===icao)/airportPageSize));
   save();byId('dialog').close();render();
  };
 }
@@ -302,10 +304,10 @@ function travelAchievements(rows) {
 
 function achievementPanel() {
  const {countries,continents}=travelAchievements(summaryFlights());
- const tile=(title,mark,date)=>'<article class="achievement'+(date?' earned':'')+'"><span class="achievement-mark" aria-hidden="true">'+esc(mark)+'</span><div><strong>'+esc(title)+'</strong><small>'+(date?displayDate(date):tr("Еще не посещен"))+'</small></div></article>';
+ const tile=(title,mark,date)=>'<article class="achievement'+(date?' earned':'')+'"><span class="achievement-mark" aria-hidden="true">'+mark+'</span><div><strong>'+esc(title)+'</strong><small>'+(date?displayDate(date):tr("Еще не посещен"))+'</small></div></article>';
  const flag=code=>[...code].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join('');
  return `<section class="panel facts"><h2>${tr("Достижения")}</h2><h3>${tr("Континенты ·")} `+continents.size+' / '+Object.keys(countryGroups).length+'</h3>'+
- '<div class="achievement-grid">'+Object.keys(countryGroups).map(r=>tile(tr(r),'✦',continents.get(r))).join('')+'</div>'+
+ '<div class="achievement-grid">'+Object.keys(countryGroups).map((r,index)=>tile(tr(r),achievementIcon(index),continents.get(r))).join('')+'</div>'+
  `<h3 class="facts">${tr("Страны и территории ·")} `+countries.size+' / '+countryContinents.size+'</h3>'+
  (countries.size?'<div class="achievement-grid">'+[...countries].sort(([a],[b])=>countryName(a).localeCompare(countryName(b),appLanguage())).map(([c,date])=>tile(`${tr("Посетил:")} `+countryName(c),flag(c),date)).join('')+'</div>':`<p class="muted">${tr("Достижения появятся после прибытия в пункт назначения.")}</p>`)+'</section>';
 }
@@ -378,7 +380,7 @@ function initializeYandexFrame(payload) {
   }));
   for(const [code,coordinates] of Object.entries(payload.points)){
    const marker=document.createElement('button');
-   marker.type='button';marker.className='airport-dot '+(code==='UUEE'?'hub':'');
+   marker.type='button';marker.className='airport-dot '+(payload.hubs?.[code]?'hub hub-'+payload.hubs[code]:'');
    marker.title=code;marker.setAttribute('aria-label',code);
    marker.onclick=()=>send({airport:code});
    map.addChild(new YMapMarker({coordinates},marker));
@@ -392,11 +394,11 @@ function initializeYandexFrame(payload) {
   map.panes.get('ground')?.getElement().style.setProperty('filter','invert(1) hue-rotate(180deg) saturate(.65)');
   map.behaviors.disable('scrollZoom');
   const normalDot=ymaps.templateLayoutFactory.createClass('<span class="airport-dot legacy"></span>');
-  const hubDot=ymaps.templateLayoutFactory.createClass('<span class="airport-dot legacy hub"></span>');
+  const hubDots=Object.fromEntries([1,2].map(level=>[level,ymaps.templateLayoutFactory.createClass('<span class="airport-dot legacy hub hub-'+level+'"></span>')]));
   const toV2=([lon,lat])=>[lat,lon];
   for(const [code,point] of Object.entries(payload.points)){
    const marker=new ymaps.Placemark(toV2(point),{hintContent:code},{
-    iconLayout:code==='UUEE'?hubDot:normalDot,iconShape:{type:'Circle',coordinates:[0,0],radius:12}
+    iconLayout:hubDots[payload.hubs?.[code]]||normalDot,iconShape:{type:'Circle',coordinates:[0,0],radius:12}
    });
    marker.events.add('click',()=>send({airport:code}));
    map.geoObjects.add(marker);
@@ -425,7 +427,7 @@ function mountYandexMap() {
  const status=byId('mapProviderStatus'), fallback=byId('offlineMap');
  const catalog=target.hasAttribute('data-catalog-map');
  const routes=catalog?[]:completedRoutes(summaryFlights()).routes;
- const codes=catalog?data.airports.map(a=>a.icao).filter(code=>hasCoordinates(airportInfo(code))):
+ const codes=catalog?orderedAirports().map(a=>a.icao).filter(code=>hasCoordinates(airportInfo(code))):
   [...new Set(routes.flatMap(r=>r.codes))];
  if(!codes.length)return;
  const points=Object.fromEntries(codes.map(code=>{
@@ -459,7 +461,7 @@ function mountYandexMap() {
  }
  function load(attempt){
   version=attempt;
-  const payload=JSON.stringify({points,paths,curves,key:mapsKey,version,catalog,locale:appLanguage()==='ru'?'ru_RU':'en_US'}).replace(/</g,'\\u003c');
+  const payload=JSON.stringify({points,paths,curves,hubs:Object.fromEntries(codes.map(code=>[code,hubLevel(airport(code))])),key:mapsKey,version,catalog,locale:appLanguage()==='ru'?'ru_RU':'en_US'}).replace(/</g,'\\u003c');
   const colors='#101822;color:#e3f1ff';
   const computed=getComputedStyle(document.body);
   const accent=computed.getPropertyValue('--accent-chip').trim()||'#434e82';
@@ -469,7 +471,7 @@ function mountYandexMap() {
   frame.setAttribute('sandbox','allow-scripts allow-popups');
   frame.srcdoc='<!doctype html><meta charset=utf-8><style>html,body,#map{width:100%;height:100%;margin:0;background:'+colors+'}'+
    '.airport-dot{display:block;width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #bde6ff;background:#4ba4e7;box-shadow:0 0 0 2px #1c4d8b88;transform:translate(-50%,-50%);cursor:pointer;box-sizing:border-box}'+
-   '.airport-dot.hub{width:17px;height:17px;background:#82dded}.airport-dot.legacy{pointer-events:none}'+
+   '.airport-dot.hub{width:17px;height:17px}.airport-dot.hub-1{background:#e6b65e}.airport-dot.hub-2{background:#60b5e6}.airport-dot.legacy{pointer-events:none}'+
    (catalog?'.airport-dot{width:20px;height:20px;border-color:rgb('+light+');background:'+accent+';border-radius:52% 52% 52% 2px;transform:translate(-50%,-86%) rotate(-45deg)}'+
    '.airport-dot::after{content:"";position:absolute;inset:5px;background:#f3f7ff;border-radius:50%}.airport-dot:is(:hover,:focus-visible){background:rgb('+light+')}':'')+
    '.map-zoom{position:absolute;z-index:1000;top:12px;left:12px;display:grid;gap:4px}'+
@@ -588,3 +590,16 @@ byId('dialog').addEventListener('click',event=>{
 byId('dialog').addEventListener('cancel',event=>{
  if(event.currentTarget.dataset.layout==='settings'){event.preventDefault();closeSettings();}
 });
+
+function achievementIcon(index) {
+ const drawings=[
+  '<path d="M3 9 12 3l9 6M4 10h16M5 20h14M7 11v7m5-7v7m5-7v7M3 21h18"/>',
+  '<path d="M3 17h18M4 21h16M7 15a5 5 0 0 1 10 0M12 3v4M3 9l3 2m15-2-3 2"/>',
+  '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>',
+  '<path d="m2 20 7-14 5 9 3-6 5 11ZM6 12l3 2 3-2"/>',
+  '<path d="M5 20C-1 9 10 3 21 3c0 12-4 19-13 15M4 21 17 8"/>',
+  '<path d="M2 6q3-4 6 0t6 0 8 0M2 12q3-4 6 0t6 0 8 0M2 18q3-4 6 0t6 0 8 0"/>',
+  '<path d="M12 2v20M3 7l18 10M3 17 21 7M8 4l4 3 4-3M8 20l4-3 4 3M3 11l4-1-1-4m15 7-4 1 1 4M3 13l4 1-1 4m15-7-4-1 1-4"/>'
+ ];
+ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+drawings[index%drawings.length]+'</svg>';
+}

@@ -35,3 +35,16 @@ test('UTC/local conversion preserves dates and handles DST gaps and overlap',()=
  assert.equal(context.utc('KJFK','2026-11-01','01:30').length,2);
  assert.equal(context.local('UNKNOWN',stamp),'');
 });
+test('hubs sort by level and then ICAO without mutating the catalog',()=>{
+ const c=vm.createContext({});
+ vm.runInContext(readFileSync(join(__dirname,'../FlightDesk/views.js'),'utf8')+`
+  const data={airports:[{icao:'AAAA'},{icao:'ZZZZ',hubLevel:1},{icao:'CCCC',hubLevel:2},{icao:'BBBB',hubLevel:1}]};
+  const airport=code=>data.airports.find(a=>a.icao===code);
+  globalThis.sorted=orderedAirports().map(a=>a.icao);
+  globalThis.initial=data.airports.map(a=>a.icao);
+  globalThis.codes=['AAAA','CCCC','ZZZZ','BBBB'].sort(compareAirports);
+ `,c);
+ assert.deepEqual(Array.from(c.sorted),['BBBB','ZZZZ','CCCC','AAAA']);
+ assert.deepEqual(Array.from(c.codes),Array.from(c.sorted));
+ assert.deepEqual(Array.from(c.initial),['AAAA','ZZZZ','CCCC','BBBB']);
+});

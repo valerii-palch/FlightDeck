@@ -1,3 +1,16 @@
+function cleanAirportHistory(value) {
+ if(!value||typeof value!=='object'||Array.isArray(value))return {};
+ const fields=['name','cityRu','cityEn','nameRu','nameEn','iata','country','countryCode','continent','timezone','lat','lon'];
+ return Object.fromEntries(Object.entries(value).filter(([code,a])=>/^[A-Z]{4}$/.test(code)&&a&&typeof a.name==='string').map(([code,a])=>[
+  code,Object.fromEntries(fields.filter(key=>typeof a[key]==='string'||typeof a[key]==='number').map(key=>[key,a[key]]))
+ ]));
+}
+function archiveFlightAirports(journal) {
+ const codes=new Set(journal.flights.flatMap(f=>[f.dep,f.arr,f.diversionAirport||f.note?.match(/Запасной аэропорт\s+([A-Z]{4})/i)?.[1]?.toUpperCase()]));
+ const records={...cleanAirportHistory(journal.airportHistory),...Object.fromEntries(journal.airports.filter(a=>codes.has(a.icao)).map(a=>[a.icao,a]))};
+ return cleanAirportHistory(Object.fromEntries(Object.entries(records).filter(([code])=>codes.has(code))));
+}
+
 const cloudURL='https://dntuchblnbpxgvdggapw.supabase.co';
 const cloudKey='sb_publishable_2G0lwSIutKWV7bS6ry72mg_x_B5EsYt';
 let cloudSession=null, cloudBase=null, cloudRemoteBase=null, cloudBusy=false, cloudStatus='', cloudConflict=null;
@@ -185,7 +198,7 @@ function rememberCloudCheckpoint(){
 
 const cloudSnapshot=()=>{
  const photo=preferences().profilePhotos?.[profilePhotoOwner()];
- return JSON.parse(JSON.stringify({flights:data.flights,airports:data.airports,profileName:preferences().profileName,profilePhoto:validProfilePhoto(photo)?photo:''}));
+ return JSON.parse(JSON.stringify({flights:data.flights,airports:data.airports,airportHistory:cleanAirportHistory(data.airportHistory),profileName:preferences().profileName,profilePhoto:validProfilePhoto(photo)?photo:''}));
 };
 function cloudCanonical(value){
  if(Array.isArray(value)) return value.map(cloudCanonical);
@@ -196,7 +209,7 @@ const cloudSame=(a,b)=>JSON.stringify(cloudCanonical(a))===JSON.stringify(cloudC
 
 function applyCloudCopy(copy){
  if(!validBackup(copy)) throw Error('Формат облачного журнала не поддерживается.');
- data={...data,...JSON.parse(JSON.stringify({flights:copy.flights,airports:copy.airports}))};
+ data={...data,...JSON.parse(JSON.stringify({flights:copy.flights,airports:copy.airports,airportHistory:cleanAirportHistory(copy.airportHistory)}))};
  if(typeof copy.profileName==='string') data.preferences={...preferences(),profileName:copy.profileName.trim().slice(0,80)};
  storeProfilePhoto(validProfilePhoto(copy.profilePhoto)?copy.profilePhoto:'');
  if(!airport(airportCode)) airportCode=data.airports[0]?.icao||'';
@@ -220,9 +233,9 @@ async function synchronizeCloud(choice='',expected,automatic=false){
   profileName:typeof remote.journal.profileName==='string'?remote.journal.profileName:local.profileName,
   profilePhoto:typeof remote.journal.profilePhoto==='string'?(validProfilePhoto(remote.journal.profilePhoto)?remote.journal.profilePhoto:''):local.profilePhoto}:null;
  // The logbook remains one unit. Each profile field can sync independently of a logbook conflict.
- const split=copy=>copy&&[{flights:copy.flights,airports:copy.airports},copy.profileName??'',copy.profilePhoto??''];
+ const split=copy=>copy&&[{flights:copy.flights,airports:copy.airports,airportHistory:cleanAirportHistory(copy.airportHistory)},copy.profileName??'',copy.profilePhoto??''];
  const join=([journal,profileName,profilePhoto])=>({...journal,profileName,profilePhoto});
- const empty=[{flights:[],airports:[]},'',''];
+ const empty=[{flights:[],airports:[],airportHistory:{}},'',''];
  const here=split(local), there=split(remoteJournal), prior=split(cloudBase), previousRemote=split(cloudRemoteBase);
  const merged=here.map((value,index)=>{
   if(choice==='upload'||!there||cloudSame(value,there[index]))return value;
@@ -266,31 +279,48 @@ function cloudMessage(message) {
  return tr(message);
 }
 
-async function resetCloudProfile() {
- if(!cloudSession||cloudBusy) throw Error('Дождись завершения синхронизации.');
+async function clearCloudCollection(kind) {
+ if(!['flights','airports'].includes(kind))throw Error('Неизвестный раздел.');
+ if(!cloudSession||cloudBusy)throw Error('Дождись завершения синхронизации.');
+ if(cloudConflict)throw Error('Сначала разреши конфликт синхронизации.');
+ const owner=cloudSession.user.id;
  clearTimeout(cloudTimer);
  cloudBusy=true;
  try {
+  const sync=await synchronizeCloud();
+  if(sync.remote){cloudConflict=sync;throw Error('Сначала разреши конфликт синхронизации.');}
+  if(cloudSession?.user.id!==owner)throw Error('Аккаунт изменился. Повтори действие.');
+  const local=cloudSnapshot();
   const token=await cloudToken();
-  const owner=cloudSession.user.id;
   const endpoint='/rest/v1/flightdeck_journals';
   const filter='?owner_id=eq.'+encodeURIComponent(owner);
   const [remote]=await cloudRequest(endpoint+filter+'&select=version,journal',{token});
-  if(remote&&!validBackup(remote.journal)) throw Error('Формат облачного журнала не поддерживается.');
-  const local={...cloudSnapshot(),flights:[],profileName:'',profilePhoto:''};
-  const journal={...local,airports:remote?.journal.airports??local.airports};
+  if(remote&&!validBackup(remote.journal))throw Error('Формат облачного журнала не поддерживается.');
+  const remoteCopy=remote?{flights:remote.journal.flights,airports:remote.journal.airports,
+   airportHistory:cleanAirportHistory(remote.journal.airportHistory),
+   profileName:remote.journal.profileName??local.profileName,profilePhoto:remote.journal.profilePhoto??local.profilePhoto}:null;
+  if(cloudSession?.user.id!==owner||!cloudSame(local,cloudSnapshot())||remoteCopy&&!cloudSame(local,remoteCopy))
+   throw Error('Журнал изменился. Подтверди очистку снова.');
+  const journal=kind==='flights'?{...local,flights:[]}:{...local,airports:[],airportHistory:archiveFlightAirports(local)};
   const body={journal,version:(remote?.version??0)+1};
   const updated=await cloudRequest(remote?endpoint+filter+'&version=eq.'+remote.version:endpoint,{
    token,method:remote?'PATCH':'POST',representation:true,
    body:remote?body:{...body,owner_id:owner}
   });
-  if(!updated?.length) throw Error('Журнал изменился. Подтверди сброс снова.');
-  cloudBase=local;cloudRemoteBase=journal;
+  if(!updated?.length)throw Error('Журнал изменился. Подтверди очистку снова.');
+  if(cloudSession?.user.id!==owner)throw Error('Аккаунт изменился. Повтори действие.');
+  cloudBase=journal;cloudRemoteBase=journal;
+  if(!cloudSame(local,cloudSnapshot())){
+   cloudConflict={version:body.version,local:cloudSnapshot(),remote:journal};
+   rememberCloudCheckpoint();
+   throw Error('Данные изменились во время очистки. Проверь облачный конфликт.');
+  }
+  applyCloudCopy(journal);
+  cloudConflict=null;
   rememberCloudCheckpoint();
-  cloudConflict=cloudSame(local,journal)?null:{version:body.version,local,remote:journal};
   cloudState='ready';
-  cloudStatus='Рейсы и профиль очищены.';
- } finally {cloudBusy=false;}
+  cloudStatus=kind==='flights'?'Журнал очищен.':'Аэропорты очищены.';
+ }finally{cloudBusy=false;}
 }
 
 function windowsCloudConflict({local,remote},disabled){

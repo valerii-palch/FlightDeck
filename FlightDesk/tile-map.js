@@ -115,9 +115,10 @@ function mountYandexTiles(target,fallback,status,{points,curves,catalog,onAirpor
   marker.className='tile-map-pin';
   marker.type='button';
   marker.dataset.tileAirport=code;
-  marker.title=code+' · '+airportCity(code);
+  marker.title=[code,airportCity(code),hubLabel(airport(code))].filter(Boolean).join(' · ');
   marker.setAttribute('aria-label',marker.title);
-  marker.classList.toggle('hub',code==='UUEE');
+  marker.classList.toggle('hub',!!hubLevel(airport(code)));
+  if(hubLevel(airport(code)))marker.classList.add('hub-'+hubLevel(airport(code)));
   marker.onclick=()=>onAirport(code);
   markers.set(code,marker);pins.append(marker);
  }
