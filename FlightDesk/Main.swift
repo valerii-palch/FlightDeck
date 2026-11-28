@@ -600,12 +600,47 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         """) { result, error in
             if let error { fputs("\(error)\n", stderr); exit(1) }
             print(result ?? "No test result")
-            if result != nil && ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" {
-                self.verifyBuiltMaps()
-                return
-            }
-            exit(result == nil ? 1 : 0)
+            guard result != nil else { exit(1) }
+            self.verifyLayout()
         }
+    }
+    private func verifyLayout(_ index: Int = 0) {
+        let themes = ["morning", "day", "evening", "night"]
+        guard index < 8 else {
+            if ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" { verifyBuiltMaps() }
+            else { exit(0) }
+            return
+        }
+        let width = index < 4 ? 1100 : 1400
+        window.contentMinSize = .zero
+        window.contentMaxSize = NSSize(width: 2000, height: 1400)
+        window.setContentSize(NSSize(width: width, height: index < 4 ? 760 : 900))
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        do {
+            let script = try String(contentsOf: root.appendingPathComponent("tests/layout-check.js"), encoding: .utf8)
+            webView.callAsyncJavaScript(script + "\nreturn await verifyFlightLayout(theme);", arguments: ["theme": themes[index % 4]], in: nil, in: .page) { result in
+                switch result {
+                case .failure(let error): fputs("\(error)\n", stderr); exit(1)
+                case .success(let value):
+                    print(value)
+                    self.webView.takeSnapshot(with: nil) { image, error in
+                        do {
+                            guard let image, let tiff = image.tiffRepresentation,
+                                  let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+                                throw error ?? NSError(domain: "FlightDeckSnapshot", code: 1)
+                            }
+                            let folder = root.appendingPathComponent("tests/ui-artifacts")
+                            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                            try png.write(to: folder.appendingPathComponent("mac-layout-\(themes[index % 4])-\(width).png"))
+                            self.webView.evaluateJavaScript("restoreFlightLayoutFixture()") { _, error in
+                                if let error { fputs("\(error)\n", stderr); exit(1) }
+                                self.verifyLayout(index + 1)
+                            }
+                        } catch { fputs("\(error)\n", stderr); exit(1) }
+                    }
+                }
+            }
+        } catch { fputs("\(error)\n", stderr); exit(1) }
     }
     private func verifyBuiltMaps() {
         webView.callAsyncJavaScript("""

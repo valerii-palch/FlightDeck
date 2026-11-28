@@ -28,8 +28,8 @@ FlightDeck помогает любителям авиасимуляторов в
 
 | Компьютер | Требования | Установщик |
 | --- | --- | --- |
-| Mac | macOS 13 или новее, Intel или Apple Silicon | FlightDeck-macOS-0.5.1.pkg |
-| Windows | Windows 10 или 11, x64 или ARM64 | FlightDeck-0.5.1-Windows-Setup.exe |
+| Mac | macOS 13 или новее, Intel или Apple Silicon | FlightDeck-macOS-0.5.2.pkg |
+| Windows | Windows 10 или 11, x64 или ARM64 | FlightDeck-0.5.2-Windows-Setup.exe |
 
 **На Mac** откройте файл .pkg и пройдите шаги установки. Приложение появится в папке «Программы».
 

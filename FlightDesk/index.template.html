@@ -188,7 +188,7 @@ const minute = 60000;
 const formatTime = (time,date) => {
  const value = new Date(time).toISOString();
  const delta = Math.round((Date.parse(value.slice(0,10))-Date.parse(date))/86400000);
- return '<span class="clock-stamp">'+value.slice(11,16)+(delta?'<small class="day-offset">'+(delta>0?'+':'')+delta+'</small>':'')+'</span>';
+ return '<span class="clock-stamp"><span class="clock-value">'+value.slice(11,16)+'</span>'+(delta?'<small class="day-offset">'+(delta>0?'+':'')+delta+'</small>':'')+'</span>';
 };
 function forecast(f) {
  if (!f.std || ['Вылетел','Выполнен','Отменен','Уход на запасной'].includes(f.status)) return '';

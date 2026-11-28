@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, rm, mkdir } = require('node:fs/promises');
+const { mkdtemp, rm, mkdir, readFile } = require('node:fs/promises');
 const { createRequire } = require('node:module');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
@@ -198,6 +198,18 @@ async function testApplication() {
       const colors=await page.locator('.dashboard-card').evaluateAll(cards=>cards.map(card=>getComputedStyle(card).getPropertyValue('--section-rgb').trim()));
       assert.equal(new Set(colors).size,1);
     }
+    await page.addScriptTag({content:await readFile(resolve(__dirname,'layout-check.js'),'utf8')});
+    const layoutWindow=await app.browserWindow(page);
+    const originalLayoutSize=await layoutWindow.evaluate(window=>window.getContentSize());
+    for(const size of [[1100,760],[1400,900]]) {
+      await layoutWindow.evaluate((window,size)=>window.setContentSize(...size),size);
+      for(const theme of ['morning','day','evening','night']) {
+        console.log(await page.evaluate(theme=>verifyFlightLayout(theme),theme));
+        await page.screenshot({path:resolve(__dirname,'ui-artifacts/layout-'+theme+'-'+size[0]+'.png')});
+        await page.evaluate(()=>restoreFlightLayoutFixture());
+      }
+    }
+    await layoutWindow.evaluate((window,size)=>window.setContentSize(...size),originalLayoutSize);
     await page.locator('.flight-open').click();
     await page.waitForTimeout(400);
     await page.screenshot({path:resolve(__dirname,'ui-artifacts/card.png')});

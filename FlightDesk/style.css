@@ -1778,19 +1778,27 @@ body .badge.diverted { background:#392d58; color:#d7c3ff; }
 body .badge.progress { background:#233e60; color:#bfdcff; }
 body .badge.late { background:#47351f; color:#ffdc9b; }
 body .badge.scheduled { background:var(--control-glass); color:rgb(var(--theme-rgb)); }
-.clock-stamp { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.day-offset { display:inline-block; font:600 10px/1.1 system-ui,sans-serif; padding:3px 5px; border:1px solid var(--glass-border); border-radius:6px; background:var(--control-glass); color:inherit; vertical-align:middle; }
-.flight-route-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; padding:20px 0 8px; }
-.route-summary-endpoint { display:flex; min-width:0; flex-direction:column; gap:7px; }
-.route-summary-endpoint:last-child { text-align:right; align-items:flex-end; }
-.route-summary-endpoint:last-child .flight-time-stack { justify-items:end; }
-.route-summary-endpoint>small { color:var(--muted); font-size:11px; }
-.route-summary-endpoint .flight-time-stack strong { font-size:clamp(25px,3vw,42px); font-weight:680; letter-spacing:-.04em; }
-.route-summary-endpoint .flight-time-stack del { font-size:15px; }
-.route-summary-endpoint .route-city { font-size:19px; font-weight:650; margin-top:9px; }
-.route-summary-endpoint .code { font-size:clamp(21px,2.5vw,32px); color:rgb(var(--theme-rgb)); }
+/* A shared set of rows keeps both endpoints aligned as text wraps. */
+.clock-stamp { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-variant-numeric:tabular-nums; vertical-align:middle; }
+body .clock-stamp>.day-offset { display:inline-flex; align-items:center; justify-content:center; flex:none; box-sizing:border-box; min-width:24px; height:20px; margin:0; padding:0 5px; font:600 10px/1 system-ui,sans-serif; letter-spacing:0; border:1px solid var(--glass-border); border-radius:6px; background:var(--control-glass); color:inherit; }
+del .clock-value { text-decoration-line:line-through; text-decoration-thickness:1.5px; }
+.flight-route-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:24px; row-gap:4px; padding:16px 0 8px; }
+.route-summary-endpoint,.route-summary-endpoint .flight-time-stack { display:contents; }
+.route-summary-endpoint>*,.route-summary-endpoint .flight-time-stack>* { grid-column:1; min-width:0; margin:0; align-self:start; justify-self:start; }
+.route-summary-endpoint:last-child { text-align:right; }
+.route-summary-endpoint:last-child>*,.route-summary-endpoint:last-child .flight-time-stack>* { grid-column:2; justify-self:end; }
+.route-summary-endpoint>small { color:var(--muted); font-size:11px; line-height:1.4; }
+.route-summary-endpoint>small:first-child { grid-row:1; }
+.route-summary-endpoint .flight-time-stack del { grid-row:2; font-size:15px; }
+.route-summary-endpoint .flight-time-stack strong { grid-row:3; font-size:clamp(25px,3vw,42px); font-weight:680; letter-spacing:-.04em; line-height:1.15; }
+.route-summary-endpoint .flight-time-stack>small { grid-row:4; color:var(--muted); }
+.route-summary-endpoint .route-local { grid-row:5; margin-top:4px; }
+.route-summary-endpoint .route-city { grid-row:6; font-size:19px; font-weight:650; line-height:1.2; margin-top:12px; }
+.route-summary-endpoint .code { grid-row:7; font-size:clamp(21px,2.5vw,32px); line-height:1.2; color:rgb(var(--theme-rgb)); }
+.route-summary-endpoint>small:last-child { grid-row:8; }
 .route-summary-endpoint .time.good { color:#9de6c4; }
 .route-summary-endpoint .time.late { color:#ffc0cc; }
+body .dashboard-grid>.dashboard-card { background:radial-gradient(ellipse at 90% 0,rgba(var(--theme-rgb),.16),transparent 65%),var(--glass-fill); border-color:var(--glass-border); backdrop-filter:blur(24px); }
 .route-stop-label { color:var(--muted); font-size:12px; text-align:center; }
 .flight-hero .flight-route .flight-endpoint { display:none; }
 .flight-hero .flight-route { display:block; margin-block:8px 20px; }
@@ -1806,15 +1814,8 @@ body .badge.scheduled { background:var(--control-glass); color:rgb(var(--theme-r
 dialog[data-layout="update"] { padding:26px; border-radius:24px; }
 dialog[data-layout="update"] .release-details { padding:18px; border:1px solid var(--glass-border); border-radius:16px; }
 @media(max-width:600px) { .flight-route-summary { gap:14px; }.actual-editor .flight-editor-fields { grid-template-columns:1fr; } }
-.route-summary-endpoint { display:grid; grid-template-rows:14px 84px 28px 44px 38px auto; align-content:start; gap:4px; }
-.route-summary-endpoint .flight-time-stack { align-content:start; margin:0; }
-.route-summary-endpoint .route-local { line-height:1.4; }
-.route-summary-endpoint .route-city { margin:0; line-height:1.2; align-self:end; }
-.route-summary-endpoint .code { align-self:center; }
-.route-summary-endpoint:last-child { justify-items:end; }
 @media(max-height:800px) {
- .flight-route-summary { padding-top:10px; gap:16px; }
- .route-summary-endpoint { grid-template-rows:14px 76px 28px 38px 32px auto; }
+ .flight-route-summary { padding-top:10px; column-gap:16px; }
  .route-summary-endpoint .flight-time-stack strong { font-size:30px; }
  .route-summary-endpoint .route-city { font-size:17px; }
  .route-summary-endpoint .code { font-size:25px; }
