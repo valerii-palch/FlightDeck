@@ -605,6 +605,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         }
     }
     private func verifyLayout(_ index: Int = 0) {
+        if index == 0 { window.orderFrontRegardless() }
         let themes = ["morning", "day", "evening", "night"]
         guard index < 8 else {
             if ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" { verifyBuiltMaps() }
