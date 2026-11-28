@@ -64,7 +64,7 @@ jobs:
             exit 1
           fi
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$((build + 1))"
-          sudo /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion $((build - 1))' "$app/Contents/Info.plist"
+          sudo /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $((build - 1))" "$app/Contents/Info.plist"
           sudo /usr/sbin/installer -pkg "$package" -target /
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$build"
@@ -128,6 +128,7 @@ jobs:
           $installedVersion = "$($installed.ProductMajorPart).$($installed.ProductMinorPart).$($installed.ProductBuildPart)"
           if ($installedVersion -ne $version) { throw "Expected FlightDeck $version, found $installedVersion" }
           npm install --no-save --no-audit --no-fund playwright-core@1.62.1
+          Get-Process -Name FlightDeck -ErrorAction SilentlyContinue | Stop-Process -Force
           $env:FLIGHTDECK_TEST_EXE = $exe
           $env:FLIGHTDECK_EXPECT_MAPS = '1'
           node ../tests/windows.cjs
