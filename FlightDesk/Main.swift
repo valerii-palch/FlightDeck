@@ -619,7 +619,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         do {
             let script = try String(contentsOf: root.appendingPathComponent("tests/layout-check.js"), encoding: .utf8)
-            webView.callAsyncJavaScript(script + "\nconst result = await verifyFlightLayout(theme); page = layoutPage; render(); await new Promise(resolve => setTimeout(resolve, 300)); return result;", arguments: ["theme": themes[index % 4], "layoutPage": index < 4 ? "home" : "center"], in: nil, in: .page) { result in
+            webView.callAsyncJavaScript(script + "\nconst result = await verifyFlightLayout(theme, captureIndex); page = layoutPage; render(); await new Promise(resolve => setTimeout(resolve, 300)); return result;", arguments: ["theme": themes[index % 4], "layoutPage": index < 4 ? "home" : "center", "captureIndex": [0, 1, 2, 6][index % 4]], in: nil, in: .page) { result in
                 switch result {
                 case .failure(let error): fputs("\(error)\n", stderr); exit(1)
                 case .success(let value):

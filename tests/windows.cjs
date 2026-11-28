@@ -204,7 +204,7 @@ async function testApplication() {
     for(const size of [[1100,760],[1400,900]]) {
       await layoutWindow.evaluate((window,size)=>window.setContentSize(...size),size);
       for(const theme of ['morning','day','evening','night']) {
-        console.log(await page.evaluate(theme=>verifyFlightLayout(theme),theme));
+        console.log(await page.evaluate(theme=>verifyFlightLayout(theme,({morning:0,day:1,evening:2,night:6})[theme]),theme));
         await page.screenshot({path:resolve(__dirname,'ui-artifacts/layout-'+theme+'-'+size[0]+'.png')});
         await page.evaluate(()=>restoreFlightLayoutFixture());
       }

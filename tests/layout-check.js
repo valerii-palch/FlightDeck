@@ -1,5 +1,5 @@
 // Runs in both native WebKit and Electron with synthetic flights only.
-async function verifyFlightLayout(theme) {
+async function verifyFlightLayout(theme, captureIndex=2) {
  const check=(ok,label)=>{if(!ok)throw new Error('Flight layout: '+label);};
  const near=(a,b)=>Math.abs(a-b)<1.1;
  updateDaylight=()=>{document.body.dataset.daylight=theme;};updateDaylight();
@@ -39,7 +39,7 @@ async function verifyFlightLayout(theme) {
   data.flights=[{...base,...extra}];tail=base.tail;selected=base.id;explicitAircraft=true;
   for(const section of ['home','center','journal']) {
    page=section;render();
-   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   await new Promise(resolve=>setTimeout(resolve,30));
    if(section!=='journal'&&document.querySelector('.flight-route-summary'))verify();
    else for(const value of document.querySelectorAll('.board-time del .clock-value'))check(getComputedStyle(value).textDecorationLine.includes('line-through'),'journal strike');
    if(section==='home') {
@@ -48,8 +48,8 @@ async function verifyFlightLayout(theme) {
    }
   }
  }
- // Leave a delayed overnight flight on screen for native screenshot inspection.
- data.flights=[{...base,...cases[2]}];page='home';render();
+ // Leave the requested flight status on screen for native screenshot inspection.
+ data.flights=[{...base,...cases[captureIndex]}];page='home';render();
  await new Promise(resolve=>setTimeout(resolve,2700));
  verify();
  window.restoreFlightLayoutFixture=()=>{data.flights=saved.flights;data.airports=saved.airports;page=saved.page;tail=saved.tail;selected=saved.selected;explicitAircraft=saved.explicitAircraft;render();};
