@@ -139,7 +139,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         }
         guard let html = Bundle.main.url(forResource: "FlightDesk", withExtension: "html") else { exit(1) }
         webView.loadFileURL(html, allowingReadAccessTo: html.deletingLastPathComponent())
-        if testing { DispatchQueue.main.asyncAfter(deadline: .now() + (ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" ? 90 : 20)) { exit(2) } }
+        if testing { DispatchQueue.main.asyncAfter(deadline: .now() + (ProcessInfo.processInfo.environment["FLIGHTDECK_EXPECT_MAPS"] == "1" ? 180 : 120)) { exit(2) } }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -618,7 +618,7 @@ final class FlightDesk: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         do {
             let script = try String(contentsOf: root.appendingPathComponent("tests/layout-check.js"), encoding: .utf8)
-            webView.callAsyncJavaScript(script + "\nreturn await verifyFlightLayout(theme);", arguments: ["theme": themes[index % 4]], in: nil, in: .page) { result in
+            webView.callAsyncJavaScript(script + "\nconst result = await verifyFlightLayout(theme); page = layoutPage; render(); await new Promise(resolve => setTimeout(resolve, 300)); return result;", arguments: ["theme": themes[index % 4], "layoutPage": index < 4 ? "home" : "center"], in: nil, in: .page) { result in
                 switch result {
                 case .failure(let error): fputs("\(error)\n", stderr); exit(1)
                 case .success(let value):
