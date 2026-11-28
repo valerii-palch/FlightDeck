@@ -1798,7 +1798,7 @@ del .clock-value { text-decoration-line:line-through; text-decoration-thickness:
 .route-summary-endpoint>small:last-child { grid-row:8; }
 .route-summary-endpoint .time.good { color:#9de6c4; }
 .route-summary-endpoint .time.late { color:#ffc0cc; }
-body .dashboard-grid>.dashboard-card { background:radial-gradient(ellipse at 90% 0,rgba(var(--theme-rgb),.16),transparent 65%),var(--glass-fill); border-color:var(--glass-border); backdrop-filter:blur(24px); }
+body .shell .dashboard-grid>.dashboard-card { background:radial-gradient(ellipse at 90% 0,rgba(var(--theme-rgb),.16),transparent 65%),var(--glass-fill); border-color:var(--glass-border); backdrop-filter:blur(24px); }
 .route-stop-label { color:var(--muted); font-size:12px; text-align:center; }
 .flight-hero .flight-route .flight-endpoint { display:none; }
 .flight-hero .flight-route { display:block; margin-block:8px 20px; }
